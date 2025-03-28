@@ -66,6 +66,12 @@ document.addEventListener('DOMContentLoaded', function() {
         exportToExcel();
     });
     
+    // 綁定匯出JSON按鈕點擊事件
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+    exportJsonBtn.addEventListener('click', function() {
+        exportToJSON();
+    });
+    
     // 綁定匯入Excel按鈕點擊事件
     importExcelBtn.addEventListener('click', function() {
         importExcelModal.style.display = 'block';
@@ -228,6 +234,31 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 生成Excel文件並下載
         XLSX.writeFile(workbook, '書籍清單.xlsx');
+    }
+    
+    // 導出為JSON文件
+    function exportToJSON() {
+        // 獲取所有書籍數據
+        const books = BookData.getAllBooks();
+        
+        // 創建Blob對象
+        const blob = new Blob([JSON.stringify(books, null, 2)], { type: 'application/json' });
+        
+        // 創建下載鏈接
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'books.json';
+        
+        // 觸發下載
+        document.body.appendChild(a);
+        a.click();
+        
+        // 清理
+        setTimeout(() => {
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }, 0);
     }
     
     // 匯入Excel功能

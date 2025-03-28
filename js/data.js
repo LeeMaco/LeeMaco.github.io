@@ -10,6 +10,9 @@ const BookData = {
         password: 'admin123'
     },
     
+    // 存儲從JSON文件加載的書籍數據
+    jsonBooks: [],
+    
     // 初始化數據
     init: function() {
         // 如果本地存儲中沒有書籍數據，則初始化一些示例數據
@@ -59,12 +62,41 @@ const BookData = {
         if (!localStorage.getItem('adminCredentials')) {
             localStorage.setItem('adminCredentials', JSON.stringify(this.adminCredentials));
         }
+        
+        // 從JSON文件加載書籍數據
+        this.loadBooksFromJSON();
     },
     
-    // 獲取所有書籍
+    // 從JSON文件加載書籍數據
+    loadBooksFromJSON: function() {
+        fetch('/data/books.json')
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('無法加載JSON文件: ' + response.statusText);
+                }
+                return response.json();
+            })
+            .then(data => {
+                console.log('從JSON文件加載了', data.length, '本書籍');
+                this.jsonBooks = data;
+            })
+            .catch(error => {
+                console.error('加載JSON書籍數據時發生錯誤:', error);
+                this.jsonBooks = [];
+            });
+    },
+    
+    // 獲取所有書籍（合併localStorage和JSON文件中的數據）
     getAllBooks: function() {
-        const books = localStorage.getItem('books');
-        return books ? JSON.parse(books) : [];
+        // 從localStorage獲取書籍
+        const localBooks = localStorage.getItem('books');
+        const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
+        
+        // 合併localStorage和JSON文件中的書籍，避免ID重複
+        const localBookIds = new Set(parsedLocalBooks.map(book => book.id));
+        const uniqueJsonBooks = this.jsonBooks.filter(book => !localBookIds.has(book.id));
+        
+        return [...parsedLocalBooks, ...uniqueJsonBooks];
     },
     
     // 根據ID獲取書籍
