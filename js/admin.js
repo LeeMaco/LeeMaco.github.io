@@ -16,16 +16,19 @@ document.addEventListener('DOMContentLoaded', function() {
     const addBookBtn = document.getElementById('addBookBtn');
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const importExcelBtn = document.getElementById('importExcelBtn');
+    const githubSettingsBtn = document.getElementById('githubSettingsBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const backToHomeBtn = document.getElementById('backToHomeBtn');
     const bookFormModal = document.getElementById('bookFormModal');
     const importExcelModal = document.getElementById('importExcelModal');
+    const githubSettingsModal = document.getElementById('githubSettingsModal');
     const deleteConfirmModal = document.getElementById('deleteConfirmModal');
     const bookForm = document.getElementById('bookForm');
     const importExcelForm = document.getElementById('importExcelForm');
+    const githubSettingsForm = document.getElementById('githubSettingsForm');
     const formTitle = document.getElementById('formTitle');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');}]}}],"name":"open_preview
     
     // 檢查DOM元素是否存在，如果不存在則輸出錯誤信息
     if (!importExcelModal || !importExcelForm) {
@@ -261,11 +264,108 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 0);
     }
     
+    // GitHub API相關功能
+    async function uploadToGitHub(content, fileName = 'books.json') {
+        try {
+            const statusElement = document.getElementById('uploadStatus');
+            if (statusElement) {
+                statusElement.textContent = '正在上傳到GitHub...';
+                statusElement.style.color = '#3498db';
+            }
+            
+            // 獲取GitHub個人訪問令牌
+            const token = localStorage.getItem('githubToken');
+            if (!token) {
+                throw new Error('未設置GitHub訪問令牌，請在設置中配置');
+            }
+            
+            // 獲取GitHub倉庫信息
+            const repo = localStorage.getItem('githubRepo') || '';
+            const [owner, repoName] = repo.split('/');
+            if (!owner || !repoName) {
+                throw new Error('GitHub倉庫格式不正確，應為 "用戶名/倉庫名"');
+            }
+            
+            // 獲取分支名稱
+            const branch = localStorage.getItem('githubBranch') || 'main';
+            
+            // 檢查文件是否已存在，獲取SHA
+            let fileSha = '';
+            try {
+                const checkResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3+json'
+                    }
+                });
+                
+                if (checkResponse.status === 200) {
+                    const fileData = await checkResponse.json();
+                    fileSha = fileData.sha;
+                }
+            } catch (error) {
+                console.log('文件不存在，將創建新文件');
+            }
+            
+            // 準備上傳數據
+            const uploadData = {
+                message: `更新書籍數據 - ${new Date().toLocaleString()}`,
+                content: btoa(unescape(encodeURIComponent(content))),
+                branch: branch
+            };
+            
+            // 如果文件已存在，添加SHA
+            if (fileSha) {
+                uploadData.sha = fileSha;
+            }
+            
+            // 上傳到GitHub
+            const response = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
+                method: 'PUT',
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/vnd.github.v3+json'
+                },
+                body: JSON.stringify(uploadData)
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
+            }
+            
+            const result = await response.json();
+            console.log('上傳成功:', result);
+            
+            if (statusElement) {
+                statusElement.textContent = '上傳成功！';
+                statusElement.style.color = '#2ecc71';
+                setTimeout(() => {
+                    statusElement.textContent = '';
+                }, 5000);
+            }
+            
+            return result;
+        } catch (error) {
+            console.error('上傳到GitHub時發生錯誤:', error);
+            
+            const statusElement = document.getElementById('uploadStatus');
+            if (statusElement) {
+                statusElement.textContent = `上傳失敗: ${error.message}`;
+                statusElement.style.color = '#e74c3c';
+            }
+            
+            throw error;
+        }
+    }
+    
     // 匯入Excel功能
     function importFromExcel() {
         console.log('開始匯入Excel文件');
         const fileInput = document.getElementById('excelFile');
         const file = fileInput.files[0];
+        const autoUpload = document.getElementById('autoUpload') ? document.getElementById('autoUpload').checked : false;
         
         if (!file) {
             alert('請選擇Excel文件');
@@ -323,10 +423,12 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 處理匯入的數據
                 let importCount = 0;
+                const books = [];
                 jsonData.forEach((row, index) => {
                     // 檢查必要欄位
                     if (row['書名'] && row['作者']) {
                         const bookData = {
+                            id: Date.now().toString() + index, // 確保ID唯一
                             title: row['書名'],
                             author: row['作者'],
                             series: row['集數'] || '',
@@ -340,6 +442,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         
                         // 添加書籍
                         BookData.addBook(bookData);
+                        books.push(bookData);
                         importCount++;
                     } else {
                         console.warn(`第${index+1}行數據缺少必要欄位:`, JSON.stringify(row));
@@ -351,11 +454,24 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 重新加載書籍列表
                 loadBooks();
                 
+                // 如果啟用了自動上傳，則上傳到GitHub
+                if (autoUpload) {
+                    const jsonContent = JSON.stringify(books, null, 2);
+                    uploadToGitHub(jsonContent)
+                        .then(() => {
+                            console.log('自動上傳成功');
+                        })
+                        .catch(error => {
+                            console.error('自動上傳失敗:', error);
+                            alert(`自動上傳失敗: ${error.message}`);
+                        });
+                }
+                
                 // 關閉彈窗
                 importExcelModal.style.display = 'none';
                 
                 // 顯示匯入結果
-                alert(`成功匯入 ${importCount} 本書籍`);
+                alert(`成功匯入 ${importCount} 本書籍${autoUpload ? '，並已開始上傳到GitHub' : ''}`);
                 
                 // 重置表單
                 fileInput.value = '';

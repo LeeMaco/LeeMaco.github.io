@@ -26,6 +26,7 @@
                     <button id="exportExcelBtn" class="excel-btn"><i class="fas fa-file-export"></i> 匯出Excel</button>
                     <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
                     <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
+                    <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
                     <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
                 </div>
             </div>
@@ -120,7 +121,36 @@
                 <div class="form-group">
                     <input type="file" id="excelFile" accept=".xlsx" required>
                 </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="autoUpload" style="margin-right: 8px;">
+                    <label for="autoUpload">自動上傳到GitHub</label>
+                </div>
+                <div id="uploadStatus" style="margin-top: 10px; font-weight: bold;"></div>
                 <button type="submit">匯入</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- GitHub設置彈窗 -->
+    <div id="githubSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>GitHub設置</h2>
+            <p>請設置GitHub相關信息，用於自動上傳功能。</p>
+            <form id="githubSettingsForm">
+                <div class="form-group">
+                    <label for="githubToken">個人訪問令牌 (PAT)：</label>
+                    <input type="password" id="githubToken" placeholder="輸入您的GitHub個人訪問令牌" required>
+                </div>
+                <div class="form-group">
+                    <label for="githubRepo">倉庫名稱：</label>
+                    <input type="text" id="githubRepo" placeholder="格式：用戶名/倉庫名" required>
+                </div>
+                <div class="form-group">
+                    <label for="githubBranch">分支名稱：</label>
+                    <input type="text" id="githubBranch" placeholder="例如：main 或 master" value="main">
+                </div>
+                <button type="submit">保存設置</button>
             </form>
         </div>
     </div>
