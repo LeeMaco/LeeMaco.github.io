@@ -80,10 +80,42 @@ document.addEventListener('DOMContentLoaded', function() {
         importExcelModal.style.display = 'block';
     });
     
+    // 綁定GitHub設置按鈕點擊事件
+    githubSettingsBtn.addEventListener('click', function() {
+        // 顯示GitHub設置彈窗
+        githubSettingsModal.style.display = 'block';
+        
+        // 填充已保存的設置
+        document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
+        document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
+        document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
+    });
+    
     // 綁定匯入Excel表單提交事件
     importExcelForm.addEventListener('submit', function(e) {
         e.preventDefault();
         importFromExcel();
+    });
+    
+    // 綁定GitHub設置表單提交事件
+    githubSettingsForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // 獲取表單數據
+        const token = document.getElementById('githubToken').value;
+        const repo = document.getElementById('githubRepo').value;
+        const branch = document.getElementById('githubBranch').value;
+        
+        // 保存到本地存儲
+        localStorage.setItem('githubToken', token);
+        localStorage.setItem('githubRepo', repo);
+        localStorage.setItem('githubBranch', branch);
+        
+        // 關閉彈窗
+        githubSettingsModal.style.display = 'none';
+        
+        // 顯示成功消息
+        alert('GitHub設置已保存');
     });
     
     // 綁定表單提交事件
