@@ -28,7 +28,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const githubSettingsForm = document.getElementById('githubSettingsForm');
     const formTitle = document.getElementById('formTitle');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
-    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');}]}}],"name":"open_preview
+    const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
     
     // 檢查DOM元素是否存在，如果不存在則輸出錯誤信息
     if (!importExcelModal || !importExcelForm) {
