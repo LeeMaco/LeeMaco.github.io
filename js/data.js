@@ -75,19 +75,39 @@ const BookData = {
     
     // 搜索書籍
     searchBooks: function(query, type = 'title') {
-        if (!query) return [];
-        
-        const books = this.getAllBooks();
-        const lowerQuery = query.toLowerCase();
-        
-        return books.filter(book => {
-            if (type === 'title') {
-                return book.title.toLowerCase().includes(lowerQuery);
-            } else if (type === 'author') {
-                return book.author.toLowerCase().includes(lowerQuery);
+        try {
+            console.log('開始搜索書籍，查詢:', query, '類型:', type);
+            
+            if (!query) {
+                console.log('查詢為空，返回空結果');
+                return [];
             }
-            return false;
-        });
+            
+            const books = this.getAllBooks();
+            console.log('獲取到書籍總數:', books.length);
+            
+            if (books.length === 0) {
+                console.log('書籍數據為空');
+                return [];
+            }
+            
+            const lowerQuery = query.toLowerCase();
+            
+            const results = books.filter(book => {
+                if (type === 'title') {
+                    return book.title && book.title.toLowerCase().includes(lowerQuery);
+                } else if (type === 'author') {
+                    return book.author && book.author.toLowerCase().includes(lowerQuery);
+                }
+                return false;
+            });
+            
+            console.log('搜索結果數量:', results.length);
+            return results;
+        } catch (error) {
+            console.error('搜索書籍時發生錯誤:', error);
+            return [];
+        }
     },
     
     // 添加新書籍

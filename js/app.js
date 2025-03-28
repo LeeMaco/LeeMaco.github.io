@@ -37,8 +37,15 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        const results = BookData.searchBooks(query, type);
-        displaySearchResults(results);
+        try {
+            console.log('執行搜索，關鍵字:', query, '類型:', type);
+            const results = BookData.searchBooks(query, type);
+            console.log('搜索結果數量:', results.length);
+            displaySearchResults(results);
+        } catch (error) {
+            console.error('搜索過程中發生錯誤:', error);
+            searchResults.innerHTML = '<p class="no-results">搜索過程中發生錯誤，請稍後再試</p>';
+        }
     }
     
     // 顯示搜索結果

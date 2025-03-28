@@ -285,7 +285,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 const firstRow = jsonData[0];
                 console.log('第一行數據:', JSON.stringify(firstRow));
                 
-                if (!firstRow['書名'] && !firstRow['作者']) {
+                if (!firstRow['書名'] || !firstRow['作者']) {
                     alert('Excel文件格式不正確，請確保包含「書名」和「作者」欄位');
                     return;
                 }
