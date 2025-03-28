@@ -136,13 +136,14 @@ document.addEventListener('DOMContentLoaded', function() {
             notes: document.getElementById('notes').value
         };
         
+        let savedBook;
         // 保存數據
         if (bookId) {
             // 更新現有書籍
-            BookData.updateBook(bookId, bookData);
+            savedBook = BookData.updateBook(bookId, bookData);
         } else {
             // 添加新書籍
-            BookData.addBook(bookData);
+            savedBook = BookData.addBook(bookData);
         }
         
         // 重新加載書籍列表
@@ -150,6 +151,37 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 關閉彈窗
         bookFormModal.style.display = 'none';
+        
+        // 自動上傳到GitHub
+        const books = BookData.getAllBooks();
+        const jsonContent = JSON.stringify(books, null, 2);
+        
+        // 創建上傳狀態元素
+        let statusElement = document.getElementById('uploadStatus');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'uploadStatus';
+            statusElement.style.position = 'fixed';
+            statusElement.style.bottom = '20px';
+            statusElement.style.right = '20px';
+            statusElement.style.padding = '10px 15px';
+            statusElement.style.backgroundColor = '#f8f9fa';
+            statusElement.style.border = '1px solid #ddd';
+            statusElement.style.borderRadius = '4px';
+            statusElement.style.zIndex = '1000';
+            statusElement.style.fontWeight = 'bold';
+            document.body.appendChild(statusElement);
+        }
+        
+        // 上傳到GitHub
+        uploadToGitHub(jsonContent)
+            .then(() => {
+                console.log('書籍數據上傳成功');
+            })
+            .catch(error => {
+                console.error('書籍數據上傳失敗:', error);
+                alert(`上傳失敗: ${error.message}`);
+            });
     });
     
     // 綁定編輯按鈕點擊事件（使用事件委託）
