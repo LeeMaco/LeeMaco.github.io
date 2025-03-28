@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍管理系統 - 管理頁面</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>書籍查詢管理系統</h1>
+            <div class="admin-login">
+                <button id="backToHomeBtn"><i class="fas fa-home"></i> 返回首頁</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section>
+            <div class="admin-header">
+                <h2>書籍管理</h2>
+                <div class="admin-actions">
+                    <button id="addBookBtn" class="add-btn"><i class="fas fa-plus"></i> 新增書籍</button>
+                    <button id="exportExcelBtn" class="excel-btn"><i class="fas fa-file-export"></i> 匯出Excel</button>
+                    <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
+                    <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
+                </div>
+            </div>
+            
+            <div class="admin-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>書名</th>
+                            <th>作者</th>
+                            <th>出版社</th>
+                            <th>ISBN號</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookTableBody">
+                        <!-- 書籍資料將在這裡顯示 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- 新增/編輯書籍彈窗 -->
+    <div id="bookFormModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="formTitle">新增書籍</h2>
+            <form id="bookForm">
+                <input type="hidden" id="bookId">
+                <div class="form-group">
+                    <label for="title">書名：</label>
+                    <input type="text" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">作者：</label>
+                    <input type="text" id="author" required>
+                </div>
+                <div class="form-group">
+                    <label for="series">集數：</label>
+                    <input type="text" id="series">
+                </div>
+                <div class="form-group">
+                    <label for="publisher">出版社：</label>
+                    <input type="text" id="publisher">
+                </div>
+                <div class="form-group">
+                    <label for="description">描述：</label>
+                    <textarea id="description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="cabinet">櫃號：</label>
+                    <input type="text" id="cabinet">
+                </div>
+                <div class="form-group">
+                    <label for="row">行號：</label>
+                    <input type="text" id="row">
+                </div>
+                <div class="form-group">
+                    <label for="isbn">ISBN號：</label>
+                    <input type="text" id="isbn">
+                </div>
+                <div class="form-group">
+                    <label for="notes">備註：</label>
+                    <textarea id="notes"></textarea>
+                </div>
+                <button type="submit">儲存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 確認刪除彈窗 -->
+    <div id="deleteConfirmModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>確認刪除</h2>
+            <p>您確定要刪除這本書嗎？此操作無法撤銷。</p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button id="cancelDeleteBtn" style="background-color: #7f8c8d;">取消</button>
+                <button id="confirmDeleteBtn" style="background-color: #e74c3c;">確認刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯入Excel彈窗 -->
+    <div id="importExcelModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>匯入Excel</h2>
+            <p>請選擇Excel文件進行匯入。文件格式應包含：書名、作者、出版社、ISBN號等欄位。</p>
+            <form id="importExcelForm">
+                <div class="form-group">
+                    <input type="file" id="excelFile" accept=".xlsx" required>
+                </div>
+                <button type="submit">匯入</button>
+            </form>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 書籍查詢管理系統</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/admin.js"></script>
+</body>
+</html>

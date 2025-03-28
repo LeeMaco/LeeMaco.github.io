@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍查詢管理系統</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>書籍查詢管理系統</h1>
+            <div class="admin-login">
+                <button id="adminLoginBtn"><i class="fas fa-user-lock"></i> 管理員登入</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="search-section">
+            <h2>書籍查詢</h2>
+            <div class="search-box">
+                <input type="text" id="searchInput" placeholder="輸入書名或作者...">
+                <select id="searchType">
+                    <option value="title">書名</option>
+                    <option value="author">作者</option>
+                </select>
+                <button id="searchBtn"><i class="fas fa-search"></i> 查詢</button>
+            </div>
+        </section>
+
+        <section class="results-section">
+            <h2>查詢結果</h2>
+            <div id="searchResults" class="book-list">
+                <!-- 查詢結果將在這裡顯示 -->
+                <p class="no-results">請輸入關鍵字進行查詢</p>
+            </div>
+        </section>
+    </main>
+
+    <!-- 管理員登入彈窗 -->
+    <div id="adminLoginModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>管理員登入</h2>
+            <form id="loginForm">
+                <div class="form-group">
+                    <label for="username">帳號：</label>
+                    <input type="text" id="username" required>
+                </div>
+                <div class="form-group">
+                    <label for="password">密碼：</label>
+                    <input type="password" id="password" required>
+                </div>
+                <button type="submit">登入</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 書籍詳情彈窗 -->
+    <div id="bookDetailModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="bookDetailContent">
+                <!-- 書籍詳情將在這裡顯示 -->
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 書籍查詢管理系統</p>
+        </div>
+    </footer>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
