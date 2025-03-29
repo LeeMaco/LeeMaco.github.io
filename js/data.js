@@ -105,17 +105,12 @@ const BookData = {
         return books.find(book => book.id === id) || null;
     },
     
-    // 搜索書籍
-    searchBooks: function(query, type = 'title') {
+    // 搜索書籍（增強版，支持多欄位搜索和篩選）
+    searchBooks: function(query, type = 'title', filters = {}) {
         try {
-            console.log('開始搜索書籍，查詢:', query, '類型:', type);
+            console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
             
-            if (!query) {
-                console.log('查詢為空，返回空結果');
-                return [];
-            }
-            
-            const books = this.getAllBooks();
+            let books = this.getAllBooks();
             console.log('獲取到書籍總數:', books.length);
             
             if (books.length === 0) {
@@ -123,19 +118,42 @@ const BookData = {
                 return [];
             }
             
-            const lowerQuery = query.toLowerCase();
+            // 應用關鍵字搜索
+            if (query) {
+                const lowerQuery = query.toLowerCase();
+                
+                books = books.filter(book => {
+                    if (type === 'all') {
+                        // 搜索所有欄位
+                        return (
+                            (book.title && book.title.toLowerCase().includes(lowerQuery)) ||
+                            (book.author && book.author.toLowerCase().includes(lowerQuery)) ||
+                            (book.publisher && book.publisher.toLowerCase().includes(lowerQuery)) ||
+                            (book.isbn && book.isbn.toLowerCase().includes(lowerQuery)) ||
+                            (book.description && book.description.toLowerCase().includes(lowerQuery)) ||
+                            (book.notes && book.notes.toLowerCase().includes(lowerQuery))
+                        );
+                    } else {
+                        // 搜索特定欄位
+                        return book[type] && book[type].toLowerCase().includes(lowerQuery);
+                    }
+                });
+            }
             
-            const results = books.filter(book => {
-                if (type === 'title') {
-                    return book.title && book.title.toLowerCase().includes(lowerQuery);
-                } else if (type === 'author') {
-                    return book.author && book.author.toLowerCase().includes(lowerQuery);
-                }
-                return false;
-            });
+            // 應用篩選條件
+            if (filters && Object.keys(filters).length > 0) {
+                books = books.filter(book => {
+                    for (const key in filters) {
+                        if (filters[key] && (!book[key] || book[key] !== filters[key])) {
+                            return false;
+                        }
+                    }
+                    return true;
+                });
+            }
             
-            console.log('搜索結果數量:', results.length);
-            return results;
+            console.log('搜索結果數量:', books.length);
+            return books;
         } catch (error) {
             console.error('搜索書籍時發生錯誤:', error);
             return [];
@@ -145,9 +163,12 @@ const BookData = {
     // 添加新書籍
     addBook: function(bookData) {
         const books = this.getAllBooks();
+        const now = new Date();
         const newBook = {
             ...bookData,
-            id: Date.now().toString() // 使用時間戳作為唯一ID
+            id: Date.now().toString(), // 使用時間戳作為唯一ID
+            createdAt: now.toISOString(), // 添加創建時間
+            updatedAt: now.toISOString()  // 添加更新時間
         };
         
         books.push(newBook);
@@ -161,7 +182,12 @@ const BookData = {
         const index = books.findIndex(book => book.id === id);
         
         if (index !== -1) {
-            books[index] = { ...books[index], ...bookData };
+            const now = new Date();
+            books[index] = { 
+                ...books[index], 
+                ...bookData,
+                updatedAt: now.toISOString() // 更新修改時間
+            };
             localStorage.setItem('books', JSON.stringify(books));
             return books[index];
         }

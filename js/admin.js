@@ -41,6 +41,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 加載並顯示所有書籍
     loadBooks();
     
+    // 初始化篩選選項
+    initFilterOptions();
+    
     // 綁定登出按鈕點擊事件
     logoutBtn.addEventListener('click', function() {
         // 清除登入狀態
@@ -224,25 +227,143 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     });
     
-    // 加載並顯示所有書籍
-    function loadBooks() {
+    // 綁定搜索表單提交事件
+    const searchFilterForm = document.getElementById('searchFilterForm');
+    searchFilterForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        loadBooks();
+    });
+    
+    // 綁定重置按鈕點擊事件
+    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+    resetFiltersBtn.addEventListener('click', function() {
+        searchFilterForm.reset();
+        loadBooks();
+    });
+    
+    // 初始化篩選選項
+    function initFilterOptions() {
         const books = BookData.getAllBooks();
+        const publishers = new Set();
+        const cabinets = new Set();
+        
+        // 收集所有出版社和櫃號
+        books.forEach(book => {
+            if (book.publisher) publishers.add(book.publisher);
+            if (book.cabinet) cabinets.add(book.cabinet);
+        });
+        
+        // 填充出版社選項
+        const filterPublisher = document.getElementById('filterPublisher');
+        publishers.forEach(publisher => {
+            const option = document.createElement('option');
+            option.value = publisher;
+            option.textContent = publisher;
+            filterPublisher.appendChild(option);
+        });
+        
+        // 填充櫃號選項
+        const filterCabinet = document.getElementById('filterCabinet');
+        cabinets.forEach(cabinet => {
+            const option = document.createElement('option');
+            option.value = cabinet;
+            option.textContent = cabinet;
+            filterCabinet.appendChild(option);
+        });
+    }
+    
+    // 加載並顯示書籍（支持篩選和排序）
+    function loadBooks() {
+        // 獲取所有書籍
+        let books = BookData.getAllBooks();
+        
+        // 獲取篩選條件
+        const searchKeyword = document.getElementById('searchKeyword').value.trim().toLowerCase();
+        const searchField = document.getElementById('searchField').value;
+        const filterPublisher = document.getElementById('filterPublisher').value;
+        const filterCabinet = document.getElementById('filterCabinet').value;
+        const sortField = document.getElementById('sortField').value;
+        const sortOrder = document.getElementById('sortOrder').value;
+        
+        // 應用關鍵字搜索
+        if (searchKeyword) {
+            books = books.filter(book => {
+                if (searchField === 'all') {
+                    // 搜索所有欄位
+                    return (
+                        (book.title && book.title.toLowerCase().includes(searchKeyword)) ||
+                        (book.author && book.author.toLowerCase().includes(searchKeyword)) ||
+                        (book.publisher && book.publisher.toLowerCase().includes(searchKeyword)) ||
+                        (book.isbn && book.isbn.toLowerCase().includes(searchKeyword)) ||
+                        (book.description && book.description.toLowerCase().includes(searchKeyword)) ||
+                        (book.notes && book.notes.toLowerCase().includes(searchKeyword))
+                    );
+                } else {
+                    // 搜索特定欄位
+                    return book[searchField] && book[searchField].toLowerCase().includes(searchKeyword);
+                }
+            });
+        }
+        
+        // 應用出版社篩選
+        if (filterPublisher) {
+            books = books.filter(book => book.publisher === filterPublisher);
+        }
+        
+        // 應用櫃號篩選
+        if (filterCabinet) {
+            books = books.filter(book => book.cabinet === filterCabinet);
+        }
+        
+        // 應用排序
+        books.sort((a, b) => {
+            let valueA = a[sortField] || '';
+            let valueB = b[sortField] || '';
+            
+            // 對於日期欄位，需要特殊處理
+            if (sortField === 'createdAt' || sortField === 'updatedAt') {
+                valueA = valueA ? new Date(valueA).getTime() : 0;
+                valueB = valueB ? new Date(valueB).getTime() : 0;
+            } else {
+                // 對於字符串，轉為小寫進行比較
+                valueA = typeof valueA === 'string' ? valueA.toLowerCase() : valueA;
+                valueB = typeof valueB === 'string' ? valueB.toLowerCase() : valueB;
+            }
+            
+            // 根據排序方向返回比較結果
+            if (sortOrder === 'asc') {
+                return valueA > valueB ? 1 : -1;
+            } else {
+                return valueA < valueB ? 1 : -1;
+            }
+        });
+        
+        // 更新表格
         let html = '';
         
-        books.forEach(book => {
-            html += `
-                <tr data-id="${book.id}">
-                    <td>${book.title}</td>
-                    <td>${book.author}</td>
-                    <td>${book.publisher || '-'}</td>
-                    <td>${book.isbn || '-'}</td>
-                    <td>
-                        <button class="edit-btn"><i class="fas fa-edit"></i></button>
-                        <button class="delete-btn"><i class="fas fa-trash"></i></button>
-                    </td>
-                </tr>
-            `;
-        });
+        if (books.length === 0) {
+            html = `<tr><td colspan="5" style="text-align: center;">沒有找到符合條件的書籍</td></tr>`;
+        } else {
+            books.forEach(book => {
+                // 格式化日期（如果存在）
+                let createdDate = book.createdAt ? new Date(book.createdAt).toLocaleString() : '-';
+                let updatedDate = book.updatedAt ? new Date(book.updatedAt).toLocaleString() : '-';
+                
+                html += `
+                    <tr data-id="${book.id}">
+                        <td>${book.title}</td>
+                        <td>${book.author}</td>
+                        <td>${book.publisher || '-'}</td>
+                        <td>${book.isbn || '-'}</td>
+                        <td>
+                            <button class="edit-btn" title="編輯"><i class="fas fa-edit"></i></button>
+                            <button class="delete-btn" title="刪除"><i class="fas fa-trash"></i></button>
+                            <button class="info-btn" title="查看詳情（創建時間：${createdDate}，更新時間：${updatedDate}）"><i class="fas fa-info-circle"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
         
         bookTableBody.innerHTML = html;
     }
