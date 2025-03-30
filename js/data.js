@@ -13,6 +13,9 @@ const BookData = {
     // 存儲從JSON文件加載的書籍數據
     jsonBooks: [],
     
+    // 垃圾桶存儲鍵名
+    TRASH_KEY: 'books_trash',
+    
     // 初始化數據
     init: function() {
         // 如果本地存儲中沒有書籍數據，則初始化一些示例數據
@@ -309,23 +312,136 @@ const BookData = {
         }
     },
     
-    // 刪除書籍
-    deleteBook: function(id) {
+    // 將書籍移至垃圾桶
+    moveToTrash: function(id) {
         // 確保ID是字符串類型
         const bookId = String(id);
-        console.log('刪除書籍ID:', bookId, '(原始ID:', id, ')');
+        console.log('將書籍移至垃圾桶，ID:', bookId, '(原始ID:', id, ')');
         
+        // 獲取要刪除的書籍
+        const book = this.getBookById(bookId);
+        if (!book) {
+            console.log('未找到書籍ID:', bookId, '無法移至垃圾桶');
+            return false;
+        }
+        
+        // 從書籍列表中移除
         const books = this.getAllBooks();
-        const filteredBooks = books.filter(book => String(book.id) !== bookId);
+        const filteredBooks = books.filter(b => String(b.id) !== bookId);
         
-        if (filteredBooks.length < books.length) {
-            localStorage.setItem('books', JSON.stringify(filteredBooks));
-            console.log('成功刪除書籍ID:', bookId);
+        // 添加刪除時間戳
+        book.deletedAt = new Date().toISOString();
+        
+        // 獲取垃圾桶中的書籍
+        const trashBooks = this.getTrashBooks();
+        
+        // 添加到垃圾桶
+        trashBooks.push(book);
+        
+        // 保存更新後的書籍列表和垃圾桶
+        localStorage.setItem('books', JSON.stringify(filteredBooks));
+        localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
+        
+        console.log('成功將書籍移至垃圾桶，ID:', bookId);
+        return true;
+    },
+    
+    // 刪除書籍（現在調用moveToTrash）
+    deleteBook: function(id) {
+        return this.moveToTrash(id);
+    },
+    
+    // 獲取垃圾桶中的所有書籍
+    getTrashBooks: function() {
+        const trashBooks = localStorage.getItem(this.TRASH_KEY);
+        return trashBooks ? JSON.parse(trashBooks) : [];
+    },
+    
+    // 從垃圾桶恢復書籍
+    restoreFromTrash: function(id) {
+        // 確保ID是字符串類型
+        const bookId = String(id);
+        console.log('從垃圾桶恢復書籍，ID:', bookId);
+        
+        // 獲取垃圾桶中的書籍
+        const trashBooks = this.getTrashBooks();
+        const bookIndex = trashBooks.findIndex(book => String(book.id) === bookId);
+        
+        if (bookIndex === -1) {
+            console.log('垃圾桶中未找到書籍ID:', bookId);
+            return false;
+        }
+        
+        // 從垃圾桶中取出書籍
+        const book = trashBooks[bookIndex];
+        trashBooks.splice(bookIndex, 1);
+        
+        // 移除刪除時間戳
+        delete book.deletedAt;
+        
+        // 更新修改時間
+        book.updatedAt = new Date().toISOString();
+        
+        // 獲取當前書籍列表並添加恢復的書籍
+        const books = this.getAllBooks();
+        books.push(book);
+        
+        // 保存更新後的書籍列表和垃圾桶
+        localStorage.setItem('books', JSON.stringify(books));
+        localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
+        
+        console.log('成功從垃圾桶恢復書籍，ID:', bookId);
+        return true;
+    },
+    
+    // 從垃圾桶永久刪除書籍
+    deleteFromTrash: function(id) {
+        // 確保ID是字符串類型
+        const bookId = String(id);
+        console.log('從垃圾桶永久刪除書籍，ID:', bookId);
+        
+        // 獲取垃圾桶中的書籍
+        const trashBooks = this.getTrashBooks();
+        const filteredBooks = trashBooks.filter(book => String(book.id) !== bookId);
+        
+        if (filteredBooks.length < trashBooks.length) {
+            localStorage.setItem(this.TRASH_KEY, JSON.stringify(filteredBooks));
+            console.log('成功從垃圾桶永久刪除書籍，ID:', bookId);
             return true;
         }
         
-        console.log('未找到書籍ID:', bookId, '無法刪除');
+        console.log('垃圾桶中未找到書籍ID:', bookId);
         return false;
+    },
+    
+    // 清空垃圾桶
+    emptyTrash: function() {
+        localStorage.setItem(this.TRASH_KEY, JSON.stringify([]));
+        console.log('垃圾桶已清空');
+        return true;
+    },
+    
+    // 清理垃圾桶中超過指定天數的書籍
+    cleanupTrash: function(days = 30) {
+        console.log(`開始清理垃圾桶中超過 ${days} 天的書籍`);
+        
+        const trashBooks = this.getTrashBooks();
+        const now = new Date();
+        const cleanedBooks = trashBooks.filter(book => {
+            if (!book.deletedAt) return true; // 如果沒有刪除時間，保留
+            
+            const deletedDate = new Date(book.deletedAt);
+            const diffTime = now - deletedDate;
+            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+            
+            return diffDays <= days; // 保留未超過指定天數的書籍
+        });
+        
+        const removedCount = trashBooks.length - cleanedBooks.length;
+        localStorage.setItem(this.TRASH_KEY, JSON.stringify(cleanedBooks));
+        
+        console.log(`垃圾桶清理完成，刪除了 ${removedCount} 本超過 ${days} 天的書籍`);
+        return removedCount;
     },
     
     // 驗證管理員登錄
@@ -340,7 +456,7 @@ const BookData = {
         return username === this.adminCredentials.username && password === this.adminCredentials.password;
     },
     
-    // 移除重複書籍
+    // 移除重複書籍並將其移至垃圾桶
     removeDuplicateBooks: function(criteria = ['title', 'author', 'isbn']) {
         console.log('開始移除重複書籍，判斷標準:', criteria);
         
@@ -398,6 +514,23 @@ const BookData = {
         
         // 更新localStorage中的書籍數據
         localStorage.setItem('books', JSON.stringify(uniqueBookArray));
+        
+        // 將移除的書籍添加到垃圾桶
+        if (removedBooks.length > 0) {
+            // 獲取垃圾桶中的書籍
+            const trashBooks = this.getTrashBooks();
+            
+            // 為每本移除的書籍添加刪除時間
+            removedBooks.forEach(book => {
+                book.deletedAt = new Date().toISOString();
+                book.deleteReason = '自動去重'; // 標記刪除原因
+            });
+            
+            // 添加到垃圾桶
+            trashBooks.push(...removedBooks);
+            localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
+            console.log('已將', removedBooks.length, '本重複書籍移至垃圾桶');
+        }
         
         // 返回去重結果
         return {

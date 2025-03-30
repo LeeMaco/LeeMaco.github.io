@@ -28,6 +28,7 @@
                     <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
                     <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
                     <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
+                    <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
                     <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
                 </div>
             </div>
@@ -178,6 +179,35 @@
             <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
                 <button id="cancelDeleteBtn" style="background-color: #7f8c8d;">取消</button>
                 <button id="confirmDeleteBtn" style="background-color: #e74c3c;">確認刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 垃圾桶彈窗 -->
+    <div id="trashModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>垃圾桶</h2>
+            <p>這裡顯示被刪除的書籍和自動去重的重複書籍，超過30天將自動永久刪除。</p>
+            <div class="trash-actions" style="margin-bottom: 15px;">
+                <button id="emptyTrashBtn" class="delete-btn"><i class="fas fa-trash"></i> 清空垃圾桶</button>
+            </div>
+            <div class="admin-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>書名</th>
+                            <th>作者</th>
+                            <th>出版社</th>
+                            <th>刪除原因</th>
+                            <th>刪除時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trashTableBody">
+                        <!-- 垃圾桶中的書籍將在這裡顯示 -->
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
