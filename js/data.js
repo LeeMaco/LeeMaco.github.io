@@ -73,7 +73,7 @@ const BookData = {
     
     // 從JSON文件加載書籍數據
     loadBooksFromJSON: function() {
-        return fetch('/data/books.json')
+        return fetch('./data/books.json')
             .then(response => {
                 if (!response.ok) {
                     throw new Error('無法加載JSON文件: ' + response.statusText);
