@@ -338,6 +338,73 @@ const BookData = {
         
         // 如果沒有存儲的憑證，使用默認值
         return username === this.adminCredentials.username && password === this.adminCredentials.password;
+    },
+    
+    // 移除重複書籍
+    removeDuplicateBooks: function(criteria = ['title', 'author', 'isbn']) {
+        console.log('開始移除重複書籍，判斷標準:', criteria);
+        
+        // 獲取所有書籍
+        const allBooks = this.getAllBooks();
+        console.log('原始書籍總數:', allBooks.length);
+        
+        if (allBooks.length <= 1) {
+            console.log('書籍數量不足，無需去重');
+            return { removed: 0, total: allBooks.length };
+        }
+        
+        // 用於存儲唯一書籍的Map
+        const uniqueBooks = new Map();
+        // 用於存儲被移除的書籍
+        const removedBooks = [];
+        
+        // 遍歷所有書籍，根據指定的標準生成唯一鍵
+        allBooks.forEach(book => {
+            // 生成唯一鍵，基於指定的標準欄位
+            let key = criteria.map(field => {
+                // 確保欄位存在且轉換為小寫字符串
+                return book[field] ? String(book[field]).toLowerCase() : '';
+            }).join('|');
+            
+            // 如果是空鍵（所有標準欄位都為空），則使用ID作為鍵
+            if (key === '' || key.split('|').every(part => part === '')) {
+                key = String(book.id);
+            }
+            
+            // 如果該鍵已存在，表示找到重複書籍
+            if (uniqueBooks.has(key)) {
+                // 比較創建時間，保留最新的記錄
+                const existingBook = uniqueBooks.get(key);
+                const existingTime = existingBook.createdAt ? new Date(existingBook.createdAt).getTime() : 0;
+                const currentTime = book.createdAt ? new Date(book.createdAt).getTime() : 0;
+                
+                // 如果當前書籍比已存在的書籍更新，則替換
+                if (currentTime > existingTime) {
+                    removedBooks.push(existingBook);
+                    uniqueBooks.set(key, book);
+                } else {
+                    removedBooks.push(book);
+                }
+            } else {
+                // 如果該鍵不存在，則添加到唯一書籍Map中
+                uniqueBooks.set(key, book);
+            }
+        });
+        
+        // 將唯一書籍轉換為數組
+        const uniqueBookArray = Array.from(uniqueBooks.values());
+        console.log('去重後的書籍數量:', uniqueBookArray.length);
+        console.log('移除的重複書籍數量:', removedBooks.length);
+        
+        // 更新localStorage中的書籍數據
+        localStorage.setItem('books', JSON.stringify(uniqueBookArray));
+        
+        // 返回去重結果
+        return {
+            removed: removedBooks.length,
+            total: uniqueBookArray.length,
+            removedBooks: removedBooks
+        };
     }
 };
 

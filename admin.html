@@ -23,6 +23,7 @@
                 <h2>書籍管理</h2>
                 <div class="admin-actions">
                     <button id="addBookBtn" class="add-btn"><i class="fas fa-plus"></i> 新增書籍</button>
+                    <button id="removeDuplicatesBtn" class="excel-btn"><i class="fas fa-broom"></i> 去除重複</button>
                     <button id="exportExcelBtn" class="excel-btn"><i class="fas fa-file-export"></i> 匯出Excel</button>
                     <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
                     <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
@@ -197,6 +198,39 @@
                 </div>
                 <div id="uploadStatus" style="margin-top: 10px; font-weight: bold;"></div>
                 <button type="submit">匯入</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 去除重複書籍彈窗 -->
+    <div id="removeDuplicatesModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>去除重複書籍</h2>
+            <p>請選擇用於判斷重複的標準：</p>
+            <form id="removeDuplicatesForm">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaTitle" checked style="margin-right: 8px;">
+                    <label for="criteriaTitle">書名</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaAuthor" checked style="margin-right: 8px;">
+                    <label for="criteriaAuthor">作者</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaISBN" checked style="margin-right: 8px;">
+                    <label for="criteriaISBN">ISBN</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaPublisher" style="margin-right: 8px;">
+                    <label for="criteriaPublisher">出版社</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaSeries" style="margin-right: 8px;">
+                    <label for="criteriaSeries">集數</label>
+                </div>
+                <div id="duplicateStatus" style="margin-top: 10px; font-weight: bold;"></div>
+                <button type="submit">開始去重</button>
             </form>
         </div>
     </div>

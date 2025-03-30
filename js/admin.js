@@ -14,21 +14,25 @@ document.addEventListener('DOMContentLoaded', function() {
     // 獲取DOM元素
     const bookTableBody = document.getElementById('bookTableBody');
     const addBookBtn = document.getElementById('addBookBtn');
+    const removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const importExcelBtn = document.getElementById('importExcelBtn');
     const githubSettingsBtn = document.getElementById('githubSettingsBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const backToHomeBtn = document.getElementById('backToHomeBtn');
     const bookFormModal = document.getElementById('bookFormModal');
+    const removeDuplicatesModal = document.getElementById('removeDuplicatesModal');
     const importExcelModal = document.getElementById('importExcelModal');
     const githubSettingsModal = document.getElementById('githubSettingsModal');
     const deleteConfirmModal = document.getElementById('deleteConfirmModal');
     const bookForm = document.getElementById('bookForm');
+    const removeDuplicatesForm = document.getElementById('removeDuplicatesForm');
     const importExcelForm = document.getElementById('importExcelForm');
     const githubSettingsForm = document.getElementById('githubSettingsForm');
     const formTitle = document.getElementById('formTitle');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
+    const duplicateStatus = document.getElementById('duplicateStatus');
     
     // 檢查DOM元素是否存在，如果不存在則輸出錯誤信息
     if (!importExcelModal || !importExcelForm) {
@@ -65,6 +69,14 @@ document.addEventListener('DOMContentLoaded', function() {
         formTitle.textContent = '新增書籍';
         // 顯示表單彈窗
         bookFormModal.style.display = 'block';
+    });
+    
+    // 綁定去除重複按鈕點擊事件
+    removeDuplicatesBtn.addEventListener('click', function() {
+        // 顯示去重彈窗
+        removeDuplicatesModal.style.display = 'block';
+        // 清空之前的狀態信息
+        duplicateStatus.textContent = '';
     });
     
     // 綁定匯出Excel按鈕點擊事件
@@ -157,6 +169,49 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 關閉彈窗
         bookFormModal.style.display = 'none';
+    });
+    
+    // 綁定去重表單提交事件
+    removeDuplicatesForm.addEventListener('submit', function(e) {
+        e.preventDefault();
+        
+        // 獲取選中的判斷標準
+        const criteria = [];
+        if (document.getElementById('criteriaTitle').checked) criteria.push('title');
+        if (document.getElementById('criteriaAuthor').checked) criteria.push('author');
+        if (document.getElementById('criteriaISBN').checked) criteria.push('isbn');
+        if (document.getElementById('criteriaPublisher').checked) criteria.push('publisher');
+        if (document.getElementById('criteriaSeries').checked) criteria.push('series');
+        
+        // 確保至少選擇了一個標準
+        if (criteria.length === 0) {
+            duplicateStatus.textContent = '請至少選擇一個判斷標準';
+            duplicateStatus.style.color = 'red';
+            return;
+        }
+        
+        // 執行去重操作
+        const result = BookData.removeDuplicateBooks(criteria);
+        
+        // 顯示去重結果
+        duplicateStatus.textContent = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
+        duplicateStatus.style.color = 'green';
+        
+        // 重新加載書籍列表
+        loadBooks();
+        
+        // 自動上傳到GitHub（如果有設置）
+        const books = BookData.getAllBooks();
+        const jsonContent = JSON.stringify(books, null, 2);
+        
+        uploadToGitHub(jsonContent)
+            .then(() => {
+                console.log('去重後的書籍數據上傳成功');
+            })
+            .catch(error => {
+                console.error('去重後的書籍數據上傳失敗:', error);
+            });
+    });
         
         // 自動上傳到GitHub
         const books = BookData.getAllBooks();
