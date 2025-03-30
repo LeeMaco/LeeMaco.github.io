@@ -142,8 +142,11 @@ document.addEventListener('DOMContentLoaded', function() {
         let savedBook;
         // 保存數據
         if (bookId) {
+            // 確保bookId是字符串類型
+            const stringBookId = String(bookId);
+            console.log('保存書籍ID:', stringBookId, '(原始ID:', bookId, ')');
             // 更新現有書籍
-            savedBook = BookData.updateBook(bookId, bookData);
+            savedBook = BookData.updateBook(stringBookId, bookData);
         } else {
             // 添加新書籍
             savedBook = BookData.addBook(bookData);
@@ -189,11 +192,19 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定編輯按鈕點擊事件（使用事件委託）
     bookTableBody.addEventListener('click', function(e) {
+        const row = e.target.closest('tr');
+        if (!row) return;
+        
+        const bookId = row.getAttribute('data-id');
+        if (!bookId) return;
+        
+        // 確保bookId是字符串類型
+        const stringBookId = String(bookId);
+        console.log('點擊書籍ID:', stringBookId, '(原始ID:', bookId, ')');
+        
         if (e.target.classList.contains('edit-btn') || e.target.parentElement.classList.contains('edit-btn')) {
-            const bookId = e.target.closest('tr').getAttribute('data-id');
-            editBook(bookId);
+            editBook(stringBookId);
         } else if (e.target.classList.contains('delete-btn') || e.target.parentElement.classList.contains('delete-btn')) {
-            const bookId = e.target.closest('tr').getAttribute('data-id');
             showDeleteConfirm(bookId);
         }
     });
@@ -293,7 +304,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     return (
                         (book.title && book.title.toLowerCase().includes(searchKeyword)) ||
                         (book.author && book.author.toLowerCase().includes(searchKeyword)) ||
+                        (book.series && book.series.toLowerCase().includes(searchKeyword)) ||
                         (book.publisher && book.publisher.toLowerCase().includes(searchKeyword)) ||
+                        (book.cabinet && book.cabinet.toLowerCase().includes(searchKeyword)) ||
+                        (book.row && book.row.toLowerCase().includes(searchKeyword)) ||
                         (book.isbn && book.isbn.toLowerCase().includes(searchKeyword)) ||
                         (book.description && book.description.toLowerCase().includes(searchKeyword)) ||
                         (book.notes && book.notes.toLowerCase().includes(searchKeyword))
@@ -307,12 +321,12 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 應用出版社篩選
         if (filterPublisher) {
-            books = books.filter(book => book.publisher === filterPublisher);
+            books = books.filter(book => String(book.publisher).toLowerCase() === String(filterPublisher).toLowerCase());
         }
         
         // 應用櫃號篩選
         if (filterCabinet) {
-            books = books.filter(book => book.cabinet === filterCabinet);
+            books = books.filter(book => String(book.cabinet).toLowerCase() === String(filterCabinet).toLowerCase());
         }
         
         // 應用排序
@@ -342,7 +356,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         
         if (books.length === 0) {
-            html = `<tr><td colspan="5" style="text-align: center;">沒有找到符合條件的書籍</td></tr>`;
+            html = `<tr><td colspan="9" style="text-align: center;">沒有找到符合條件的書籍</td></tr>`;
         } else {
             books.forEach(book => {
                 // 格式化日期（如果存在）
@@ -353,12 +367,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${book.id}">
                         <td>${book.title}</td>
                         <td>${book.author}</td>
+                        <td>${book.series || '-'}</td>
                         <td>${book.publisher || '-'}</td>
-                        <td>${book.isbn || '-'}</td>
+                        <td>${book.cabinet || '-'}</td>
+                        <td>${book.row || '-'}</td>
+                        <td>${createdDate}</td>
                         <td>
                             <button class="edit-btn" title="編輯"><i class="fas fa-edit"></i></button>
                             <button class="delete-btn" title="刪除"><i class="fas fa-trash"></i></button>
-                            <button class="info-btn" title="查看詳情（創建時間：${createdDate}，更新時間：${updatedDate}）"><i class="fas fa-info-circle"></i></button>
+                            <button class="info-btn" title="查看詳情（更新時間：${updatedDate}）"><i class="fas fa-info-circle"></i></button>
                         </td>
                     </tr>
                 `;
@@ -370,8 +387,17 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 編輯書籍
     function editBook(bookId) {
-        const book = BookData.getBookById(bookId);
-        if (!book) return;
+        // 確保bookId是字符串類型
+        const stringBookId = String(bookId);
+        console.log('編輯書籍ID:', stringBookId);
+        
+        const book = BookData.getBookById(stringBookId);
+        if (!book) {
+            console.error('未找到ID為', stringBookId, '的書籍');
+            return;
+        }
+        
+        console.log('正在編輯書籍:', book.title, '(ID:', book.id, ')');
         
         // 填充表單
         document.getElementById('bookId').value = book.id;
@@ -394,7 +420,10 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 顯示刪除確認彈窗
     function showDeleteConfirm(bookId) {
-        confirmDeleteBtn.setAttribute('data-id', bookId);
+        // 確保bookId是字符串類型
+        const stringBookId = String(bookId);
+        console.log('確認刪除書籍ID:', stringBookId, '(原始ID:', bookId, ')');
+        confirmDeleteBtn.setAttribute('data-id', stringBookId);
         deleteConfirmModal.style.display = 'block';
     }
     
