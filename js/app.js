@@ -84,6 +84,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h3>${book.title}</h3>
                     <p><strong>作者：</strong>${book.author}</p>
                     ${book.series ? `<p><strong>集數：</strong>${book.series}</p>` : ''}
+                    <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
                     <p><strong>出版社：</strong>${book.publisher || '未知'}</p>
                 </div>
             `;
@@ -110,9 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="book-detail-content">
                 <p><strong>作者：</strong>${book.author}</p>
                 ${book.series ? `<p><strong>集數：</strong>${book.series}</p>` : ''}
+                <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
                 <p><strong>出版社：</strong>${book.publisher || '未知'}</p>
                 <p><strong>ISBN號：</strong>${book.isbn || '未知'}</p>
-                <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
                 ${book.description ? `<p><strong>描述：</strong>${book.description}</p>` : ''}
                 ${book.notes ? `<p><strong>備註：</strong>${book.notes}</p>` : ''}
             </div>
