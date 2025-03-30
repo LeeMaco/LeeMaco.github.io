@@ -51,6 +51,9 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化篩選選項
     initFilterOptions();
     
+    // 初始化垃圾桶表格事件處理
+    initTrashTableEvents();
+    
     // 綁定垃圾桶按鈕點擊事件
     if (trashBtn) {
         trashBtn.addEventListener('click', function() {
@@ -86,34 +89,6 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log(`自動清理：已從垃圾桶中刪除 ${removedCount} 本超過30天的書籍`);
         }
     }, 24 * 60 * 60 * 1000); // 24小時檢查一次
-    
-    // 綁定垃圾桶按鈕點擊事件
-    if (trashBtn) {
-        trashBtn.addEventListener('click', function() {
-            // 顯示垃圾桶彈窗
-            trashModal.style.display = 'block';
-            // 加載垃圾桶中的書籍
-            loadTrashBooks();
-        });
-        
-        // 綁定清空垃圾桶按鈕
-        const emptyTrashBtn = document.getElementById('emptyTrashBtn');
-        if (emptyTrashBtn) {
-            emptyTrashBtn.addEventListener('click', function() {
-                emptyTrash();
-            });
-        }
-        
-        // 綁定關閉垃圾桶彈窗
-        const trashModalClose = trashModal.querySelector('.close');
-        if (trashModalClose) {
-            trashModalClose.addEventListener('click', function() {
-                trashModal.style.display = 'none';
-            });
-        }
-    } else {
-        console.error('垃圾桶按鈕不存在，請檢查HTML結構');
-    }
     
     // 綁定登出按鈕點擊事件
     logoutBtn.addEventListener('click', function() {
@@ -271,19 +246,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const books = BookData.getAllBooks();
         const jsonContent = JSON.stringify(books, null, 2);
         
-        uploadToGitHub(jsonContent)
-            .then(() => {
-                console.log('去重後的書籍數據上傳成功');
-            })
-            .catch(error => {
-                console.error('去重後的書籍數據上傳失敗:', error);
-            });
-    });
-        
-        // 自動上傳到GitHub
-        const books = BookData.getAllBooks();
-        const jsonContent = JSON.stringify(books, null, 2);
-        
         // 創建上傳狀態元素
         let statusElement = document.getElementById('uploadStatus');
         if (!statusElement) {
@@ -304,13 +266,17 @@ document.addEventListener('DOMContentLoaded', function() {
         // 上傳到GitHub
         uploadToGitHub(jsonContent)
             .then(() => {
-                console.log('書籍數據上傳成功');
+                console.log('去重後的書籍數據上傳成功');
             })
             .catch(error => {
-                console.error('書籍數據上傳失敗:', error);
+                console.error('去重後的書籍數據上傳失敗:', error);
                 alert(`上傳失敗: ${error.message}`);
             });
+        
+        // 關閉彈窗
+        removeDuplicatesModal.style.display = 'none';
     });
+    
     
     // 綁定編輯按鈕點擊事件（使用事件委託）
     bookTableBody.addEventListener('click', function(e) {
@@ -507,42 +473,9 @@ document.addEventListener('DOMContentLoaded', function() {
         bookTableBody.innerHTML = html;
     }
     
-    // 加載垃圾桶中的書籍
-    function loadTrashBooks() {
-        // 獲取垃圾桶中的所有書籍
-        const trashBooks = BookData.getTrashBooks();
-        
-        // 更新表格
-        let html = '';
-        
-        if (trashBooks.length === 0) {
-            html = `<tr><td colspan="9" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
-        } else {
-            trashBooks.forEach(book => {
-                // 格式化日期
-                let createdDate = book.createdAt ? new Date(book.createdAt).toLocaleString() : '-';
-                let deletedDate = book.deletedAt ? new Date(book.deletedAt).toLocaleString() : '-';
-                let deleteReason = book.deleteReason || '手動刪除';
-                
-                html += `
-                    <tr data-id="${book.id}">
-                        <td>${book.title}</td>
-                        <td>${book.author}</td>
-                        <td>${book.publisher || '-'}</td>
-                        <td>${deleteReason}</td>
-                        <td>${deletedDate}</td>
-                        <td>
-                            <button class="restore-btn" title="恢復"><i class="fas fa-undo"></i></button>
-                            <button class="permanent-delete-btn" title="永久刪除"><i class="fas fa-times-circle"></i></button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-        
-        trashTableBody.innerHTML = html;
-        
-        // 綁定垃圾桶表格中的按鈕事件
+    // 初始化垃圾桶表格事件處理
+    function initTrashTableEvents() {
+        // 使用事件委託綁定垃圾桶表格中的按鈕事件
         trashTableBody.addEventListener('click', function(e) {
             // 獲取被點擊的行和書籍ID
             const row = e.target.closest('tr');
@@ -578,6 +511,42 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         });
+    }
+    
+    // 加載垃圾桶中的書籍
+    function loadTrashBooks() {
+        // 獲取垃圾桶中的所有書籍
+        const trashBooks = BookData.getTrashBooks();
+        
+        // 更新表格
+        let html = '';
+        
+        if (trashBooks.length === 0) {
+            html = `<tr><td colspan="9" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
+        } else {
+            trashBooks.forEach(book => {
+                // 格式化日期
+                let createdDate = book.createdAt ? new Date(book.createdAt).toLocaleString() : '-';
+                let deletedDate = book.deletedAt ? new Date(book.deletedAt).toLocaleString() : '-';
+                let deleteReason = book.deleteReason || '手動刪除';
+                
+                html += `
+                    <tr data-id="${book.id}">
+                        <td>${book.title}</td>
+                        <td>${book.author}</td>
+                        <td>${book.publisher || '-'}</td>
+                        <td>${deleteReason}</td>
+                        <td>${deletedDate}</td>
+                        <td>
+                            <button class="restore-btn" title="恢復"><i class="fas fa-undo"></i></button>
+                            <button class="permanent-delete-btn" title="永久刪除"><i class="fas fa-times-circle"></i></button>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+        
+        trashTableBody.innerHTML = html;
     }
     
     // 清空垃圾桶
@@ -897,7 +866,9 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 如果啟用了自動上傳，則上傳到GitHub
                 if (autoUpload) {
-                    const jsonContent = JSON.stringify(books, null, 2);
+                    // 獲取所有書籍數據，確保上傳的是完整數據
+                    const allBooks = BookData.getAllBooks();
+                    const jsonContent = JSON.stringify(allBooks, null, 2);
                     uploadToGitHub(jsonContent)
                         .then(() => {
                             console.log('自動上傳成功');
