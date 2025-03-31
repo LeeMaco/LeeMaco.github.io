@@ -150,7 +150,7 @@ const BookData = {
                 console.error('加載JSON書籍數據時發生錯誤:', error);
                 // 提供更詳細的錯誤信息
                 const errorMessage = `無法加載書籍數據: ${error.message}\n` +
-                                    `嘗試的URL: ${jsonUrl}\n` +
+                                    `嘗試的URL: ${strategies.join(', ')}\n` +
                                     `當前環境: ${window.location.href.includes('github.io') ? 'GitHub Pages' : '本地'}\n` +
                                     `當前頁面: ${window.location.href}`;
                 console.error(errorMessage);

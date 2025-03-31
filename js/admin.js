@@ -333,6 +333,17 @@ document.addEventListener('DOMContentLoaded', function() {
         loadBooks();
     });
     
+    // 綁定搜索按鈕點擊事件
+    const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+    if (applyFiltersBtn) {
+        applyFiltersBtn.addEventListener('click', function(e) {
+            e.preventDefault();
+            loadBooks();
+        });
+    } else {
+        console.error('搜索按鈕元素不存在，請檢查HTML結構');
+    }
+    
     // 綁定重置按鈕點擊事件
     const resetFiltersBtn = document.getElementById('resetFiltersBtn');
     resetFiltersBtn.addEventListener('click', function() {
