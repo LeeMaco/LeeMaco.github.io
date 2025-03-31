@@ -14,28 +14,21 @@ document.addEventListener('DOMContentLoaded', function() {
     // 獲取DOM元素
     const bookTableBody = document.getElementById('bookTableBody');
     const addBookBtn = document.getElementById('addBookBtn');
-    const removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const importExcelBtn = document.getElementById('importExcelBtn');
     const githubSettingsBtn = document.getElementById('githubSettingsBtn');
-    const trashBtn = document.getElementById('trashBtn'); // 垃圾桶按鈕
     const logoutBtn = document.getElementById('logoutBtn');
     const backToHomeBtn = document.getElementById('backToHomeBtn');
     const bookFormModal = document.getElementById('bookFormModal');
-    const removeDuplicatesModal = document.getElementById('removeDuplicatesModal');
     const importExcelModal = document.getElementById('importExcelModal');
     const githubSettingsModal = document.getElementById('githubSettingsModal');
-    const trashModal = document.getElementById('trashModal'); // 垃圾桶彈窗
     const deleteConfirmModal = document.getElementById('deleteConfirmModal');
     const bookForm = document.getElementById('bookForm');
-    const removeDuplicatesForm = document.getElementById('removeDuplicatesForm');
     const importExcelForm = document.getElementById('importExcelForm');
     const githubSettingsForm = document.getElementById('githubSettingsForm');
     const formTitle = document.getElementById('formTitle');
     const confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
     const cancelDeleteBtn = document.getElementById('cancelDeleteBtn');
-    const duplicateStatus = document.getElementById('duplicateStatus');
-    const trashTableBody = document.getElementById('trashTableBody'); // 垃圾桶表格內容
     
     // 檢查DOM元素是否存在，如果不存在則輸出錯誤信息
     if (!importExcelModal || !importExcelForm) {
@@ -50,45 +43,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 初始化篩選選項
     initFilterOptions();
-    
-    // 初始化垃圾桶表格事件處理
-    initTrashTableEvents();
-    
-    // 綁定垃圾桶按鈕點擊事件
-    if (trashBtn) {
-        trashBtn.addEventListener('click', function() {
-            // 顯示垃圾桶彈窗
-            trashModal.style.display = 'block';
-            // 加載垃圾桶中的書籍
-            loadTrashBooks();
-        });
-        
-        // 綁定清空垃圾桶按鈕
-        const emptyTrashBtn = document.getElementById('emptyTrashBtn');
-        if (emptyTrashBtn) {
-            emptyTrashBtn.addEventListener('click', function() {
-                emptyTrash();
-            });
-        }
-        
-        // 綁定關閉垃圾桶彈窗
-        const trashModalClose = trashModal.querySelector('.close');
-        if (trashModalClose) {
-            trashModalClose.addEventListener('click', function() {
-                trashModal.style.display = 'none';
-            });
-        }
-    } else {
-        console.error('垃圾桶按鈕不存在，請檢查HTML結構');
-    }
-    
-    // 設置自動清理垃圾桶的定時任務（每天檢查一次）
-    setInterval(function() {
-        const removedCount = BookData.cleanupTrash(30);
-        if (removedCount > 0) {
-            console.log(`自動清理：已從垃圾桶中刪除 ${removedCount} 本超過30天的書籍`);
-        }
-    }, 24 * 60 * 60 * 1000); // 24小時檢查一次
     
     // 綁定登出按鈕點擊事件
     logoutBtn.addEventListener('click', function() {
@@ -111,14 +65,6 @@ document.addEventListener('DOMContentLoaded', function() {
         formTitle.textContent = '新增書籍';
         // 顯示表單彈窗
         bookFormModal.style.display = 'block';
-    });
-    
-    // 綁定去除重複按鈕點擊事件
-    removeDuplicatesBtn.addEventListener('click', function() {
-        // 顯示去重彈窗
-        removeDuplicatesModal.style.display = 'block';
-        // 清空之前的狀態信息
-        duplicateStatus.textContent = '';
     });
     
     // 綁定匯出Excel按鈕點擊事件
@@ -211,38 +157,8 @@ document.addEventListener('DOMContentLoaded', function() {
         
         // 關閉彈窗
         bookFormModal.style.display = 'none';
-    });
-    
-    // 綁定去重表單提交事件
-    removeDuplicatesForm.addEventListener('submit', function(e) {
-        e.preventDefault();
         
-        // 獲取選中的判斷標準
-        const criteria = [];
-        if (document.getElementById('criteriaTitle').checked) criteria.push('title');
-        if (document.getElementById('criteriaAuthor').checked) criteria.push('author');
-        if (document.getElementById('criteriaISBN').checked) criteria.push('isbn');
-        if (document.getElementById('criteriaPublisher').checked) criteria.push('publisher');
-        if (document.getElementById('criteriaSeries').checked) criteria.push('series');
-        
-        // 確保至少選擇了一個標準
-        if (criteria.length === 0) {
-            duplicateStatus.textContent = '請至少選擇一個判斷標準';
-            duplicateStatus.style.color = 'red';
-            return;
-        }
-        
-        // 執行去重操作
-        const result = BookData.removeDuplicateBooks(criteria);
-        
-        // 顯示去重結果
-        duplicateStatus.textContent = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
-        duplicateStatus.style.color = 'green';
-        
-        // 重新加載書籍列表
-        loadBooks();
-        
-        // 自動上傳到GitHub（如果有設置）
+        // 自動上傳到GitHub
         const books = BookData.getAllBooks();
         const jsonContent = JSON.stringify(books, null, 2);
         
@@ -266,17 +182,13 @@ document.addEventListener('DOMContentLoaded', function() {
         // 上傳到GitHub
         uploadToGitHub(jsonContent)
             .then(() => {
-                console.log('去重後的書籍數據上傳成功');
+                console.log('書籍數據上傳成功');
             })
             .catch(error => {
-                console.error('去重後的書籍數據上傳失敗:', error);
+                console.error('書籍數據上傳失敗:', error);
                 alert(`上傳失敗: ${error.message}`);
             });
-        
-        // 關閉彈窗
-        removeDuplicatesModal.style.display = 'none';
     });
-    
     
     // 綁定編輯按鈕點擊事件（使用事件委託）
     bookTableBody.addEventListener('click', function(e) {
@@ -333,17 +245,6 @@ document.addEventListener('DOMContentLoaded', function() {
         loadBooks();
     });
     
-    // 綁定搜索按鈕點擊事件
-    const applyFiltersBtn = document.getElementById('applyFiltersBtn');
-    if (applyFiltersBtn) {
-        applyFiltersBtn.addEventListener('click', function(e) {
-            e.preventDefault();
-            loadBooks();
-        });
-    } else {
-        console.error('搜索按鈕元素不存在，請檢查HTML結構');
-    }
-    
     // 綁定重置按鈕點擊事件
     const resetFiltersBtn = document.getElementById('resetFiltersBtn');
     resetFiltersBtn.addEventListener('click', function() {
@@ -399,30 +300,21 @@ document.addEventListener('DOMContentLoaded', function() {
         if (searchKeyword) {
             books = books.filter(book => {
                 if (searchField === 'all') {
-                    // 搜索所有欄位，使用安全的字符串處理和更寬鬆的比較方式
+                    // 搜索所有欄位
                     return (
-                        (book.title && (String(book.title).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.title).toLowerCase()))) ||
-                        (book.author && (String(book.author).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.author).toLowerCase()))) ||
-                        (book.series && (String(book.series).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.series).toLowerCase()))) ||
-                        (book.publisher && (String(book.publisher).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.publisher).toLowerCase()))) ||
-                        (book.cabinet && (String(book.cabinet).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.cabinet).toLowerCase()))) ||
-                        (book.row && (String(book.row).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.row).toLowerCase()))) ||
-                        (book.isbn && (String(book.isbn).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.isbn).toLowerCase()))) ||
-                        (book.description && (String(book.description).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.description).toLowerCase()))) ||
-                        (book.notes && (String(book.notes).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.notes).toLowerCase())))
+                        (book.title && book.title.toLowerCase().includes(searchKeyword)) ||
+                        (book.author && book.author.toLowerCase().includes(searchKeyword)) ||
+                        (book.series && book.series.toLowerCase().includes(searchKeyword)) ||
+                        (book.publisher && book.publisher.toLowerCase().includes(searchKeyword)) ||
+                        (book.cabinet && book.cabinet.toLowerCase().includes(searchKeyword)) ||
+                        (book.row && book.row.toLowerCase().includes(searchKeyword)) ||
+                        (book.isbn && book.isbn.toLowerCase().includes(searchKeyword)) ||
+                        (book.description && book.description.toLowerCase().includes(searchKeyword)) ||
+                        (book.notes && book.notes.toLowerCase().includes(searchKeyword))
                     );
-                } else if (searchField === 'cabinet') {
-                    // 特別處理櫃號搜索，確保安全的字符串比較
-                    return book.cabinet && String(book.cabinet).toLowerCase() === searchKeyword;
                 } else {
-                    // 搜索特定欄位，確保欄位存在且進行安全的字符串處理
-                    // 使用更寬鬆的比較方式，允許部分匹配
-                    if (book[searchField]) {
-                        const fieldValue = String(book[searchField]).toLowerCase();
-                        // 檢查是否包含查詢字符串，或查詢字符串包含欄位值
-                        return fieldValue.includes(searchKeyword) || searchKeyword.includes(fieldValue);
-                    }
-                    return false;
+                    // 搜索特定欄位
+                    return book[searchField] && book[searchField].toLowerCase().includes(searchKeyword);
                 }
             });
         }
@@ -482,7 +374,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         <td>${createdDate}</td>
                         <td>
                             <button class="edit-btn" title="編輯"><i class="fas fa-edit"></i></button>
-                            <button class="delete-btn" title="移至垃圾桶"><i class="fas fa-trash"></i></button>
+                            <button class="delete-btn" title="刪除"><i class="fas fa-trash"></i></button>
                             <button class="info-btn" title="查看詳情（更新時間：${updatedDate}）"><i class="fas fa-info-circle"></i></button>
                         </td>
                     </tr>
@@ -491,94 +383,6 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         bookTableBody.innerHTML = html;
-    }
-    
-    // 初始化垃圾桶表格事件處理
-    function initTrashTableEvents() {
-        // 使用事件委託綁定垃圾桶表格中的按鈕事件
-        trashTableBody.addEventListener('click', function(e) {
-            // 獲取被點擊的行和書籍ID
-            const row = e.target.closest('tr');
-            if (!row) return;
-            
-            const bookId = row.dataset.id;
-            if (!bookId) return;
-            
-            // 處理恢復按鈕點擊
-            if (e.target.classList.contains('restore-btn') || e.target.parentElement.classList.contains('restore-btn')) {
-                if (confirm('確定要恢復這本書嗎？')) {
-                    if (BookData.restoreFromTrash(bookId)) {
-                        // 重新加載垃圾桶和書籍列表
-                        loadTrashBooks();
-                        loadBooks();
-                        alert('書籍已恢復');
-                    } else {
-                        alert('恢復失敗，請重試');
-                    }
-                }
-            }
-            
-            // 處理永久刪除按鈕點擊
-            if (e.target.classList.contains('permanent-delete-btn') || e.target.parentElement.classList.contains('permanent-delete-btn')) {
-                if (confirm('確定要永久刪除這本書嗎？此操作無法撤銷！')) {
-                    if (BookData.deleteFromTrash(bookId)) {
-                        // 重新加載垃圾桶
-                        loadTrashBooks();
-                        alert('書籍已永久刪除');
-                    } else {
-                        alert('刪除失敗，請重試');
-                    }
-                }
-            }
-        });
-    }
-    
-    // 加載垃圾桶中的書籍
-    function loadTrashBooks() {
-        // 獲取垃圾桶中的所有書籍
-        const trashBooks = BookData.getTrashBooks();
-        
-        // 更新表格
-        let html = '';
-        
-        if (trashBooks.length === 0) {
-            html = `<tr><td colspan="9" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
-        } else {
-            trashBooks.forEach(book => {
-                // 格式化日期
-                let createdDate = book.createdAt ? new Date(book.createdAt).toLocaleString() : '-';
-                let deletedDate = book.deletedAt ? new Date(book.deletedAt).toLocaleString() : '-';
-                let deleteReason = book.deleteReason || '手動刪除';
-                
-                html += `
-                    <tr data-id="${book.id}">
-                        <td>${book.title}</td>
-                        <td>${book.author}</td>
-                        <td>${book.publisher || '-'}</td>
-                        <td>${deleteReason}</td>
-                        <td>${deletedDate}</td>
-                        <td>
-                            <button class="restore-btn" title="恢復"><i class="fas fa-undo"></i></button>
-                            <button class="permanent-delete-btn" title="永久刪除"><i class="fas fa-times-circle"></i></button>
-                        </td>
-                    </tr>
-                `;
-            });
-        }
-        
-        trashTableBody.innerHTML = html;
-    }
-    
-    // 清空垃圾桶
-    function emptyTrash() {
-        if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
-            if (BookData.emptyTrash()) {
-                loadTrashBooks();
-                alert('垃圾桶已清空');
-            } else {
-                alert('清空垃圾桶失敗，請重試');
-            }
-        }
     }
     
     // 編輯書籍
@@ -621,26 +425,6 @@ document.addEventListener('DOMContentLoaded', function() {
         console.log('確認刪除書籍ID:', stringBookId, '(原始ID:', bookId, ')');
         confirmDeleteBtn.setAttribute('data-id', stringBookId);
         deleteConfirmModal.style.display = 'block';
-        
-        // 綁定確認刪除按鈕點擊事件
-        confirmDeleteBtn.onclick = function() {
-            // 移至垃圾桶（現在deleteBook內部調用moveToTrash）
-            if (BookData.deleteBook(bookId)) {
-                // 重新加載書籍列表
-                loadBooks();
-                // 關閉彈窗
-                deleteConfirmModal.style.display = 'none';
-                // 顯示提示
-                alert('書籍已移至垃圾桶');
-            } else {
-                alert('刪除失敗，請重試');
-            }
-        };
-        
-        // 綁定取消刪除按鈕點擊事件
-        cancelDeleteBtn.onclick = function() {
-            deleteConfirmModal.style.display = 'none';
-        };
     }
     
     // 匯出Excel功能
@@ -886,9 +670,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 如果啟用了自動上傳，則上傳到GitHub
                 if (autoUpload) {
-                    // 獲取所有書籍數據，確保上傳的是完整數據
-                    const allBooks = BookData.getAllBooks();
-                    const jsonContent = JSON.stringify(allBooks, null, 2);
+                    const jsonContent = JSON.stringify(books, null, 2);
                     uploadToGitHub(jsonContent)
                         .then(() => {
                             console.log('自動上傳成功');
