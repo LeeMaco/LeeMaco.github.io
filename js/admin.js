@@ -399,21 +399,30 @@ document.addEventListener('DOMContentLoaded', function() {
         if (searchKeyword) {
             books = books.filter(book => {
                 if (searchField === 'all') {
-                    // 搜索所有欄位
+                    // 搜索所有欄位，使用安全的字符串處理和更寬鬆的比較方式
                     return (
-                        (book.title && book.title.toLowerCase().includes(searchKeyword)) ||
-                        (book.author && book.author.toLowerCase().includes(searchKeyword)) ||
-                        (book.series && book.series.toLowerCase().includes(searchKeyword)) ||
-                        (book.publisher && book.publisher.toLowerCase().includes(searchKeyword)) ||
-                        (book.cabinet && book.cabinet.toLowerCase().includes(searchKeyword)) ||
-                        (book.row && book.row.toLowerCase().includes(searchKeyword)) ||
-                        (book.isbn && book.isbn.toLowerCase().includes(searchKeyword)) ||
-                        (book.description && book.description.toLowerCase().includes(searchKeyword)) ||
-                        (book.notes && book.notes.toLowerCase().includes(searchKeyword))
+                        (book.title && (String(book.title).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.title).toLowerCase()))) ||
+                        (book.author && (String(book.author).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.author).toLowerCase()))) ||
+                        (book.series && (String(book.series).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.series).toLowerCase()))) ||
+                        (book.publisher && (String(book.publisher).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.publisher).toLowerCase()))) ||
+                        (book.cabinet && (String(book.cabinet).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.cabinet).toLowerCase()))) ||
+                        (book.row && (String(book.row).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.row).toLowerCase()))) ||
+                        (book.isbn && (String(book.isbn).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.isbn).toLowerCase()))) ||
+                        (book.description && (String(book.description).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.description).toLowerCase()))) ||
+                        (book.notes && (String(book.notes).toLowerCase().includes(searchKeyword) || searchKeyword.includes(String(book.notes).toLowerCase())))
                     );
+                } else if (searchField === 'cabinet') {
+                    // 特別處理櫃號搜索，確保安全的字符串比較
+                    return book.cabinet && String(book.cabinet).toLowerCase() === searchKeyword;
                 } else {
-                    // 搜索特定欄位
-                    return book[searchField] && book[searchField].toLowerCase().includes(searchKeyword);
+                    // 搜索特定欄位，確保欄位存在且進行安全的字符串處理
+                    // 使用更寬鬆的比較方式，允許部分匹配
+                    if (book[searchField]) {
+                        const fieldValue = String(book[searchField]).toLowerCase();
+                        // 檢查是否包含查詢字符串，或查詢字符串包含欄位值
+                        return fieldValue.includes(searchKeyword) || searchKeyword.includes(fieldValue);
+                    }
+                    return false;
                 }
             });
         }
