@@ -73,7 +73,62 @@ const BookData = {
     
     // 從JSON文件加載書籍數據
     loadBooksFromJSON: function() {
-        return fetch('./data/books.json')
+        // 使用多種策略嘗試加載JSON數據
+        const strategies = [];
+        
+        // 策略1: 相對路徑 (適用於本地環境)
+        strategies.push('./data/books.json');
+        
+        // 策略2: 基於當前URL的路徑 (適用於大多數情況)
+        const currentUrl = window.location.href;
+        let basePath = '';
+        
+        // 從當前URL中提取基礎路徑
+        if (currentUrl.includes('.html')) {
+            // 如果URL包含HTML文件名，則移除文件名部分
+            basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+        } else {
+            // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
+            basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
+        }
+        strategies.push(basePath + 'data/books.json');
+        
+        // 策略3: GitHub Pages特定路徑 (如果檢測到GitHub Pages環境)
+        if (window.location.href.includes('github.io')) {
+            const origin = window.location.origin;
+            const pathParts = window.location.pathname.split('/');
+            
+            // 如果在倉庫子目錄中，嘗試構建正確的路徑
+            if (pathParts.length > 2) {
+                const repoName = pathParts[1]; // 假設第二部分是倉庫名
+                strategies.push(`${origin}/${repoName}/data/books.json`);
+            }
+            
+            // 直接從根路徑嘗試
+            strategies.push(`${origin}/data/books.json`);
+        }
+        
+        console.log('將嘗試以下數據加載策略:', strategies);
+        
+        // 使用Promise.any嘗試所有策略，直到一個成功
+        const fetchPromises = strategies.map(url => {
+            console.log('嘗試從URL加載:', url);
+            return fetch(url, {
+                cache: 'no-store',
+                headers: {
+                    'Cache-Control': 'no-cache'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error(`從 ${url} 加載失敗: ${response.status} ${response.statusText}`);
+                }
+                console.log('成功從URL加載數據:', url);
+                return response.json();
+            });
+        });
+        
+        return Promise.any(fetchPromises)
             .then(response => {
                 if (!response.ok) {
                     throw new Error('無法加載JSON文件: ' + response.statusText);
@@ -93,8 +148,41 @@ const BookData = {
             })
             .catch(error => {
                 console.error('加載JSON書籍數據時發生錯誤:', error);
+                // 提供更詳細的錯誤信息
+                const errorMessage = `無法加載書籍數據: ${error.message}\n` +
+                                    `嘗試的URL: ${jsonUrl}\n` +
+                                    `當前環境: ${window.location.href.includes('github.io') ? 'GitHub Pages' : '本地'}\n` +
+                                    `當前頁面: ${window.location.href}`;
+                console.error(errorMessage);
+                
+                // 如果在GitHub Pages環境中，嘗試使用備用方法
+                if (window.location.href.includes('github.io')) {
+                    console.log('在GitHub Pages環境中檢測到錯誤，嘗試使用備用方法加載數據...');
+                    // 嘗試使用絕對路徑
+                    const fallbackUrl = window.location.origin + '/data/books.json';
+                    console.log('嘗試備用URL:', fallbackUrl);
+                    
+                    return fetch(fallbackUrl, { cache: 'no-store' })
+                        .then(response => {
+                            if (!response.ok) {
+                                throw new Error(`備用方法也失敗: ${response.status} ${response.statusText}`);
+                            }
+                            return response.json();
+                        })
+                        .then(data => {
+                            console.log('使用備用方法成功加載了', data.length, '本書籍');
+                            this.jsonBooks = data;
+                            return data;
+                        })
+                        .catch(fallbackError => {
+                            console.error('備用方法也失敗:', fallbackError);
+                            this.jsonBooks = [];
+                            throw new Error(`無法加載書籍數據。原始錯誤: ${error.message}, 備用方法錯誤: ${fallbackError.message}`);
+                        });
+                }
+                
                 this.jsonBooks = [];
-                return [];
+                throw error; // 重新拋出錯誤，以便上層捕獲
             });
     },
     

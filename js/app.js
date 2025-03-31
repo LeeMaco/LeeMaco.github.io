@@ -45,14 +45,21 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // 顯示搜尋中的提示
-        searchResults.innerHTML = '<p class="searching">正在搜尋中，請稍候...</p>';
+        searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
         
         try {
             console.log('執行搜索，關鍵字:', query, '類型:', type);
+            
+            // 檢查環境
+            const isGitHubPages = window.location.href.includes('github.io');
+            if (isGitHubPages) {
+                console.log('檢測到GitHub Pages環境，使用優化的數據加載策略');
+            }
+            
             // 確保數據已完全加載
             const searchPromise = (BookData.jsonBooks.length === 0) 
-                ? BookData.loadBooksFromJSON().then(() => {
-                    console.log('數據重新加載完成');
+                ? BookData.loadBooksFromJSON().then(data => {
+                    console.log('數據重新加載完成，加載了', data.length, '本書籍');
                     return BookData.searchBooks(query, type);
                   })
                 : Promise.resolve(BookData.searchBooks(query, type));
@@ -60,13 +67,35 @@ document.addEventListener('DOMContentLoaded', function() {
             searchPromise.then(results => {
                 console.log('搜索結果數量:', results.length);
                 displaySearchResults(results);
+                
+                // 如果在GitHub Pages環境中成功搜索，添加提示
+                if (isGitHubPages && results.length > 0) {
+                    const successNote = document.createElement('div');
+                    successNote.className = 'search-success-note';
+                    successNote.innerHTML = '<small>數據加載成功！</small>';
+                    searchResults.appendChild(successNote);
+                }
             }).catch(error => {
                 console.error('搜索或加載數據時發生錯誤:', error);
-                searchResults.innerHTML = '<p class="no-results">搜索過程中發生錯誤，請稍後再試</p>';
+                // 顯示更詳細的錯誤信息
+                const errorMessage = error.message || '未知錯誤';
+                searchResults.innerHTML = `
+                    <div class="error-message">
+                        <p class="no-results"><i class="fas fa-exclamation-triangle"></i> 搜索過程中發生錯誤：</p>
+                        <p class="error-details">${errorMessage}</p>
+                        <p>可能原因：</p>
+                        <ul>
+                            <li>無法加載書籍數據文件</li>
+                            <li>數據格式不正確</li>
+                            <li>網絡連接問題</li>
+                        </ul>
+                        <p>如果您在GitHub Pages上瀏覽，請確保data/books.json文件已正確上傳。</p>
+                    </div>
+                `;
             });
         } catch (error) {
             console.error('搜索過程中發生錯誤:', error);
-            searchResults.innerHTML = '<p class="no-results">搜索過程中發生錯誤，請稍後再試</p>';
+            searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
         }
     }
     
