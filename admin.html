@@ -31,14 +31,84 @@
                 </div>
             </div>
             
+            <!-- 查詢、篩選和排序區域 -->
+            <div class="search-filter-section">
+                <form id="searchFilterForm">
+                    <div class="search-row">
+                        <div class="search-group">
+                            <label for="searchKeyword">關鍵字搜索：</label>
+                            <input type="text" id="searchKeyword" placeholder="輸入關鍵字...">
+                        </div>
+                        <div class="search-group">
+                            <label for="searchField">搜索欄位：</label>
+                            <select id="searchField">
+                                <option value="title">書名</option>
+                                <option value="author">作者</option>
+                                <option value="series">集數</option>
+                                <option value="publisher">出版社</option>
+                                <option value="cabinet">櫃號</option>
+                                <option value="row">行號</option>
+                                <option value="isbn">ISBN</option>
+                                <option value="all">全部欄位</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filterPublisher">出版社：</label>
+                            <select id="filterPublisher">
+                                <option value="">全部</option>
+                                <!-- 出版社選項將由JavaScript動態生成 -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterCabinet">櫃號：</label>
+                            <select id="filterCabinet">
+                                <option value="">全部</option>
+                                <!-- 櫃號選項將由JavaScript動態生成 -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="sort-row">
+                        <div class="sort-group">
+                            <label for="sortField">排序依據：</label>
+                            <select id="sortField">
+                                <option value="title">書名</option>
+                                <option value="author">作者</option>
+                                <option value="series">集數</option>
+                                <option value="publisher">出版社</option>
+                                <option value="cabinet">櫃號</option>
+                                <option value="row">行號</option>
+                                <option value="createdAt">創建時間</option>
+                                <option value="updatedAt">更新時間</option>
+                            </select>
+                        </div>
+                        <div class="sort-group">
+                            <label for="sortOrder">排序方式：</label>
+                            <select id="sortOrder">
+                                <option value="asc">升序</option>
+                                <option value="desc">降序</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="button-row">
+                        <button type="submit" id="applyFiltersBtn"><i class="fas fa-search"></i> 搜索</button>
+                        <button type="reset" id="resetFiltersBtn"><i class="fas fa-undo"></i> 重置</button>
+                    </div>
+                </form>
+            </div>
+            
             <div class="admin-content">
                 <table class="admin-table">
                     <thead>
                         <tr>
                             <th>書名</th>
                             <th>作者</th>
+                            <th>集數</th>
                             <th>出版社</th>
-                            <th>ISBN號</th>
+                            <th>櫃號</th>
+                            <th>行號</th>
+                            <th>創建時間</th>
                             <th>操作</th>
                         </tr>
                     </thead>
