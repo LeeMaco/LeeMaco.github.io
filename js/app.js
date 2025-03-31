@@ -37,33 +37,11 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // 顯示搜尋中的提示
-        searchResults.innerHTML = '<p class="searching">正在搜尋中，請稍候...</p>';
-        
         try {
             console.log('執行搜索，關鍵字:', query, '類型:', type);
-            // 確保數據已完全加載
-            if (BookData.jsonBooks.length === 0) {
-                console.log('JSON數據尚未加載完成，嘗試重新加載');
-                // 顯示加載中的提示
-                searchResults.innerHTML = '<p class="searching">正在加載數據，請稍候...</p>';
-                
-                // 重新加載數據並在完成後執行搜尋
-                BookData.loadBooksFromJSON().then(() => {
-                    console.log('數據重新加載完成，執行搜尋');
-                    const results = BookData.searchBooks(query, type);
-                    console.log('搜索結果數量:', results.length);
-                    displaySearchResults(results);
-                }).catch(error => {
-                    console.error('加載數據時發生錯誤:', error);
-                    searchResults.innerHTML = '<p class="no-results">加載數據時發生錯誤，請稍後再試</p>';
-                });
-            } else {
-                // 數據已加載，直接執行搜尋
-                const results = BookData.searchBooks(query, type);
-                console.log('搜索結果數量:', results.length);
-                displaySearchResults(results);
-            }
+            const results = BookData.searchBooks(query, type);
+            console.log('搜索結果數量:', results.length);
+            displaySearchResults(results);
         } catch (error) {
             console.error('搜索過程中發生錯誤:', error);
             searchResults.innerHTML = '<p class="no-results">搜索過程中發生錯誤，請稍後再試</p>';
