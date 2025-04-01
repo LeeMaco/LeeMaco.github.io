@@ -15,6 +15,13 @@ document.addEventListener('DOMContentLoaded', function() {
     const bookDetailModal = document.getElementById('bookDetailModal');
     const bookDetailContent = document.getElementById('bookDetailContent');
     
+    // 初始化數據並確保數據加載完成
+    BookData.init().then(() => {
+        console.log('數據初始化完成');
+    }).catch(error => {
+        console.error('數據初始化失敗:', error);
+    });
+    
     // 綁定搜索按鈕點擊事件
     searchBtn.addEventListener('click', function() {
         performSearch();
@@ -38,35 +45,57 @@ document.addEventListener('DOMContentLoaded', function() {
         }
         
         // 顯示搜尋中的提示
-        searchResults.innerHTML = '<p class="searching">正在搜尋中，請稍候...</p>';
+        searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
         
         try {
             console.log('執行搜索，關鍵字:', query, '類型:', type);
+            
+            // 檢查環境
+            const isGitHubPages = window.location.href.includes('github.io');
+            if (isGitHubPages) {
+                console.log('檢測到GitHub Pages環境，使用優化的數據加載策略');
+            }
+            
             // 確保數據已完全加載
-            if (BookData.jsonBooks.length === 0) {
-                console.log('JSON數據尚未加載完成，嘗試重新加載');
-                // 顯示加載中的提示
-                searchResults.innerHTML = '<p class="searching">正在加載數據，請稍候...</p>';
-                
-                // 重新加載數據並在完成後執行搜尋
-                BookData.loadBooksFromJSON().then(() => {
-                    console.log('數據重新加載完成，執行搜尋');
-                    const results = BookData.searchBooks(query, type);
-                    console.log('搜索結果數量:', results.length);
-                    displaySearchResults(results);
-                }).catch(error => {
-                    console.error('加載數據時發生錯誤:', error);
-                    searchResults.innerHTML = '<p class="no-results">加載數據時發生錯誤，請稍後再試</p>';
-                });
-            } else {
-                // 數據已加載，直接執行搜尋
-                const results = BookData.searchBooks(query, type);
+            const searchPromise = (BookData.jsonBooks.length === 0) 
+                ? BookData.loadBooksFromJSON().then(data => {
+                    console.log('數據重新加載完成，加載了', data.length, '本書籍');
+                    return BookData.searchBooks(query, type);
+                  })
+                : Promise.resolve(BookData.searchBooks(query, type));
+            
+            searchPromise.then(results => {
                 console.log('搜索結果數量:', results.length);
                 displaySearchResults(results);
-            }
+                
+                // 如果在GitHub Pages環境中成功搜索，添加提示
+                if (isGitHubPages && results.length > 0) {
+                    const successNote = document.createElement('div');
+                    successNote.className = 'search-success-note';
+                    successNote.innerHTML = '<small>數據加載成功！</small>';
+                    searchResults.appendChild(successNote);
+                }
+            }).catch(error => {
+                console.error('搜索或加載數據時發生錯誤:', error);
+                // 顯示更詳細的錯誤信息
+                const errorMessage = error.message || '未知錯誤';
+                searchResults.innerHTML = `
+                    <div class="error-message">
+                        <p class="no-results"><i class="fas fa-exclamation-triangle"></i> 搜索過程中發生錯誤：</p>
+                        <p class="error-details">${errorMessage}</p>
+                        <p>可能原因：</p>
+                        <ul>
+                            <li>無法加載書籍數據文件</li>
+                            <li>數據格式不正確</li>
+                            <li>網絡連接問題</li>
+                        </ul>
+                        <p>如果您在GitHub Pages上瀏覽，請確保data/books.json文件已正確上傳。</p>
+                    </div>
+                `;
+            });
         } catch (error) {
             console.error('搜索過程中發生錯誤:', error);
-            searchResults.innerHTML = '<p class="no-results">搜索過程中發生錯誤，請稍後再試</p>';
+            searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
         }
     }
     
@@ -84,6 +113,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <h3>${book.title}</h3>
                     <p><strong>作者：</strong>${book.author}</p>
                     ${book.series ? `<p><strong>集數：</strong>${book.series}</p>` : ''}
+                    <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
                     <p><strong>出版社：</strong>${book.publisher || '未知'}</p>
                 </div>
             `;
@@ -110,9 +140,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="book-detail-content">
                 <p><strong>作者：</strong>${book.author}</p>
                 ${book.series ? `<p><strong>集數：</strong>${book.series}</p>` : ''}
+                <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
                 <p><strong>出版社：</strong>${book.publisher || '未知'}</p>
                 <p><strong>ISBN號：</strong>${book.isbn || '未知'}</p>
-                <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
                 ${book.description ? `<p><strong>描述：</strong>${book.description}</p>` : ''}
                 ${book.notes ? `<p><strong>備註：</strong>${book.notes}</p>` : ''}
             </div>
