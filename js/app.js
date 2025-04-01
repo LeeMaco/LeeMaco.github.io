@@ -15,6 +15,32 @@ document.addEventListener('DOMContentLoaded', function() {
     const bookDetailModal = document.getElementById('bookDetailModal');
     const bookDetailContent = document.getElementById('bookDetailContent');
     
+    // 高級搜索相關元素
+    const advancedSearchBtn = document.getElementById('advancedSearchBtn');
+    const advancedSearchSection = document.getElementById('advancedSearchSection');
+    const searchFilterForm = document.getElementById('searchFilterForm');
+    const titleSearch = document.getElementById('titleSearch');
+    const authorSearch = document.getElementById('authorSearch');
+    const publisherSearch = document.getElementById('publisherSearch');
+    const cabinetFilter = document.getElementById('cabinetFilter');
+    const rowFilter = document.getElementById('rowFilter');
+    const resetFiltersBtn = document.getElementById('resetFiltersBtn');
+    const applyFiltersBtn = document.getElementById('applyFiltersBtn');
+    
+    // 搜索建議相關元素
+    let searchSuggestions;
+    let currentSuggestions = [];
+    
+    // 創建搜索建議容器
+    function createSuggestionsContainer() {
+        searchSuggestions = document.createElement('div');
+        searchSuggestions.className = 'search-suggestions';
+        searchSuggestions.style.display = 'none';
+        searchInput.parentNode.insertBefore(searchSuggestions, searchInput.nextSibling);
+    }
+    
+    createSuggestionsContainer();
+    
     // 初始化數據並確保數據加載完成
     BookData.init().then(() => {
         console.log('數據初始化完成');
@@ -33,6 +59,178 @@ document.addEventListener('DOMContentLoaded', function() {
             performSearch();
         }
     });
+    
+    // 綁定搜索輸入框輸入事件，實現搜索建議
+    searchInput.addEventListener('input', function() {
+        const query = this.value.trim();
+        if (query.length < 2) {
+            searchSuggestions.style.display = 'none';
+            return;
+        }
+        
+        // 獲取搜索類型
+        const type = searchType.value;
+        
+        // 獲取所有書籍
+        const allBooks = BookData.getAllBooks();
+        
+        // 根據搜索類型和查詢生成建議
+        currentSuggestions = [];
+        const seen = new Set(); // 用於去重
+        
+        allBooks.forEach(book => {
+            if (!book) return;
+            
+            let fieldValue = '';
+            if (type === 'all') {
+                // 檢查所有欄位
+                const fields = ['title', 'author', 'publisher', 'isbn'];
+                for (const field of fields) {
+                    if (book[field] && String(book[field]).toLowerCase().includes(query.toLowerCase())) {
+                        fieldValue = book[field];
+                        break;
+                    }
+                }
+            } else if (book[type]) {
+                fieldValue = book[type];
+            }
+            
+            if (fieldValue && String(fieldValue).toLowerCase().includes(query.toLowerCase())) {
+                const suggestionText = String(fieldValue);
+                if (!seen.has(suggestionText.toLowerCase())) {
+                    seen.add(suggestionText.toLowerCase());
+                    currentSuggestions.push({
+                        text: suggestionText,
+                        type: type
+                    });
+                }
+            }
+        });
+        
+        // 限制建議數量
+        currentSuggestions = currentSuggestions.slice(0, 5);
+        
+        // 顯示建議
+        if (currentSuggestions.length > 0) {
+            displaySuggestions(currentSuggestions);
+        } else {
+            searchSuggestions.style.display = 'none';
+        }
+    });
+    
+    // 點擊文檔其他地方時隱藏搜索建議
+    document.addEventListener('click', function(e) {
+        if (e.target !== searchInput && e.target !== searchSuggestions) {
+            searchSuggestions.style.display = 'none';
+        }
+    });
+    
+    // 顯示搜索建議
+    function displaySuggestions(suggestions) {
+        searchSuggestions.innerHTML = '';
+        
+        suggestions.forEach(suggestion => {
+            const item = document.createElement('div');
+            item.className = 'suggestion-item';
+            item.textContent = suggestion.text;
+            
+            item.addEventListener('click', function() {
+                searchInput.value = suggestion.text;
+                searchType.value = suggestion.type;
+                searchSuggestions.style.display = 'none';
+                performSearch();
+            });
+            
+            searchSuggestions.appendChild(item);
+        });
+        
+        searchSuggestions.style.display = 'block';
+    }
+    
+    // 綁定高級搜索按鈕點擊事件
+    advancedSearchBtn.addEventListener('click', function() {
+        // 切換高級搜索區域的顯示狀態
+        if (advancedSearchSection.style.display === 'none' || !advancedSearchSection.style.display) {
+            advancedSearchSection.style.display = 'block';
+            advancedSearchBtn.innerHTML = '<i class="fas fa-times"></i> 關閉高級搜索';
+        } else {
+            advancedSearchSection.style.display = 'none';
+            advancedSearchBtn.innerHTML = '<i class="fas fa-sliders-h"></i> 高級搜索';
+        }
+    });
+    
+    // 綁定重置按鈕點擊事件
+    resetFiltersBtn.addEventListener('click', function() {
+        // 重置所有搜索和篩選欄位
+        titleSearch.value = '';
+        authorSearch.value = '';
+        publisherSearch.value = '';
+        cabinetFilter.value = '';
+        rowFilter.value = '';
+    });
+    
+    // 綁定應用篩選按鈕點擊事件
+    applyFiltersBtn.addEventListener('click', function() {
+        performAdvancedSearch();
+    });
+    
+    // 執行高級搜索
+    function performAdvancedSearch() {
+        // 顯示搜尋中的提示
+        searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
+        
+        try {
+            // 收集搜索條件
+            const title = titleSearch.value.trim();
+            const author = authorSearch.value.trim();
+            const publisher = publisherSearch.value.trim();
+            const cabinet = cabinetFilter.value;
+            const row = rowFilter.value;
+            
+            // 檢查是否有輸入任何搜索條件
+            if (!title && !author && !publisher && !cabinet && !row) {
+                searchResults.innerHTML = '<p class="no-results">請輸入至少一個搜索條件</p>';
+                return;
+            }
+            
+            console.log('執行高級搜索，條件:', { title, author, publisher, cabinet, row });
+            
+            // 構建搜索條件
+            let results = BookData.getAllBooks();
+            
+            // 應用標題篩選
+            if (title) {
+                results = results.filter(book => book.title && book.title.toLowerCase().includes(title.toLowerCase()));
+            }
+            
+            // 應用作者篩選
+            if (author) {
+                results = results.filter(book => book.author && book.author.toLowerCase().includes(author.toLowerCase()));
+            }
+            
+            // 應用出版社篩選
+            if (publisher) {
+                results = results.filter(book => book.publisher && book.publisher.toLowerCase().includes(publisher.toLowerCase()));
+            }
+            
+            // 應用櫃號篩選
+            if (cabinet) {
+                results = results.filter(book => book.cabinet && book.cabinet.toLowerCase() === cabinet.toLowerCase());
+            }
+            
+            // 應用行號篩選
+            if (row) {
+                results = results.filter(book => book.row && book.row.toLowerCase() === row.toLowerCase());
+            }
+            
+            console.log('高級搜索結果數量:', results.length);
+            displaySearchResults(results);
+            
+        } catch (error) {
+            console.error('高級搜索過程中發生錯誤:', error);
+            searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
+        }
+    }
     
     // 執行搜索
     function performSearch() {

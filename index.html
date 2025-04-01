@@ -26,8 +26,58 @@
                 <select id="searchType">
                     <option value="title">書名</option>
                     <option value="author">作者</option>
+                    <option value="publisher">出版社</option>
+                    <option value="isbn">ISBN</option>
+                    <option value="all">全部欄位</option>
                 </select>
                 <button id="searchBtn"><i class="fas fa-search"></i> 查詢</button>
+                <button id="advancedSearchBtn" type="button"><i class="fas fa-sliders-h"></i> 高級搜索</button>
+            </div>
+            
+            <!-- 高級搜索區域 -->
+            <div class="search-filter-section" id="advancedSearchSection" style="display: none;">
+                <form id="searchFilterForm">
+                    <div class="search-row">
+                        <div class="search-group">
+                            <label for="titleSearch">書名</label>
+                            <input type="text" id="titleSearch" placeholder="輸入書名關鍵字">
+                        </div>
+                        <div class="search-group">
+                            <label for="authorSearch">作者</label>
+                            <input type="text" id="authorSearch" placeholder="輸入作者名稱">
+                        </div>
+                        <div class="search-group">
+                            <label for="publisherSearch">出版社</label>
+                            <input type="text" id="publisherSearch" placeholder="輸入出版社名稱">
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="cabinetFilter">櫃號</label>
+                            <select id="cabinetFilter">
+                                <option value="">全部</option>
+                                <option value="A">A</option>
+                                <option value="B">B</option>
+                                <option value="C">C</option>
+                                <option value="D">D</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="rowFilter">行號</label>
+                            <select id="rowFilter">
+                                <option value="">全部</option>
+                                <option value="1">1</option>
+                                <option value="2">2</option>
+                                <option value="3">3</option>
+                                <option value="4">4</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="button-row">
+                        <button type="button" id="resetFiltersBtn"><i class="fas fa-undo"></i> 重置</button>
+                        <button type="button" id="applyFiltersBtn"><i class="fas fa-search"></i> 搜索</button>
+                    </div>
+                </form>
             </div>
         </section>
 

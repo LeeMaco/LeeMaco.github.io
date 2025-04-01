@@ -77,6 +77,7 @@ section h2 {
     display: flex;
     gap: 10px;
     margin-bottom: 1rem;
+    position: relative;
 }
 
 .search-box input {
@@ -85,6 +86,35 @@ section h2 {
     border: 1px solid #ddd;
     border-radius: 4px;
     font-size: 1rem;
+}
+
+/* 搜索建議樣式 */
+.search-suggestions {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    width: 100%;
+    max-height: 200px;
+    overflow-y: auto;
+    background-color: white;
+    border: 1px solid #ddd;
+    border-radius: 0 0 4px 4px;
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    z-index: 100;
+}
+
+.suggestion-item {
+    padding: 0.8rem;
+    cursor: pointer;
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.suggestion-item:hover {
+    background-color: #f5f5f5;
+}
+
+.suggestion-item:last-child {
+    border-bottom: none;
 }
 
 .search-box select {
@@ -437,6 +467,29 @@ footer {
 }
 
 /* 響應式設計 */
+/* 大型平板設備 (992px以下) */
+@media (max-width: 992px) {
+    .book-list {
+        grid-template-columns: repeat(2, 1fr);
+    }
+    
+    .modal-content {
+        width: 90%;
+        margin: 8% auto;
+    }
+    
+    .search-filter-section .search-row,
+    .search-filter-section .filter-row,
+    .search-filter-section .sort-row {
+        flex-wrap: wrap;
+    }
+    
+    .search-group, .filter-group, .sort-group {
+        min-width: 180px;
+    }
+}
+
+/* 平板設備 (768px以下) */
 @media (max-width: 768px) {
     .book-list {
         grid-template-columns: 1fr;
@@ -459,5 +512,51 @@ footer {
         flex-direction: column;
         align-items: flex-start;
         gap: 10px;
+    }
+    
+    .admin-table {
+        font-size: 0.9rem;
+    }
+    
+    .admin-table th, .admin-table td {
+        padding: 0.6rem;
+    }
+}
+
+/* 手機設備 (576px以下) */
+@media (max-width: 576px) {
+    header .container {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .admin-login {
+        width: 100%;
+    }
+    
+    .admin-login button {
+        width: 100%;
+    }
+    
+    .search-group, .filter-group, .sort-group {
+        min-width: 100%;
+    }
+    
+    .button-row {
+        justify-content: center;
+    }
+    
+    .book-card {
+        padding: 0.8rem;
+    }
+    
+    .book-card h3 {
+        font-size: 1.2rem;
+    }
+    
+    .modal-content {
+        padding: 1.2rem;
+        margin: 10% auto;
     }
 }

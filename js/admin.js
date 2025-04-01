@@ -51,9 +51,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化篩選選項
     initFilterOptions();
     
-    // 初始化模糊搜索功能
-    initFuzzySearch();
-    
     // 初始化垃圾桶表格事件處理
     initTrashTableEvents();
     
@@ -382,34 +379,6 @@ document.addEventListener('DOMContentLoaded', function() {
             option.value = cabinet;
             option.textContent = cabinet;
             filterCabinet.appendChild(option);
-        });
-    }
-
-    // 初始化模糊搜索功能
-    function initFuzzySearch() {
-        const searchInput = document.getElementById('searchInput');
-        
-        searchInput.addEventListener('input', function() {
-            const searchTerm = this.value.toLowerCase();
-            
-            if (searchTerm.length >= 2) { // 至少輸入2個字符才開始搜索
-                const books = BookData.getAllBooks();
-                const filteredBooks = books.filter(book => {
-                    // 搜索書名、作者、ISBN和備註
-                    return (
-                        book.title.toLowerCase().includes(searchTerm) ||
-                        book.author.toLowerCase().includes(searchTerm) ||
-                        (book.isbn && book.isbn.toLowerCase().includes(searchTerm)) ||
-                        (book.notes && book.notes.toLowerCase().includes(searchTerm))
-                    );
-                });
-                
-                // 顯示搜索結果
-                renderBooks(filteredBooks);
-            } else if (searchTerm.length === 0) {
-                // 如果清空搜索框，顯示所有書籍
-                loadBooks();
-            }
         });
     }
     
