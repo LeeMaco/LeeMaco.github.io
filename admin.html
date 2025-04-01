@@ -266,6 +266,27 @@
         </div>
     </div>
     
+    <!-- 備份設置彈窗 -->
+    <div id="backupSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>備份設置</h2>
+            <p>配置自動備份選項</p>
+            <form id="backupSettingsForm">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="backupEnabled" style="margin-right: 8px;">
+                    <label for="backupEnabled">啟用自動備份</label>
+                </div>
+                <div class="form-group">
+                    <label for="backupInterval">備份間隔(小時):</label>
+                    <input type="number" id="backupInterval" min="1" max="720" value="24">
+                </div>
+                <div id="backupStatus" style="margin-top: 10px; font-weight: bold;"></div>
+                <button type="submit">保存設置</button>
+            </form>
+        </div>
+    </div>
+    
     <!-- GitHub設置彈窗 -->
     <div id="githubSettingsModal" class="modal">
         <div class="modal-content">
