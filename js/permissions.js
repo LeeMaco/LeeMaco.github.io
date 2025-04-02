@@ -1040,6 +1040,7 @@ const PermissionManager = {
         
         if (!token || !repo) {
             console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
+            this.showPermissionSyncStatus('同步失敗: 未設置GitHub訪問令牌或倉庫信息', false);
             return false;
         }
         
@@ -1060,9 +1061,12 @@ const PermissionManager = {
             statusElement.style.borderRadius = '4px';
             statusElement.style.zIndex = '1000';
             statusElement.style.fontWeight = 'bold';
+            statusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
             document.body.appendChild(statusElement);
         }
         
+        // 顯示初始狀態
+        statusElement.style.display = 'block';
         statusElement.textContent = '正在同步權限設置到GitHub...';
         statusElement.style.color = '#3498db';
         
@@ -1071,29 +1075,61 @@ const PermissionManager = {
             // 檢查uploadToGitHub函數是否存在
             if (typeof uploadToGitHub === 'function') {
                 uploadToGitHub(jsonContent, 'permissions.json')
-                    .then(() => {
-                        console.log('權限設置同步到GitHub成功');
-                        statusElement.textContent = '權限設置同步成功！';
-                        statusElement.style.color = '#2ecc71';
-                        setTimeout(() => {
-                            statusElement.textContent = '';
-                        }, 5000);
+                    .then(result => {
+                        console.log('權限設置同步到GitHub成功:', result);
+                        this.showPermissionSyncStatus('權限設置同步成功！', true);
+                        return true;
                     })
                     .catch(error => {
                         console.error('權限設置同步到GitHub失敗:', error);
-                        statusElement.textContent = `同步失敗: ${error.message}`;
-                        statusElement.style.color = '#e74c3c';
+                        this.showPermissionSyncStatus(`同步失敗: ${error.message}`, false);
+                        return false;
                     });
             } else {
                 console.error('uploadToGitHub函數不存在，無法同步權限設置');
-                statusElement.textContent = '同步失敗: 上傳功能不可用';
-                statusElement.style.color = '#e74c3c';
+                this.showPermissionSyncStatus('同步失敗: 上傳功能不可用', false);
+                return false;
             }
         } catch (error) {
             console.error('嘗試同步權限設置時發生錯誤:', error);
-            statusElement.textContent = `同步失敗: ${error.message}`;
-            statusElement.style.color = '#e74c3c';
+            this.showPermissionSyncStatus(`同步失敗: ${error.message}`, false);
+            return false;
         }
+        
+        return true;
+    },
+    
+    /**
+     * 顯示權限同步狀態提示
+     * @param {string} message - 要顯示的消息
+     * @param {boolean} isSuccess - 是否成功
+     */
+    showPermissionSyncStatus: function(message, isSuccess) {
+        let statusElement = document.getElementById('permissionUploadStatus');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'permissionUploadStatus';
+            statusElement.style.position = 'fixed';
+            statusElement.style.bottom = '20px';
+            statusElement.style.right = '20px';
+            statusElement.style.padding = '10px 15px';
+            statusElement.style.backgroundColor = '#f8f9fa';
+            statusElement.style.border = '1px solid #ddd';
+            statusElement.style.borderRadius = '4px';
+            statusElement.style.zIndex = '1000';
+            statusElement.style.fontWeight = 'bold';
+            statusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+            document.body.appendChild(statusElement);
+        }
+        
+        statusElement.style.display = 'block';
+        statusElement.textContent = message;
+        statusElement.style.color = isSuccess ? '#2ecc71' : '#e74c3c';
+        
+        // 設置自動消失的定時器
+        setTimeout(() => {
+            statusElement.style.display = 'none';
+        }, isSuccess ? 5000 : 8000); // 成功提示5秒後消失，錯誤提示8秒後消失
     },
     
     // 保存當前用戶的權限設置
