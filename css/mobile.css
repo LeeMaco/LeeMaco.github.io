@@ -1,0 +1,227 @@
+/* 移動端響應式設計優化 */
+
+/* 全局優化 */
+@media (max-width: 992px) {
+    .container {
+        width: 95%;
+        padding: 0 10px;
+    }
+    
+    /* 管理頁面按鈕優化 */
+    .admin-actions {
+        flex-wrap: wrap;
+        justify-content: center;
+    }
+    
+    .admin-actions button {
+        margin-bottom: 8px;
+    }
+}
+
+/* 平板設備優化 (768px以下) */
+@media (max-width: 768px) {
+    /* 搜索框優化 */
+    .search-box {
+        gap: 8px;
+    }
+    
+    .search-box input,
+    .search-box select,
+    .search-box button {
+        width: 100%;
+    }
+    
+    /* 表格優化 */
+    .admin-table {
+        display: block;
+        overflow-x: auto;
+        white-space: nowrap;
+    }
+    
+    /* 表單優化 */
+    .form-group input, 
+    .form-group textarea, 
+    .form-group select {
+        padding: 0.7rem;
+    }
+    
+    /* 模態框優化 */
+    .modal-content {
+        padding: 1.5rem;
+    }
+}
+
+/* 手機設備優化 (576px以下) */
+@media (max-width: 576px) {
+    /* 頁頭優化 */
+    header {
+        padding: 0.8rem 0;
+    }
+    
+    header h1 {
+        font-size: 1.3rem;
+    }
+    
+    /* 搜索區域優化 */
+    .search-filter-section {
+        padding: 0.8rem;
+    }
+    
+    .search-row, 
+    .filter-row, 
+    .sort-row, 
+    .button-row {
+        gap: 8px;
+    }
+    
+    /* 管理頁面按鈕優化 - 轉為下拉菜單 */
+    .admin-actions {
+        position: relative;
+        display: block;
+        width: 100%;
+    }
+    
+    .admin-actions-menu {
+        display: none;
+        position: absolute;
+        top: 100%;
+        left: 0;
+        width: 100%;
+        background-color: white;
+        border: 1px solid #ecf0f1;
+        border-radius: 4px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        z-index: 10;
+    }
+    
+    .admin-actions-menu.show {
+        display: block;
+    }
+    
+    .admin-actions-toggle {
+        display: block;
+        width: 100%;
+        background-color: #3498db;
+        color: white;
+        border: none;
+        padding: 0.7rem;
+        border-radius: 4px;
+        cursor: pointer;
+        text-align: left;
+    }
+    
+    .admin-actions-toggle i {
+        float: right;
+        margin-top: 5px;
+    }
+    
+    .admin-actions button {
+        display: block;
+        width: 100%;
+        text-align: left;
+        border-radius: 0;
+        border-bottom: 1px solid #ecf0f1;
+    }
+    
+    .admin-actions button:last-child {
+        border-bottom: none;
+    }
+    
+    /* 表格優化 - 卡片式顯示 */
+    .admin-table thead {
+        display: none;
+    }
+    
+    .admin-table, 
+    .admin-table tbody, 
+    .admin-table tr, 
+    .admin-table td {
+        display: block;
+        width: 100%;
+        text-align: left;
+    }
+    
+    .admin-table tr {
+        margin-bottom: 1rem;
+        border: 1px solid #ecf0f1;
+        border-radius: 8px;
+        padding: 0.5rem;
+        position: relative;
+    }
+    
+    .admin-table td {
+        padding: 0.5rem;
+        border: none;
+        border-bottom: 1px solid #f5f5f5;
+    }
+    
+    .admin-table td:last-child {
+        border-bottom: none;
+    }
+    
+    .admin-table td:before {
+        content: attr(data-label);
+        font-weight: bold;
+        display: inline-block;
+        width: 100px;
+    }
+    
+    .admin-table .action-btns {
+        justify-content: flex-start;
+        margin-top: 0.5rem;
+    }
+    
+    /* 書籍卡片優化 */
+    .book-card {
+        padding: 0.8rem;
+    }
+    
+    /* 模態框優化 */
+    .modal-content {
+        width: 100%;
+        margin: 0;
+        border-radius: 0;
+        height: 100%;
+        overflow-y: auto;
+    }
+    
+    /* 表單按鈕優化 */
+    form button {
+        width: 100%;
+    }
+}
+
+/* 超小屏幕設備 (400px以下) */
+@media (max-width: 400px) {
+    header h1 {
+        font-size: 1.1rem;
+    }
+    
+    section h2 {
+        font-size: 1.2rem;
+    }
+    
+    .book-card h3 {
+        font-size: 1.1rem;
+    }
+    
+    .form-group label {
+        font-size: 0.9rem;
+    }
+    
+    .form-group input, 
+    .form-group textarea, 
+    .form-group select {
+        padding: 0.6rem;
+        font-size: 0.9rem;
+    }
+    
+    .modal-content {
+        padding: 1rem;
+    }
+    
+    .close {
+        right: 15px;
+        top: 5px;
+    }
+}
