@@ -42,57 +42,75 @@ const PermissionManager = {
             localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(initialPermissions));
         }
         
-        // 添加權限設置按鈕到管理員界面
-        this.addPermissionSettingsButton();
-        
-        // 應用權限設置到界面
-        this.applyPermissions();
+        // 確保DOM已完全加載後再添加按鈕
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                this.addPermissionSettingsButton();
+                this.applyPermissions();
+            });
+        } else {
+            // 添加權限設置按鈕到管理員界面
+            this.addPermissionSettingsButton();
+            
+            // 應用權限設置到界面
+            this.applyPermissions();
+        }
     },
     
     // 添加權限設置按鈕
     addPermissionSettingsButton: function() {
-        const adminActions = document.querySelector('.admin-actions');
+        // 確保選擇正確的下拉菜單元素
+        const adminActions = document.querySelector('.admin-actions-menu');
+        console.log('找到管理選項下拉菜單:', adminActions); // 添加調試日誌
+        
         if (adminActions) {
             // 在登出按鈕前添加權限設置按鈕
             const logoutBtn = document.getElementById('logoutBtn');
             
-            const permissionBtn = document.createElement('button');
-            permissionBtn.id = 'permissionSettingsBtn';
-            permissionBtn.className = 'excel-btn';
-            permissionBtn.innerHTML = '<i class="fas fa-user-lock"></i> 權限設置';
-            
-            // 添加用戶管理按鈕（僅對超級管理員顯示）
-            const userManagementBtn = document.createElement('button');
-            userManagementBtn.id = 'userManagementBtn';
-            userManagementBtn.className = 'excel-btn';
-            userManagementBtn.innerHTML = '<i class="fas fa-users-cog"></i> 用戶管理';
-            
-            // 檢查當前用戶是否為超級管理員
-            if (window.UserManager && UserManager.isSuperAdmin()) {
-                if (logoutBtn) {
-                    adminActions.insertBefore(userManagementBtn, logoutBtn);
-                    adminActions.insertBefore(permissionBtn, userManagementBtn);
+            // 檢查是否已存在權限設置按鈕，避免重複添加
+            if (!document.getElementById('permissionSettingsBtn')) {
+                const permissionBtn = document.createElement('button');
+                permissionBtn.id = 'permissionSettingsBtn';
+                permissionBtn.className = 'excel-btn';
+                permissionBtn.innerHTML = '<i class="fas fa-user-lock"></i> 權限設置';
+                
+                // 添加用戶管理按鈕（僅對超級管理員顯示）
+                const userManagementBtn = document.createElement('button');
+                userManagementBtn.id = 'userManagementBtn';
+                userManagementBtn.className = 'excel-btn';
+                userManagementBtn.innerHTML = '<i class="fas fa-users-cog"></i> 用戶管理';
+                
+                // 檢查當前用戶是否為超級管理員
+                if (window.UserManager && UserManager.isSuperAdmin()) {
+                    if (logoutBtn) {
+                        adminActions.insertBefore(userManagementBtn, logoutBtn);
+                        adminActions.insertBefore(permissionBtn, userManagementBtn);
+                    } else {
+                        adminActions.appendChild(permissionBtn);
+                        adminActions.appendChild(userManagementBtn);
+                    }
+                    
+                    // 綁定用戶管理按鈕點擊事件
+                    userManagementBtn.addEventListener('click', function() {
+                        PermissionManager.showUserManagementModal();
+                    });
                 } else {
-                    adminActions.appendChild(permissionBtn);
-                    adminActions.appendChild(userManagementBtn);
+                    if (logoutBtn) {
+                        adminActions.insertBefore(permissionBtn, logoutBtn);
+                    } else {
+                        adminActions.appendChild(permissionBtn);
+                    }
                 }
                 
-                // 綁定用戶管理按鈕點擊事件
-                userManagementBtn.addEventListener('click', function() {
-                    PermissionManager.showUserManagementModal();
+                // 綁定權限設置按鈕點擊事件
+                permissionBtn.addEventListener('click', function() {
+                    PermissionManager.showPermissionSettingsModal();
                 });
-            } else {
-                if (logoutBtn) {
-                    adminActions.insertBefore(permissionBtn, logoutBtn);
-                } else {
-                    adminActions.appendChild(permissionBtn);
-                }
+                
+                console.log('權限設置按鈕已添加'); // 添加調試日誌
             }
-            
-            // 綁定權限設置按鈕點擊事件
-            permissionBtn.addEventListener('click', function() {
-                PermissionManager.showPermissionSettingsModal();
-            });
+        } else {
+            console.error('未找到管理選項下拉菜單元素'); // 添加錯誤日誌
         }
     },
     
@@ -1211,6 +1229,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 檢查是否已登入
     if (localStorage.getItem('isLoggedIn')) {
         // 初始化權限管理
-        PermissionManager.init();
+        PermissionManager.init(); // 直接調用初始化方法，不使用setTimeout
     }
 });
