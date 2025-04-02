@@ -29,6 +29,8 @@
                     <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
                     <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
                     <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
+                    <button id="backupSettingsBtn" class="excel-btn"><i class="fas fa-cog"></i> 備份設置</button>
+                    <button id="backupHistoryBtn" class="excel-btn"><i class="fas fa-history"></i> 備份歷史</button>
                     <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
                     <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
                 </div>
@@ -290,6 +292,71 @@
         </div>
     </div>
 
+    <!-- 備份設置彈窗 -->
+    <div id="backupSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>備份設置</h2>
+            <p>請設置自動備份相關信息。</p>
+            <form id="backupSettingsForm">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="backupEnabled" style="margin-right: 8px;">
+                    <label for="backupEnabled">啟用自動備份</label>
+                </div>
+                <div class="form-group">
+                    <label for="backupInterval">備份頻率：</label>
+                    <select id="backupInterval">
+                        <option value="hourly">每小時</option>
+                        <option value="daily" selected>每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="manual">手動備份</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="autoUploadToGitHub" style="margin-right: 8px;">
+                    <label for="autoUploadToGitHub">自動上傳到GitHub</label>
+                </div>
+                <div class="form-group">
+                    <label for="maxBackupCount">保留備份數量：</label>
+                    <input type="number" id="maxBackupCount" min="1" max="50" value="10">
+                </div>
+                <div class="form-group">
+                    <label>最後備份時間：</label>
+                    <span id="lastBackupTime">從未備份</span>
+                </div>
+                <button type="submit">保存設置</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 備份歷史彈窗 -->
+    <div id="backupHistoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>備份歷史</h2>
+            <p>這裡顯示所有的備份記錄，您可以恢復或刪除備份。</p>
+            <div class="backup-actions" style="margin-bottom: 15px;">
+                <button id="createBackupBtn" class="add-btn"><i class="fas fa-plus"></i> 立即備份</button>
+                <button id="clearBackupHistoryBtn" class="delete-btn"><i class="fas fa-trash"></i> 清空歷史</button>
+            </div>
+            <div class="admin-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>備份時間</th>
+                            <th>書籍數量</th>
+                            <th>已上傳GitHub</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupHistoryTableBody">
+                        <!-- 備份歷史記錄將在這裡顯示 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
     <footer>
         <div class="container">
             <p>&copy; 2023 書籍查詢管理系統</p>
@@ -298,6 +365,10 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="js/data.js"></script>
+    <script src="js/user-manager.js"></script>
+    <script src="js/permissions.js"></script>
     <script src="js/admin.js"></script>
+    <script src="js/backup.js"></script>
+    <script src="js/backup-ui.js"></script>
 </body>
 </html>
