@@ -11,7 +11,7 @@
     "userManagement": false
   },
   "default": {
-    "emptyTrash": true,
+    "emptyTrash": false,
     "exportExcel": false,
     "exportJson": false,
     "importExcel": false,
