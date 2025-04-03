@@ -16,7 +16,7 @@
     "exportJson": false,
     "importExcel": false,
     "githubSettings": false,
-    "backupSettings": false,
+    "backupSettings": true,
     "backupHistory": true,
     "removeDuplicates": false
   }
