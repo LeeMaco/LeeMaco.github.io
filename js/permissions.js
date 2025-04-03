@@ -331,6 +331,29 @@ const PermissionManager = {
                     newPermissions.userManagement = document.getElementById('userManagement').checked;
                 }
                 
+                // 創建同步狀態提示元素
+                let syncStatusElement = document.getElementById('permissionSyncNotification');
+                if (!syncStatusElement) {
+                    syncStatusElement = document.createElement('div');
+                    syncStatusElement.id = 'permissionSyncNotification';
+                    syncStatusElement.style.position = 'fixed';
+                    syncStatusElement.style.top = '20px';
+                    syncStatusElement.style.right = '20px';
+                    syncStatusElement.style.padding = '10px 15px';
+                    syncStatusElement.style.backgroundColor = '#f8f9fa';
+                    syncStatusElement.style.border = '1px solid #ddd';
+                    syncStatusElement.style.borderRadius = '4px';
+                    syncStatusElement.style.zIndex = '1000';
+                    syncStatusElement.style.fontWeight = 'bold';
+                    syncStatusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
+                    document.body.appendChild(syncStatusElement);
+                }
+                
+                // 顯示初始同步狀態
+                syncStatusElement.style.display = 'block';
+                syncStatusElement.textContent = '正在保存權限設置並同步至GitHub...';
+                syncStatusElement.style.color = '#3498db';
+                
                 // 保存權限設置
                 PermissionManager.savePermissions(newPermissions);
                 
@@ -339,9 +362,6 @@ const PermissionManager = {
                 
                 // 關閉彈窗
                 permissionModal.style.display = 'none';
-                
-                // 顯示成功消息
-                alert('權限設置已保存');
             });
             
             // 組裝彈窗
@@ -1027,6 +1047,9 @@ const PermissionManager = {
         const allPermissions = this.getAllPermissions();
         allPermissions[userId] = permissions;
         localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(allPermissions));
+        
+        // 顯示同步狀態提示
+        this.showPermissionSyncStatus('正在同步權限設置到GitHub...', true);
         
         // 同步權限設置到GitHub Pages
         this.syncPermissionsToGitHub(allPermissions);
