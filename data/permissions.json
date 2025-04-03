@@ -1,0 +1,23 @@
+{
+  "1": {
+    "emptyTrash": true,
+    "exportExcel": true,
+    "exportJson": true,
+    "importExcel": true,
+    "githubSettings": true,
+    "backupSettings": true,
+    "backupHistory": true,
+    "removeDuplicates": true,
+    "userManagement": false
+  },
+  "default": {
+    "emptyTrash": false,
+    "exportExcel": false,
+    "exportJson": false,
+    "importExcel": false,
+    "githubSettings": false,
+    "backupSettings": false,
+    "backupHistory": false,
+    "removeDuplicates": false
+  }
+}
