@@ -299,8 +299,16 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 顯示搜索結果
     function displaySearchResults(books) {
+        // 使用文檔片段減少DOM操作
+        const fragment = document.createDocumentFragment();
+        
         if (books.length === 0) {
-            searchResults.innerHTML = '<p class="no-results">沒有找到符合條件的書籍</p>';
+            const noResults = document.createElement('p');
+            noResults.className = 'no-results';
+            noResults.innerHTML = '沒有找到符合條件的書籍';
+            fragment.appendChild(noResults);
+            searchResults.innerHTML = '';
+            searchResults.appendChild(fragment);
             return;
         }
         

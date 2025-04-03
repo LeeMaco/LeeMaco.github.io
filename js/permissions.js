@@ -8,6 +8,10 @@ const PermissionManager = {
     // 權限設置的存儲鍵名
     PERMISSIONS_KEY: 'admin_permissions',
     
+    // 權限密碼的存儲鍵名
+    PERMISSION_PASSWORD_KEY: 'permissionPasswordHash',
+    PERMISSION_SALT_KEY: 'permissionPasswordSalt',
+    
     // 默認權限設置
     defaultPermissions: {
         // 清空垃圾桶功能
@@ -28,6 +32,41 @@ const PermissionManager = {
         removeDuplicates: true,
         // 用戶管理功能（僅超級管理員可用）
         userManagement: false
+    },
+    
+    // 設置權限密碼
+    setPermissionPassword: function(password) {
+        // 生成鹽值
+        const salt = CryptoUtils.generateSalt();
+        // 使用鹽值哈希密碼
+        const hashedPassword = CryptoUtils.hashPassword(password, salt);
+        
+        // 保存哈希密碼和鹽值
+        localStorage.setItem(this.PERMISSION_PASSWORD_KEY, hashedPassword);
+        localStorage.setItem(this.PERMISSION_SALT_KEY, salt);
+        
+        console.log('權限密碼已設置');
+        return true;
+    },
+    
+    // 驗證權限密碼
+    verifyPermissionPassword: function(password) {
+        // 獲取存儲的哈希密碼和鹽值
+        const storedHash = localStorage.getItem(this.PERMISSION_PASSWORD_KEY);
+        const salt = localStorage.getItem(this.PERMISSION_SALT_KEY);
+        
+        // 如果沒有存儲的哈希密碼，則使用默認密碼
+        if (!storedHash) {
+            // 設置默認密碼
+            if (password === '0211') {
+                this.setPermissionPassword('0211');
+                return true;
+            }
+            return false;
+        }
+        
+        // 驗證密碼
+        return CryptoUtils.verifyPassword(password, storedHash, salt);
     },
     
     // 初始化權限管理

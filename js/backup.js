@@ -251,7 +251,7 @@ const BackupManager = {
         
         // 清除現有的定時器
         if (this.backupCheckerId) {
-            clearInterval(this.backupCheckerId);
+            clearTimeout(this.backupCheckerId);
         }
         
         // 獲取備份設置
@@ -263,15 +263,35 @@ const BackupManager = {
             return;
         }
         
-        // 設置定時器，每分鐘檢查一次是否需要備份
-        this.backupCheckerId = setInterval(() => {
-            if (this.checkIfBackupNeeded()) {
-                console.log('需要進行自動備份');
-                this.createBackup();
-            }
-        }, 60 * 1000); // 每分鐘檢查一次
+        // 計算下次備份時間
+        const lastBackupTime = this.getLastBackupTime() || new Date(0);
+        const backupInterval = this.BACKUP_INTERVALS[settings.interval];
+        const nextBackupTime = new Date(lastBackupTime.getTime() + backupInterval);
         
-        console.log('備份檢查器已啟動，間隔:', settings.interval);
+        console.log('上次備份時間:', lastBackupTime);
+        console.log('下次備份時間:', nextBackupTime);
+        
+        // 計算距離下次備份的時間（毫秒）
+        const now = new Date();
+        let timeUntilNextBackup = nextBackupTime - now;
+        
+        // 如果已經過了備份時間，立即執行備份
+        if (timeUntilNextBackup <= 0) {
+            console.log('需要立即進行備份');
+            setTimeout(() => this.createBackup(), 1000);
+            timeUntilNextBackup = backupInterval;
+        }
+        
+        // 設置定時器，在下次備份時間執行
+        this.backupCheckerId = setTimeout(() => {
+            console.log('執行定時備份');
+            this.createBackup();
+            
+            // 重新啟動定時器，使用固定間隔
+            this.startBackupChecker();
+        }, timeUntilNextBackup);
+        
+        console.log('備份檢查器已啟動，下次備份將在', Math.round(timeUntilNextBackup / 60000), '分鐘後執行');
     },
     
     // 停止備份檢查器
