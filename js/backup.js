@@ -183,14 +183,6 @@ const BackupManager = {
             
             if (!token || !repo) {
                 console.error('未設置GitHub訪問令牌或倉庫信息，無法上傳');
-                this.showBackupUploadStatus('上傳失敗: 未設置GitHub訪問令牌或倉庫信息，請在GitHub設置中配置', false);
-                return false;
-            }
-            
-            // 檢查網絡連接
-            if (!navigator.onLine) {
-                console.error('網絡連接已斷開，無法上傳');
-                this.showBackupUploadStatus('上傳失敗: 網絡連接已斷開，請檢查網絡連接後重試', false);
                 return false;
             }
             
@@ -198,21 +190,10 @@ const BackupManager = {
             const jsonContent = JSON.stringify(backup.data, null, 2);
             const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
             
-            // 創建上傳狀態元素
-            this.showBackupUploadStatus('正在上傳備份到GitHub...', null);
-            
-            // 使用window對象訪問全局uploadToGitHub函數
-            if (typeof window.uploadToGitHub !== 'function') {
-                console.error('uploadToGitHub函數不存在，請確保已加載admin.js');
-                this.showBackupUploadStatus('上傳失敗: 上傳功能不可用，請確保已加載admin.js', false);
-                return false;
-            }
-            
             // 使用現有的uploadToGitHub函數上傳
-            window.uploadToGitHub(jsonContent, fileName)
+            uploadToGitHub(jsonContent, fileName)
                 .then(() => {
                     console.log('備份上傳到GitHub成功，文件名:', fileName);
-                    this.showBackupUploadStatus('備份上傳成功！', true);
                     
                     // 更新備份記錄，添加GitHub文件名
                     const history = this.getBackupHistory();
@@ -220,78 +201,17 @@ const BackupManager = {
                     
                     if (backupIndex !== -1) {
                         history[backupIndex].githubFileName = fileName;
-                        history[backupIndex].uploadedToGitHub = true;
                         localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
-                        
-                        // 如果備份歷史彈窗是打開的，重新加載備份歷史記錄
-                        if (document.getElementById('backupHistoryModal').style.display === 'block') {
-                            if (typeof loadBackupHistory === 'function') {
-                                loadBackupHistory();
-                            }
-                        }
                     }
                 })
                 .catch(error => {
                     console.error('備份上傳到GitHub失敗:', error);
-                    let errorMessage = error.message || '未知錯誤';
-                    
-                    // 提供更具體的錯誤信息
-                    if (errorMessage.includes('Bad credentials')) {
-                        errorMessage = 'GitHub訪問令牌無效或已過期，請更新令牌';
-                    } else if (errorMessage.includes('Not Found')) {
-                        errorMessage = '找不到指定的GitHub倉庫，請檢查倉庫名稱';
-                    } else if (errorMessage.includes('rate limit')) {
-                        errorMessage = 'GitHub API請求次數超過限制，請稍後再試';
-                    } else if (errorMessage.includes('network')) {
-                        errorMessage = '網絡連接問題，請檢查您的網絡連接';
-                    }
-                    
-                    this.showBackupUploadStatus(`上傳失敗: ${errorMessage}`, false);
                 });
             
             return true;
         } catch (error) {
             console.error('上傳備份到GitHub時發生錯誤:', error);
-            this.showBackupUploadStatus(`上傳失敗: ${error.message || '未知錯誤'}`, false);
             return false;
-        }
-    },
-    
-    // 顯示備份上傳狀態
-    showBackupUploadStatus: function(message, success) {
-        // 查找或創建狀態元素
-        let statusElement = document.getElementById('backupUploadStatus');
-        if (!statusElement) {
-            statusElement = document.createElement('div');
-            statusElement.id = 'backupUploadStatus';
-            statusElement.style.position = 'fixed';
-            statusElement.style.bottom = '20px';
-            statusElement.style.right = '20px';
-            statusElement.style.padding = '10px 15px';
-            statusElement.style.backgroundColor = '#f8f9fa';
-            statusElement.style.border = '1px solid #ddd';
-            statusElement.style.borderRadius = '4px';
-            statusElement.style.zIndex = '1000';
-            statusElement.style.fontWeight = 'bold';
-            statusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-            document.body.appendChild(statusElement);
-        }
-        
-        // 顯示狀態
-        statusElement.style.display = 'block';
-        statusElement.textContent = message;
-        
-        // 設置顏色
-        if (success === true) {
-            statusElement.style.color = '#2ecc71'; // 綠色
-            // 成功後5秒隱藏
-            setTimeout(() => {
-                statusElement.style.display = 'none';
-            }, 5000);
-        } else if (success === false) {
-            statusElement.style.color = '#e74c3c'; // 紅色
-        } else {
-            statusElement.style.color = '#3498db'; // 藍色
         }
     },
     

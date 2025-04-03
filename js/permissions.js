@@ -331,29 +331,6 @@ const PermissionManager = {
                     newPermissions.userManagement = document.getElementById('userManagement').checked;
                 }
                 
-                // 創建同步狀態提示元素
-                let syncStatusElement = document.getElementById('permissionSyncNotification');
-                if (!syncStatusElement) {
-                    syncStatusElement = document.createElement('div');
-                    syncStatusElement.id = 'permissionSyncNotification';
-                    syncStatusElement.style.position = 'fixed';
-                    syncStatusElement.style.top = '20px';
-                    syncStatusElement.style.right = '20px';
-                    syncStatusElement.style.padding = '10px 15px';
-                    syncStatusElement.style.backgroundColor = '#f8f9fa';
-                    syncStatusElement.style.border = '1px solid #ddd';
-                    syncStatusElement.style.borderRadius = '4px';
-                    syncStatusElement.style.zIndex = '1000';
-                    syncStatusElement.style.fontWeight = 'bold';
-                    syncStatusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-                    document.body.appendChild(syncStatusElement);
-                }
-                
-                // 顯示初始同步狀態
-                syncStatusElement.style.display = 'block';
-                syncStatusElement.textContent = '正在保存權限設置並同步至GitHub...';
-                syncStatusElement.style.color = '#3498db';
-                
                 // 保存權限設置
                 PermissionManager.savePermissions(newPermissions);
                 
@@ -362,6 +339,9 @@ const PermissionManager = {
                 
                 // 關閉彈窗
                 permissionModal.style.display = 'none';
+                
+                // 顯示成功消息
+                alert('權限設置已保存');
             });
             
             // 組裝彈窗
@@ -1048,59 +1028,19 @@ const PermissionManager = {
         allPermissions[userId] = permissions;
         localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(allPermissions));
         
-        // 顯示同步狀態提示
-        this.showPermissionSyncStatus('正在同步權限設置到GitHub...', true);
-        
         // 同步權限設置到GitHub Pages
-        // 使用Promise處理同步結果
-        this.syncPermissionsToGitHub(allPermissions)
-            .then(success => {
-                if (success) {
-                    console.log('權限設置同步到GitHub成功');
-                    this.showPermissionSyncStatus('權限設置同步成功！權限設置將在所有設備上生效。', true);
-                } else {
-                    console.warn('權限設置同步到GitHub失敗');
-                    this.showPermissionSyncStatus('權限設置已保存到本地，但同步到GitHub失敗，其他設備可能無法獲取最新設置。', false);
-                }
-            })
-            .catch(error => {
-                console.error('權限設置同步過程中發生錯誤:', error);
-                this.showPermissionSyncStatus(`同步失敗: ${error.message || '未知錯誤'}`, false);
-            });
-        
-        // 返回更新後的所有權限設置
-        return allPermissions;
+        this.syncPermissionsToGitHub(allPermissions);
     },
     
     // 同步權限設置到GitHub Pages
     syncPermissionsToGitHub: function(permissions) {
-        return new Promise((resolve, reject) => {
-        // 使用checkGitHubSettings函數檢查GitHub設置
-        if (typeof window.checkGitHubSettings === 'function') {
-            const checkResult = window.checkGitHubSettings();
-            if (!checkResult.valid) {
-                console.log('GitHub設置檢查失敗:', checkResult.message);
-                this.showPermissionSyncStatus(`同步失敗: ${checkResult.message}`, false);
-                return resolve(false);
-            }
-        } else {
-            // 如果checkGitHubSettings函數不存在，使用舊的檢查方式
-            const token = localStorage.getItem('githubToken');
-            const repo = localStorage.getItem('githubRepo');
-            
-            if (!token || !repo) {
-                console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
-                this.showPermissionSyncStatus('同步失敗: 未設置GitHub訪問令牌或倉庫信息，請在GitHub設置中配置', false);
-                return resolve(false);
-            }
-            
-            // 檢查倉庫格式
-            const [owner, repoName] = repo.split('/');
-            if (!owner || !repoName) {
-                console.log('GitHub倉庫格式不正確');
-                this.showPermissionSyncStatus('同步失敗: GitHub倉庫格式不正確，應為 "用戶名/倉庫名"', false);
-                return resolve(false);
-            }
+        // 檢查是否有GitHub設置
+        const token = localStorage.getItem('githubToken');
+        const repo = localStorage.getItem('githubRepo');
+        
+        if (!token || !repo) {
+            console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
+            return false;
         }
         
         // 準備權限數據
@@ -1120,171 +1060,51 @@ const PermissionManager = {
             statusElement.style.borderRadius = '4px';
             statusElement.style.zIndex = '1000';
             statusElement.style.fontWeight = 'bold';
-            statusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
             document.body.appendChild(statusElement);
         }
         
-        // 顯示初始狀態
-        statusElement.style.display = 'block';
         statusElement.textContent = '正在同步權限設置到GitHub...';
         statusElement.style.color = '#3498db';
         
-        // 使用window對象查找全局uploadToGitHub函數
+        // 使用現有的uploadToGitHub函數上傳
         try {
-            // 檢查全局範圍內是否存在uploadToGitHub函數
-            if (typeof window.uploadToGitHub === 'function') {
-                // 添加網絡連接檢查
-                if (!navigator.onLine) {
-                    console.error('網絡連接已斷開，無法同步權限設置');
-                    this.showPermissionSyncStatus('同步失敗: 網絡連接已斷開，請檢查網絡連接後重試', false);
-                    return resolve(false);
-                }
-                
-                // 添加重試機制
-                let retryCount = 0;
-                const maxRetries = 3;
-                
-                const attemptUpload = () => {
-                    return window.uploadToGitHub(jsonContent, 'permissions.json')
-                        .then(result => {
-                            console.log('權限設置同步到GitHub成功:', result);
-                            this.showPermissionSyncStatus('權限設置同步成功！權限設置將在所有設備上生效。', true);
-                            return resolve(true);
-                        })
-                        .catch(error => {
-                            console.error(`權限設置同步到GitHub失敗 (嘗試 ${retryCount + 1}/${maxRetries}):`, error);
-                            let errorMessage = error.message || '未知錯誤';
-                            
-                            // 提供更具體的錯誤信息
-                            if (errorMessage.includes('Bad credentials')) {
-                                errorMessage = 'GitHub訪問令牌無效或已過期，請更新令牌';
-                            } else if (errorMessage.includes('Not Found')) {
-                                errorMessage = '找不到指定的GitHub倉庫，請檢查倉庫名稱';
-                            } else if (errorMessage.includes('rate limit')) {
-                                errorMessage = 'GitHub API請求次數超過限制，請稍後再試';
-                            } else if (errorMessage.includes('network')) {
-                                errorMessage = '網絡連接問題，請檢查您的網絡連接';
-                            }
-                            
-                            // 如果是網絡問題且未達到最大重試次數，則重試
-                            if ((errorMessage.includes('網絡') || errorMessage.includes('network') || 
-                                error.name === 'TypeError' || error.name === 'NetworkError') && 
-                                retryCount < maxRetries) {
-                                
-                                retryCount++;
-                                this.showPermissionSyncStatus(`同步失敗，正在重試 (${retryCount}/${maxRetries})...`, false);
-                                
-                                // 延遲重試，每次增加延遲時間
-                                return new Promise(resolve => {
-                                    setTimeout(() => {
-                                        resolve(attemptUpload());
-                                    }, 1000 * retryCount); // 1秒、2秒、3秒...
-                                });
-                            }
-                            
-                            this.showPermissionSyncStatus(`同步失敗: ${errorMessage}`, false);
-                            return resolve(false);
-                        });
-                };
-                
-                return attemptUpload();
+            // 檢查uploadToGitHub函數是否存在
+            if (typeof uploadToGitHub === 'function') {
+                uploadToGitHub(jsonContent, 'permissions.json')
+                    .then(() => {
+                        console.log('權限設置同步到GitHub成功');
+                        statusElement.textContent = '權限設置同步成功！';
+                        statusElement.style.color = '#2ecc71';
+                        setTimeout(() => {
+                            statusElement.textContent = '';
+                        }, 5000);
+                    })
+                    .catch(error => {
+                        console.error('權限設置同步到GitHub失敗:', error);
+                        statusElement.textContent = `同步失敗: ${error.message}`;
+                        statusElement.style.color = '#e74c3c';
+                    });
             } else {
-                // 嘗試從admin.js中獲取uploadToGitHub函數
-                console.error('全局uploadToGitHub函數不存在，嘗試從其他模塊獲取');
-                this.showPermissionSyncStatus('同步失敗: 上傳功能不可用，請確保已加載admin.js', false);
-                return resolve(false);
+                console.error('uploadToGitHub函數不存在，無法同步權限設置');
+                statusElement.textContent = '同步失敗: 上傳功能不可用';
+                statusElement.style.color = '#e74c3c';
             }
         } catch (error) {
             console.error('嘗試同步權限設置時發生錯誤:', error);
-            this.showPermissionSyncStatus(`同步失敗: ${error.message || '未知錯誤'}`, false);
-            return resolve(false);
+            statusElement.textContent = `同步失敗: ${error.message}`;
+            statusElement.style.color = '#e74c3c';
         }
-    },
-    
-    /**
-     * 顯示權限同步狀態提示
-     * @param {string} message - 要顯示的消息
-     * @param {boolean} isSuccess - 是否成功
-     */
-    showPermissionSyncStatus: function(message, isSuccess) {
-        let statusElement = document.getElementById('permissionUploadStatus');
-        if (!statusElement) {
-            statusElement = document.createElement('div');
-            statusElement.id = 'permissionUploadStatus';
-            statusElement.style.position = 'fixed';
-            statusElement.style.bottom = '20px';
-            statusElement.style.right = '20px';
-            statusElement.style.padding = '10px 15px';
-            statusElement.style.backgroundColor = '#f8f9fa';
-            statusElement.style.border = '1px solid #ddd';
-            statusElement.style.borderRadius = '4px';
-            statusElement.style.zIndex = '1000';
-            statusElement.style.fontWeight = 'bold';
-            statusElement.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-            statusElement.style.display = 'flex';
-            statusElement.style.alignItems = 'center';
-            statusElement.style.minWidth = '250px';
-            document.body.appendChild(statusElement);
-        }
-        
-        // 清除之前的內容
-        statusElement.innerHTML = '';
-        
-        // 添加圖標
-        const iconSpan = document.createElement('span');
-        iconSpan.style.marginRight = '10px';
-        iconSpan.style.fontSize = '16px';
-        
-        if (isSuccess) {
-            iconSpan.innerHTML = '<i class="fas fa-check-circle"></i>';
-            iconSpan.style.color = '#2ecc71';
-        } else if (message.includes('正在')) {
-            iconSpan.innerHTML = '<i class="fas fa-sync fa-spin"></i>';
-            iconSpan.style.color = '#3498db';
-        } else {
-            iconSpan.innerHTML = '<i class="fas fa-exclamation-circle"></i>';
-            iconSpan.style.color = '#e74c3c';
-        }
-        
-        statusElement.appendChild(iconSpan);
-        
-        // 添加消息文本
-        const textSpan = document.createElement('span');
-        textSpan.textContent = message;
-        textSpan.style.color = isSuccess ? '#2ecc71' : (message.includes('正在') ? '#3498db' : '#e74c3c');
-        statusElement.appendChild(textSpan);
-        
-        // 顯示元素
-        statusElement.style.display = 'flex';
-        
-        // 設置自動消失的定時器
-        clearTimeout(statusElement._hideTimeout); // 清除之前的定時器
-        statusElement._hideTimeout = setTimeout(() => {
-            // 添加淡出效果
-            statusElement.style.transition = 'opacity 0.5s';
-            statusElement.style.opacity = '0';
-            
-            setTimeout(() => {
-                statusElement.style.display = 'none';
-                statusElement.style.opacity = '1';
-                statusElement.style.transition = '';
-            }, 500);
-        }, isSuccess ? 5000 : 8000); // 成功提示5秒後消失，錯誤提示8秒後消失
     },
     
     // 保存當前用戶的權限設置
     savePermissions: function(permissions) {
         // 獲取當前登錄用戶
         const currentUser = window.UserManager ? UserManager.getCurrentUser() : null;
-        let userId = currentUser ? currentUser.id : 'default';
-        
-        // 創建同步狀態提示元素
-        this.showPermissionSyncStatus('正在保存權限設置並同步至GitHub...', true);
-        
-        // 保存權限設置並同步到GitHub
-        const result = this.saveUserPermissions(userId, permissions);
-        
-        return result;
+        if (currentUser) {
+            this.saveUserPermissions(currentUser.id, permissions);
+        } else {
+            this.saveUserPermissions('default', permissions);
+        }
     },
     
     // 檢查功能是否啟用

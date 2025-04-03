@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${backup.id}">
                         <td>${backupDate}</td>
                         <td>${backup.bookCount} 本</td>
-                        <td>${backup.uploadedToGitHub ? '是' : '否'}</td>
+                        <td>${backup.githubFileName ? '是' : '否'}</td>
                         <td>
                             <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
                             <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>

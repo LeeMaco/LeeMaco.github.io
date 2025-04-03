@@ -33,11 +33,6 @@ document.addEventListener('DOMContentLoaded', function() {
         UserManager.init();
     }
     
-    // 初始化權限管理
-    if (window.PermissionManager) {
-        PermissionManager.init();
-    }
-    
     // 獲取DOM元素
     const bookTableBody = document.getElementById('bookTableBody');
     const addBookBtn = document.getElementById('addBookBtn');
@@ -786,34 +781,8 @@ document.addEventListener('DOMContentLoaded', function() {
         }, 0);
     }
     
-    // 檢查GitHub設置是否完整有效
-    window.checkGitHubSettings = function() {
-        const token = localStorage.getItem('githubToken');
-        const repo = localStorage.getItem('githubRepo');
-        
-        if (!token) {
-            return { valid: false, message: '未設置GitHub訪問令牌，請在設置中配置' };
-        }
-        
-        if (!repo) {
-            return { valid: false, message: '未設置GitHub倉庫信息，請在設置中配置' };
-        }
-        
-        const [owner, repoName] = repo.split('/');
-        if (!owner || !repoName) {
-            return { valid: false, message: 'GitHub倉庫格式不正確，應為 "用戶名/倉庫名"' };
-        }
-        
-        if (!navigator.onLine) {
-            return { valid: false, message: '網絡連接已斷開，請檢查網絡連接後重試' };
-        }
-        
-        return { valid: true, message: 'GitHub設置有效' };
-    };
-    
     // GitHub API相關功能
-    // 將uploadToGitHub函數暴露為全局函數，以便其他模塊可以使用
-    window.uploadToGitHub = async function(content, fileName = 'books.json') {
+    async function uploadToGitHub(content, fileName = 'books.json') {
         try {
             const statusElement = document.getElementById('uploadStatus');
             if (statusElement) {
@@ -836,11 +805,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 獲取分支名稱
             const branch = localStorage.getItem('githubBranch') || 'main';
-            
-            // 檢查網絡連接
-            if (!navigator.onLine) {
-                throw new Error('網絡連接已斷開，請檢查網絡連接後重試');
-            }
             
             // 檢查文件是否已存在，獲取SHA
             let fileSha = '';
@@ -884,33 +848,8 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             if (!response.ok) {
-                let errorMessage = '';
-                try {
-                    const errorData = await response.json();
-                    errorMessage = errorData.message || '';
-                } catch (e) {
-                    // 如果無法解析JSON，使用狀態文本
-                    errorMessage = response.statusText || '';
-                }
-                
-                // 提供更具體的錯誤信息
-                let detailedMessage = `GitHub API錯誤: ${response.status}`;
-                if (errorMessage) {
-                    detailedMessage += ` - ${errorMessage}`;
-                }
-                
-                // 根據狀態碼提供更友好的錯誤信息
-                if (response.status === 401) {
-                    detailedMessage += '\n可能原因: GitHub訪問令牌無效或已過期';
-                } else if (response.status === 404) {
-                    detailedMessage += '\n可能原因: 找不到指定的GitHub倉庫或路徑';
-                } else if (response.status === 403 && errorMessage.includes('rate limit')) {
-                    detailedMessage += '\n可能原因: GitHub API請求次數超過限制，請稍後再試';
-                } else if (response.status === 422) {
-                    detailedMessage += '\n可能原因: 請求數據格式不正確';
-                }
-                
-                throw new Error(detailedMessage);
+                const errorData = await response.json();
+                throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
             }
             
             const result = await response.json();
