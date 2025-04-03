@@ -1052,7 +1052,21 @@ const PermissionManager = {
         this.showPermissionSyncStatus('正在同步權限設置到GitHub...', true);
         
         // 同步權限設置到GitHub Pages
-        this.syncPermissionsToGitHub(allPermissions);
+        // 使用Promise處理同步結果
+        this.syncPermissionsToGitHub(allPermissions)
+            .then(success => {
+                if (success) {
+                    console.log('權限設置同步到GitHub成功');
+                    this.showPermissionSyncStatus('權限設置同步成功！權限設置將在所有設備上生效。', true);
+                } else {
+                    console.warn('權限設置同步到GitHub失敗');
+                    this.showPermissionSyncStatus('權限設置已保存到本地，但同步到GitHub失敗，其他設備可能無法獲取最新設置。', false);
+                }
+            })
+            .catch(error => {
+                console.error('權限設置同步過程中發生錯誤:', error);
+                this.showPermissionSyncStatus(`同步失敗: ${error.message || '未知錯誤'}`, false);
+            });
         
         // 返回更新後的所有權限設置
         return allPermissions;
@@ -1060,13 +1074,14 @@ const PermissionManager = {
     
     // 同步權限設置到GitHub Pages
     syncPermissionsToGitHub: function(permissions) {
+        return new Promise((resolve, reject) => {
         // 使用checkGitHubSettings函數檢查GitHub設置
         if (typeof window.checkGitHubSettings === 'function') {
             const checkResult = window.checkGitHubSettings();
             if (!checkResult.valid) {
                 console.log('GitHub設置檢查失敗:', checkResult.message);
                 this.showPermissionSyncStatus(`同步失敗: ${checkResult.message}`, false);
-                return false;
+                return resolve(false);
             }
         } else {
             // 如果checkGitHubSettings函數不存在，使用舊的檢查方式
@@ -1076,7 +1091,7 @@ const PermissionManager = {
             if (!token || !repo) {
                 console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
                 this.showPermissionSyncStatus('同步失敗: 未設置GitHub訪問令牌或倉庫信息，請在GitHub設置中配置', false);
-                return false;
+                return resolve(false);
             }
             
             // 檢查倉庫格式
@@ -1084,7 +1099,7 @@ const PermissionManager = {
             if (!owner || !repoName) {
                 console.log('GitHub倉庫格式不正確');
                 this.showPermissionSyncStatus('同步失敗: GitHub倉庫格式不正確，應為 "用戶名/倉庫名"', false);
-                return false;
+                return resolve(false);
             }
         }
         
@@ -1122,7 +1137,7 @@ const PermissionManager = {
                 if (!navigator.onLine) {
                     console.error('網絡連接已斷開，無法同步權限設置');
                     this.showPermissionSyncStatus('同步失敗: 網絡連接已斷開，請檢查網絡連接後重試', false);
-                    return false;
+                    return resolve(false);
                 }
                 
                 // 添加重試機制
@@ -1134,7 +1149,7 @@ const PermissionManager = {
                         .then(result => {
                             console.log('權限設置同步到GitHub成功:', result);
                             this.showPermissionSyncStatus('權限設置同步成功！權限設置將在所有設備上生效。', true);
-                            return true;
+                            return resolve(true);
                         })
                         .catch(error => {
                             console.error(`權限設置同步到GitHub失敗 (嘗試 ${retryCount + 1}/${maxRetries}):`, error);
@@ -1168,7 +1183,7 @@ const PermissionManager = {
                             }
                             
                             this.showPermissionSyncStatus(`同步失敗: ${errorMessage}`, false);
-                            return false;
+                            return resolve(false);
                         });
                 };
                 
@@ -1177,12 +1192,12 @@ const PermissionManager = {
                 // 嘗試從admin.js中獲取uploadToGitHub函數
                 console.error('全局uploadToGitHub函數不存在，嘗試從其他模塊獲取');
                 this.showPermissionSyncStatus('同步失敗: 上傳功能不可用，請確保已加載admin.js', false);
-                return false;
+                return resolve(false);
             }
         } catch (error) {
             console.error('嘗試同步權限設置時發生錯誤:', error);
             this.showPermissionSyncStatus(`同步失敗: ${error.message || '未知錯誤'}`, false);
-            return false;
+            return resolve(false);
         }
     },
     

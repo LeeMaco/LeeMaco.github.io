@@ -160,6 +160,15 @@ const UserManager = {
         if (user && user.password === password) {
             // 設置當前用戶
             this.setCurrentUser(user);
+            
+            // 登入成功後同步權限設置
+            if (window.PermissionSync && typeof window.PermissionSync.syncPermissionsAfterLogin === 'function') {
+                // 使用setTimeout確保不阻塞登入過程
+                setTimeout(() => {
+                    window.PermissionSync.syncPermissionsAfterLogin(user);
+                }, 500);
+            }
+            
             return { success: true, user };
         }
         return { success: false, message: '用戶名或密碼錯誤' };
