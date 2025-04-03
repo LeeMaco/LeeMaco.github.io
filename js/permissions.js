@@ -1034,14 +1034,32 @@ const PermissionManager = {
     
     // 同步權限設置到GitHub Pages
     syncPermissionsToGitHub: function(permissions) {
-        // 檢查是否有GitHub設置
-        const token = localStorage.getItem('githubToken');
-        const repo = localStorage.getItem('githubRepo');
-        
-        if (!token || !repo) {
-            console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
-            this.showPermissionSyncStatus('同步失敗: 未設置GitHub訪問令牌或倉庫信息', false);
-            return false;
+        // 使用checkGitHubSettings函數檢查GitHub設置
+        if (typeof window.checkGitHubSettings === 'function') {
+            const checkResult = window.checkGitHubSettings();
+            if (!checkResult.valid) {
+                console.log('GitHub設置檢查失敗:', checkResult.message);
+                this.showPermissionSyncStatus(`同步失敗: ${checkResult.message}`, false);
+                return false;
+            }
+        } else {
+            // 如果checkGitHubSettings函數不存在，使用舊的檢查方式
+            const token = localStorage.getItem('githubToken');
+            const repo = localStorage.getItem('githubRepo');
+            
+            if (!token || !repo) {
+                console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
+                this.showPermissionSyncStatus('同步失敗: 未設置GitHub訪問令牌或倉庫信息，請在GitHub設置中配置', false);
+                return false;
+            }
+            
+            // 檢查倉庫格式
+            const [owner, repoName] = repo.split('/');
+            if (!owner || !repoName) {
+                console.log('GitHub倉庫格式不正確');
+                this.showPermissionSyncStatus('同步失敗: GitHub倉庫格式不正確，應為 "用戶名/倉庫名"', false);
+                return false;
+            }
         }
         
         // 準備權限數據
@@ -1070,11 +1088,18 @@ const PermissionManager = {
         statusElement.textContent = '正在同步權限設置到GitHub...';
         statusElement.style.color = '#3498db';
         
-        // 使用現有的uploadToGitHub函數上傳
+        // 使用window對象查找全局uploadToGitHub函數
         try {
-            // 檢查uploadToGitHub函數是否存在
-            if (typeof uploadToGitHub === 'function') {
-                uploadToGitHub(jsonContent, 'permissions.json')
+            // 檢查全局範圍內是否存在uploadToGitHub函數
+            if (typeof window.uploadToGitHub === 'function') {
+                // 添加網絡連接檢查
+                if (!navigator.onLine) {
+                    console.error('網絡連接已斷開，無法同步權限設置');
+                    this.showPermissionSyncStatus('同步失敗: 網絡連接已斷開，請檢查網絡連接後重試', false);
+                    return false;
+                }
+                
+                window.uploadToGitHub(jsonContent, 'permissions.json')
                     .then(result => {
                         console.log('權限設置同步到GitHub成功:', result);
                         this.showPermissionSyncStatus('權限設置同步成功！', true);
@@ -1082,17 +1107,31 @@ const PermissionManager = {
                     })
                     .catch(error => {
                         console.error('權限設置同步到GitHub失敗:', error);
-                        this.showPermissionSyncStatus(`同步失敗: ${error.message}`, false);
+                        let errorMessage = error.message || '未知錯誤';
+                        
+                        // 提供更具體的錯誤信息
+                        if (errorMessage.includes('Bad credentials')) {
+                            errorMessage = 'GitHub訪問令牌無效或已過期，請更新令牌';
+                        } else if (errorMessage.includes('Not Found')) {
+                            errorMessage = '找不到指定的GitHub倉庫，請檢查倉庫名稱';
+                        } else if (errorMessage.includes('rate limit')) {
+                            errorMessage = 'GitHub API請求次數超過限制，請稍後再試';
+                        } else if (errorMessage.includes('network')) {
+                            errorMessage = '網絡連接問題，請檢查您的網絡連接';
+                        }
+                        
+                        this.showPermissionSyncStatus(`同步失敗: ${errorMessage}`, false);
                         return false;
                     });
             } else {
-                console.error('uploadToGitHub函數不存在，無法同步權限設置');
-                this.showPermissionSyncStatus('同步失敗: 上傳功能不可用', false);
+                // 嘗試從admin.js中獲取uploadToGitHub函數
+                console.error('全局uploadToGitHub函數不存在，嘗試從其他模塊獲取');
+                this.showPermissionSyncStatus('同步失敗: 上傳功能不可用，請確保已加載admin.js', false);
                 return false;
             }
         } catch (error) {
             console.error('嘗試同步權限設置時發生錯誤:', error);
-            this.showPermissionSyncStatus(`同步失敗: ${error.message}`, false);
+            this.showPermissionSyncStatus(`同步失敗: ${error.message || '未知錯誤'}`, false);
             return false;
         }
         
