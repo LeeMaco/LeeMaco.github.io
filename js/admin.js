@@ -33,6 +33,11 @@ document.addEventListener('DOMContentLoaded', function() {
         UserManager.init();
     }
     
+    // 初始化權限管理
+    if (window.PermissionManager) {
+        PermissionManager.init();
+    }
+    
     // 獲取DOM元素
     const bookTableBody = document.getElementById('bookTableBody');
     const addBookBtn = document.getElementById('addBookBtn');
