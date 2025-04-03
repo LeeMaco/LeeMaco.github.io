@@ -14,9 +14,9 @@
     "emptyTrash": false,
     "exportExcel": false,
     "exportJson": false,
-    "importExcel": false,
+    "importExcel": true,
     "githubSettings": false,
-    "backupSettings": true,
+    "backupSettings": false,
     "backupHistory": true,
     "removeDuplicates": false
   }
