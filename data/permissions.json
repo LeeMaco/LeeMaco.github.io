@@ -11,12 +11,12 @@
     "userManagement": false
   },
   "default": {
-    "emptyTrash": false,
+    "emptyTrash": true,
     "exportExcel": false,
     "exportJson": false,
     "importExcel": true,
     "githubSettings": false,
-    "backupSettings": false,
+    "backupSettings": true,
     "backupHistory": true,
     "removeDuplicates": false
   }
