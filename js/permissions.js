@@ -42,78 +42,57 @@ const PermissionManager = {
             localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(initialPermissions));
         }
         
-        // 嘗試從GitHub同步最新的權限設置
-        this.syncPermissionsFromGitHub();
+        // 添加權限設置按鈕到管理員界面
+        this.addPermissionSettingsButton();
         
-        // 確保DOM已完全加載後再添加按鈕
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => {
-                this.addPermissionSettingsButton();
-                this.applyPermissions();
-            });
-        } else {
-            // 添加權限設置按鈕到管理員界面
-            this.addPermissionSettingsButton();
-            
-            // 應用權限設置到界面
-            this.applyPermissions();
-        }
+        // 應用權限設置到界面
+        this.applyPermissions();
     },
     
     // 添加權限設置按鈕
     addPermissionSettingsButton: function() {
-        // 確保選擇正確的下拉菜單元素
-        const adminActions = document.querySelector('.admin-actions-menu');
-        console.log('找到管理選項下拉菜單:', adminActions); // 添加調試日誌
-        
+        const adminActions = document.querySelector('.admin-actions');
         if (adminActions) {
             // 在登出按鈕前添加權限設置按鈕
             const logoutBtn = document.getElementById('logoutBtn');
             
-            // 檢查是否已存在權限設置按鈕，避免重複添加
-            if (!document.getElementById('permissionSettingsBtn')) {
-                const permissionBtn = document.createElement('button');
-                permissionBtn.id = 'permissionSettingsBtn';
-                permissionBtn.className = 'excel-btn';
-                permissionBtn.innerHTML = '<i class="fas fa-user-lock"></i> 權限設置';
-                
-                // 添加用戶管理按鈕（僅對超級管理員顯示）
-                const userManagementBtn = document.createElement('button');
-                userManagementBtn.id = 'userManagementBtn';
-                userManagementBtn.className = 'excel-btn';
-                userManagementBtn.innerHTML = '<i class="fas fa-users-cog"></i> 用戶管理';
-                
-                // 檢查當前用戶是否為超級管理員
-                if (window.UserManager && UserManager.isSuperAdmin()) {
-                    if (logoutBtn) {
-                        adminActions.insertBefore(userManagementBtn, logoutBtn);
-                        adminActions.insertBefore(permissionBtn, userManagementBtn);
-                    } else {
-                        adminActions.appendChild(permissionBtn);
-                        adminActions.appendChild(userManagementBtn);
-                    }
-                    
-                    // 綁定用戶管理按鈕點擊事件
-                    userManagementBtn.addEventListener('click', function() {
-                        PermissionManager.showUserManagementModal();
-                    });
+            const permissionBtn = document.createElement('button');
+            permissionBtn.id = 'permissionSettingsBtn';
+            permissionBtn.className = 'excel-btn';
+            permissionBtn.innerHTML = '<i class="fas fa-user-lock"></i> 權限設置';
+            
+            // 添加用戶管理按鈕（僅對超級管理員顯示）
+            const userManagementBtn = document.createElement('button');
+            userManagementBtn.id = 'userManagementBtn';
+            userManagementBtn.className = 'excel-btn';
+            userManagementBtn.innerHTML = '<i class="fas fa-users-cog"></i> 用戶管理';
+            
+            // 檢查當前用戶是否為超級管理員
+            if (window.UserManager && UserManager.isSuperAdmin()) {
+                if (logoutBtn) {
+                    adminActions.insertBefore(userManagementBtn, logoutBtn);
+                    adminActions.insertBefore(permissionBtn, userManagementBtn);
                 } else {
-                    if (logoutBtn) {
-                        adminActions.insertBefore(permissionBtn, logoutBtn);
-                    } else {
-                        adminActions.appendChild(permissionBtn);
-                    }
+                    adminActions.appendChild(permissionBtn);
+                    adminActions.appendChild(userManagementBtn);
                 }
                 
-                // 綁定權限設置按鈕點擊事件
-                permissionBtn.addEventListener('click', function() {
-                    PermissionManager.showPermissionSettingsModal();
+                // 綁定用戶管理按鈕點擊事件
+                userManagementBtn.addEventListener('click', function() {
+                    PermissionManager.showUserManagementModal();
                 });
-                
-                console.log('權限設置按鈕已添加'); // 添加調試日誌
+            } else {
+                if (logoutBtn) {
+                    adminActions.insertBefore(permissionBtn, logoutBtn);
+                } else {
+                    adminActions.appendChild(permissionBtn);
+                }
             }
-        } else {
-            console.error('未找到管理選項下拉菜單元素'); // 添加錯誤日誌
+            
+            // 綁定權限設置按鈕點擊事件
+            permissionBtn.addEventListener('click', function() {
+                PermissionManager.showPermissionSettingsModal();
+            });
         }
     },
     
@@ -1030,118 +1009,6 @@ const PermissionManager = {
         const allPermissions = this.getAllPermissions();
         allPermissions[userId] = permissions;
         localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(allPermissions));
-        
-        // 同步權限設置到GitHub Pages
-        this.syncPermissionsToGitHub(allPermissions);
-    },
-    
-    // 從GitHub同步權限設置
-    syncPermissionsFromGitHub: function() {
-        // 檢查GitHubSync模塊是否存在
-        if (typeof GitHubSync === 'undefined') {
-            console.warn('GitHubSync模塊未加載，無法從GitHub同步權限設置');
-            return Promise.resolve(false);
-        }
-        
-        // 創建同步狀態元素
-        let statusElement = document.getElementById('permissionSyncStatus');
-        if (!statusElement) {
-            statusElement = document.createElement('div');
-            statusElement.id = 'permissionSyncStatus';
-            statusElement.style.position = 'fixed';
-            statusElement.style.bottom = '20px';
-            statusElement.style.right = '20px';
-            statusElement.style.padding = '10px 15px';
-            statusElement.style.backgroundColor = '#f8f9fa';
-            statusElement.style.border = '1px solid #ddd';
-            statusElement.style.borderRadius = '4px';
-            statusElement.style.zIndex = '1000';
-            statusElement.style.fontWeight = 'bold';
-            document.body.appendChild(statusElement);
-        }
-        
-        statusElement.textContent = '正在從GitHub同步權限設置...';
-        statusElement.style.color = '#3498db';
-        
-        // 使用GitHubSync模塊從GitHub同步權限設置
-        return GitHubSync.syncPermissionsFromGitHub()
-            .then(permissions => {
-                console.log('從GitHub同步權限設置成功');
-                statusElement.textContent = '權限設置同步成功！';
-                statusElement.style.color = '#2ecc71';
-                setTimeout(() => {
-                    statusElement.textContent = '';
-                }, 5000);
-                
-                // 應用新的權限設置
-                this.applyPermissions();
-                return true;
-            })
-            .catch(error => {
-                console.warn('從GitHub同步權限設置失敗:', error);
-                // 如果是因為未設置GitHub信息而失敗，不顯示錯誤提示
-                if (error === '未設置GitHub信息') {
-                    console.log('未設置GitHub信息，使用本地權限設置');
-                    statusElement.textContent = '';
-                } else {
-                    statusElement.textContent = `同步失敗: ${error}`;
-                    statusElement.style.color = '#e74c3c';
-                    setTimeout(() => {
-                        statusElement.textContent = '';
-                    }, 5000);
-                }
-                return false;
-            });
-    },
-    
-    // 同步權限設置到GitHub Pages
-    syncPermissionsToGitHub: function(permissions) {
-        // 檢查GitHubSync模塊是否存在
-        if (typeof GitHubSync === 'undefined') {
-            console.warn('GitHubSync模塊未加載，無法同步權限設置到GitHub');
-            return false;
-        }
-        
-        // 創建上傳狀態元素
-        let statusElement = document.getElementById('permissionUploadStatus');
-        if (!statusElement) {
-            statusElement = document.createElement('div');
-            statusElement.id = 'permissionUploadStatus';
-            statusElement.style.position = 'fixed';
-            statusElement.style.bottom = '20px';
-            statusElement.style.right = '20px';
-            statusElement.style.padding = '10px 15px';
-            statusElement.style.backgroundColor = '#f8f9fa';
-            statusElement.style.border = '1px solid #ddd';
-            statusElement.style.borderRadius = '4px';
-            statusElement.style.zIndex = '1000';
-            statusElement.style.fontWeight = 'bold';
-            document.body.appendChild(statusElement);
-        }
-        
-        statusElement.textContent = '正在同步權限設置到GitHub...';
-        statusElement.style.color = '#3498db';
-        
-        // 使用GitHubSync模塊同步到GitHub
-        return GitHubSync.syncPermissionsToGitHub()
-            .then(() => {
-                console.log('權限設置同步到GitHub成功');
-                statusElement.textContent = '權限設置同步成功！';
-                statusElement.style.color = '#2ecc71';
-                setTimeout(() => {
-                    statusElement.textContent = '';
-                }, 5000);
-                return true;
-            })
-            .catch(error => {
-                console.error('權限設置同步到GitHub失敗:', error);
-                statusElement.textContent = `同步失敗: ${error}`;
-                statusElement.style.color = '#e74c3c';
-                setTimeout(() => {
-                    statusElement.textContent = '';
-                }, 5000);
-                return false;
-            });
     },
     
     // 保存當前用戶的權限設置
@@ -1277,6 +1144,6 @@ document.addEventListener('DOMContentLoaded', function() {
     // 檢查是否已登入
     if (localStorage.getItem('isLoggedIn')) {
         // 初始化權限管理
-        PermissionManager.init(); // 直接調用初始化方法，不使用setTimeout
+        PermissionManager.init();
     }
 });

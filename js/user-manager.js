@@ -160,23 +160,6 @@ const UserManager = {
         if (user && user.password === password) {
             // 設置當前用戶
             this.setCurrentUser(user);
-            
-            // 嘗試從GitHub同步最新的權限設置
-            if (window.PermissionManager && typeof PermissionManager.syncPermissionsFromGitHub === 'function') {
-                console.log('嘗試從GitHub同步最新的權限設置');
-                PermissionManager.syncPermissionsFromGitHub()
-                    .then(success => {
-                        if (success) {
-                            console.log('成功從GitHub同步權限設置');
-                        } else {
-                            console.log('從GitHub同步權限設置失敗，使用本地權限設置');
-                        }
-                    })
-                    .catch(error => {
-                        console.error('同步權限設置時發生錯誤:', error);
-                    });
-            }
-            
             return { success: true, user };
         }
         return { success: false, message: '用戶名或密碼錯誤' };
