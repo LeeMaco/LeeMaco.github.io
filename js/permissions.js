@@ -42,6 +42,9 @@ const PermissionManager = {
             localStorage.setItem(this.PERMISSIONS_KEY, JSON.stringify(initialPermissions));
         }
         
+        // 嘗試從GitHub同步最新的權限設置
+        this.syncPermissionsFromGitHub();
+        
         // 確保DOM已完全加載後再添加按鈕
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', () => {
@@ -1032,19 +1035,72 @@ const PermissionManager = {
         this.syncPermissionsToGitHub(allPermissions);
     },
     
-    // 同步權限設置到GitHub Pages
-    syncPermissionsToGitHub: function(permissions) {
-        // 檢查是否有GitHub設置
-        const token = localStorage.getItem('githubToken');
-        const repo = localStorage.getItem('githubRepo');
-        
-        if (!token || !repo) {
-            console.log('未設置GitHub訪問令牌或倉庫信息，無法同步權限設置');
-            return false;
+    // 從GitHub同步權限設置
+    syncPermissionsFromGitHub: function() {
+        // 檢查GitHubSync模塊是否存在
+        if (typeof GitHubSync === 'undefined') {
+            console.warn('GitHubSync模塊未加載，無法從GitHub同步權限設置');
+            return Promise.resolve(false);
         }
         
-        // 準備權限數據
-        const jsonContent = JSON.stringify(permissions, null, 2);
+        // 創建同步狀態元素
+        let statusElement = document.getElementById('permissionSyncStatus');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'permissionSyncStatus';
+            statusElement.style.position = 'fixed';
+            statusElement.style.bottom = '20px';
+            statusElement.style.right = '20px';
+            statusElement.style.padding = '10px 15px';
+            statusElement.style.backgroundColor = '#f8f9fa';
+            statusElement.style.border = '1px solid #ddd';
+            statusElement.style.borderRadius = '4px';
+            statusElement.style.zIndex = '1000';
+            statusElement.style.fontWeight = 'bold';
+            document.body.appendChild(statusElement);
+        }
+        
+        statusElement.textContent = '正在從GitHub同步權限設置...';
+        statusElement.style.color = '#3498db';
+        
+        // 使用GitHubSync模塊從GitHub同步權限設置
+        return GitHubSync.syncPermissionsFromGitHub()
+            .then(permissions => {
+                console.log('從GitHub同步權限設置成功');
+                statusElement.textContent = '權限設置同步成功！';
+                statusElement.style.color = '#2ecc71';
+                setTimeout(() => {
+                    statusElement.textContent = '';
+                }, 5000);
+                
+                // 應用新的權限設置
+                this.applyPermissions();
+                return true;
+            })
+            .catch(error => {
+                console.warn('從GitHub同步權限設置失敗:', error);
+                // 如果是因為未設置GitHub信息而失敗，不顯示錯誤提示
+                if (error === '未設置GitHub信息') {
+                    console.log('未設置GitHub信息，使用本地權限設置');
+                    statusElement.textContent = '';
+                } else {
+                    statusElement.textContent = `同步失敗: ${error}`;
+                    statusElement.style.color = '#e74c3c';
+                    setTimeout(() => {
+                        statusElement.textContent = '';
+                    }, 5000);
+                }
+                return false;
+            });
+    },
+    
+    // 同步權限設置到GitHub Pages
+    syncPermissionsToGitHub: function(permissions) {
+        // 檢查GitHubSync模塊是否存在
+        if (typeof GitHubSync === 'undefined') {
+            console.warn('GitHubSync模塊未加載，無法同步權限設置到GitHub');
+            return false;
+        }
         
         // 創建上傳狀態元素
         let statusElement = document.getElementById('permissionUploadStatus');
@@ -1066,34 +1122,26 @@ const PermissionManager = {
         statusElement.textContent = '正在同步權限設置到GitHub...';
         statusElement.style.color = '#3498db';
         
-        // 使用現有的uploadToGitHub函數上傳
-        try {
-            // 檢查uploadToGitHub函數是否存在
-            if (typeof uploadToGitHub === 'function') {
-                uploadToGitHub(jsonContent, 'permissions.json')
-                    .then(() => {
-                        console.log('權限設置同步到GitHub成功');
-                        statusElement.textContent = '權限設置同步成功！';
-                        statusElement.style.color = '#2ecc71';
-                        setTimeout(() => {
-                            statusElement.textContent = '';
-                        }, 5000);
-                    })
-                    .catch(error => {
-                        console.error('權限設置同步到GitHub失敗:', error);
-                        statusElement.textContent = `同步失敗: ${error.message}`;
-                        statusElement.style.color = '#e74c3c';
-                    });
-            } else {
-                console.error('uploadToGitHub函數不存在，無法同步權限設置');
-                statusElement.textContent = '同步失敗: 上傳功能不可用';
+        // 使用GitHubSync模塊同步到GitHub
+        return GitHubSync.syncPermissionsToGitHub()
+            .then(() => {
+                console.log('權限設置同步到GitHub成功');
+                statusElement.textContent = '權限設置同步成功！';
+                statusElement.style.color = '#2ecc71';
+                setTimeout(() => {
+                    statusElement.textContent = '';
+                }, 5000);
+                return true;
+            })
+            .catch(error => {
+                console.error('權限設置同步到GitHub失敗:', error);
+                statusElement.textContent = `同步失敗: ${error}`;
                 statusElement.style.color = '#e74c3c';
-            }
-        } catch (error) {
-            console.error('嘗試同步權限設置時發生錯誤:', error);
-            statusElement.textContent = `同步失敗: ${error.message}`;
-            statusElement.style.color = '#e74c3c';
-        }
+                setTimeout(() => {
+                    statusElement.textContent = '';
+                }, 5000);
+                return false;
+            });
     },
     
     // 保存當前用戶的權限設置
