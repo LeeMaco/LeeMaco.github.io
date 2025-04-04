@@ -117,11 +117,11 @@ const PermissionManager = {
     // 顯示權限設置彈窗
     showPermissionSettingsModal: function() {
         // 先顯示密碼驗證彈窗
-        this.showPasswordVerificationModal('permissionSettings');
+        this.showPasswordVerificationModal();
     },
     
     // 顯示密碼驗證彈窗
-    showPasswordVerificationModal: function(action, callback) {
+    showPasswordVerificationModal: function() {
         // 檢查彈窗是否已存在
         let passwordModal = document.getElementById('passwordVerificationModal');
         
@@ -145,23 +145,15 @@ const PermissionManager = {
             
             // 創建標題
             const title = document.createElement('h2');
-            title.id = 'passwordVerificationTitle';
             title.textContent = '權限設置驗證';
             
             // 創建說明
             const description = document.createElement('p');
-            description.id = 'passwordVerificationDescription';
             description.textContent = '請輸入權限設置密碼以繼續';
             
             // 創建表單
             const form = document.createElement('form');
             form.id = 'passwordVerificationForm';
-            
-            // 創建隱藏的操作類型輸入框
-            const actionInput = document.createElement('input');
-            actionInput.type = 'hidden';
-            actionInput.id = 'verificationAction';
-            form.appendChild(actionInput);
             
             // 創建密碼輸入框
             const formGroup = document.createElement('div');
@@ -189,19 +181,14 @@ const PermissionManager = {
                 e.preventDefault();
                 
                 const password = document.getElementById('permissionPassword').value;
-                const currentAction = document.getElementById('verificationAction').value;
                 
                 // 驗證密碼 (0211)
                 if (password === '0211') {
                     // 關閉密碼驗證彈窗
                     passwordModal.style.display = 'none';
                     
-                    // 根據不同的操作執行不同的回調
-                    if (currentAction === 'permissionSettings') {
-                        PermissionManager.showPermissionSettingsModalAfterVerification();
-                    } else if (typeof callback === 'function') {
-                        callback();
-                    }
+                    // 顯示權限設置彈窗
+                    PermissionManager.showPermissionSettingsModalAfterVerification();
                 } else {
                     alert('密碼錯誤，請重試');
                 }
