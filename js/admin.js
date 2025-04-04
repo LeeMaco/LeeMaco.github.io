@@ -202,37 +202,117 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定去除重複按鈕點擊事件
     removeDuplicatesBtn.addEventListener('click', function() {
-        // 顯示去重彈窗
-        removeDuplicatesModal.style.display = 'block';
-        // 清空之前的狀態信息
-        duplicateStatus.textContent = '';
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('removeDuplicates')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
+        
+        // 顯示密碼驗證彈窗
+        if (window.PermissionManager) {
+            PermissionManager.showPasswordVerificationModal('removeDuplicates', function() {
+                // 密碼驗證成功後顯示去重彈窗
+                removeDuplicatesModal.style.display = 'block';
+                // 清空之前的狀態信息
+                duplicateStatus.textContent = '';
+            });
+        } else {
+            // 向下兼容：直接顯示去重彈窗
+            removeDuplicatesModal.style.display = 'block';
+            // 清空之前的狀態信息
+            duplicateStatus.textContent = '';
+        }
     });
     
     // 綁定匯出Excel按鈕點擊事件
     exportExcelBtn.addEventListener('click', function() {
-        exportToExcel();
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('exportExcel')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
+        
+        // 顯示密碼驗證彈窗
+        if (window.PermissionManager) {
+            PermissionManager.showPasswordVerificationModal('exportExcel', function() {
+                // 密碼驗證成功後執行匯出
+                exportToExcel();
+            });
+        } else {
+            // 向下兼容：直接執行匯出
+            exportToExcel();
+        }
     });
     
     // 綁定匯出JSON按鈕點擊事件
     const exportJsonBtn = document.getElementById('exportJsonBtn');
     exportJsonBtn.addEventListener('click', function() {
-        exportToJSON();
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('exportJson')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
+        
+        // 顯示密碼驗證彈窗
+        if (window.PermissionManager) {
+            PermissionManager.showPasswordVerificationModal('exportJson', function() {
+                // 密碼驗證成功後執行匯出
+                exportToJSON();
+            });
+        } else {
+            // 向下兼容：直接執行匯出
+            exportToJSON();
+        }
     });
     
     // 綁定匯入Excel按鈕點擊事件
     importExcelBtn.addEventListener('click', function() {
-        importExcelModal.style.display = 'block';
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('importExcel')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
+        
+        // 顯示密碼驗證彈窗
+        if (window.PermissionManager) {
+            PermissionManager.showPasswordVerificationModal('importExcel', function() {
+                // 密碼驗證成功後顯示匯入彈窗
+                importExcelModal.style.display = 'block';
+            });
+        } else {
+            // 向下兼容：直接顯示匯入彈窗
+            importExcelModal.style.display = 'block';
+        }
     });
     
     // 綁定GitHub設置按鈕點擊事件
     githubSettingsBtn.addEventListener('click', function() {
-        // 顯示GitHub設置彈窗
-        githubSettingsModal.style.display = 'block';
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('githubSettings')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
         
-        // 填充已保存的設置
-        document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
-        document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
-        document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
+        // 顯示密碼驗證彈窗
+        if (window.PermissionManager) {
+            PermissionManager.showPasswordVerificationModal('githubSettings', function() {
+                // 密碼驗證成功後顯示GitHub設置彈窗
+                githubSettingsModal.style.display = 'block';
+                
+                // 填充已保存的設置
+                document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
+                document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
+                document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
+            });
+        } else {
+            // 向下兼容：直接顯示GitHub設置彈窗
+            githubSettingsModal.style.display = 'block';
+            
+            // 填充已保存的設置
+            document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
+            document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
+            document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
+        }
     });
     
     // 綁定匯入Excel表單提交事件
@@ -672,19 +752,42 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 清空垃圾桶
     function emptyTrash() {
-        if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
-            try {
-                // 確保垃圾桶清空操作成功執行
-                if (BookData.emptyTrash()) {
-                    // 重新加載垃圾桶顯示
-                    loadTrashBooks();
-                    alert('垃圾桶已清空');
-                } else {
-                    alert('清空垃圾桶失敗，請重試');
+        // 顯示密碼驗證彈窗
+        if (window.PermissionManager) {
+            PermissionManager.showPasswordVerificationModal('emptyTrash', function() {
+                // 密碼驗證成功後執行清空操作
+                if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
+                    try {
+                        // 確保垃圾桶清空操作成功執行
+                        if (BookData.emptyTrash()) {
+                            // 重新加載垃圾桶顯示
+                            loadTrashBooks();
+                            alert('垃圾桶已清空');
+                        } else {
+                            alert('清空垃圾桶失敗，請重試');
+                        }
+                    } catch (error) {
+                        console.error('清空垃圾桶時發生錯誤:', error);
+                        alert('清空垃圾桶時發生錯誤: ' + error.message);
+                    }
                 }
-            } catch (error) {
-                console.error('清空垃圾桶時發生錯誤:', error);
-                alert('清空垃圾桶時發生錯誤: ' + error.message);
+            });
+        } else {
+            // 向下兼容：直接執行清空操作
+            if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
+                try {
+                    // 確保垃圾桶清空操作成功執行
+                    if (BookData.emptyTrash()) {
+                        // 重新加載垃圾桶顯示
+                        loadTrashBooks();
+                        alert('垃圾桶已清空');
+                    } else {
+                        alert('清空垃圾桶失敗，請重試');
+                    }
+                } catch (error) {
+                    console.error('清空垃圾桶時發生錯誤:', error);
+                    alert('清空垃圾桶時發生錯誤: ' + error.message);
+                }
             }
         }
     }
