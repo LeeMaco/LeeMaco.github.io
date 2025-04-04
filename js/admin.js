@@ -793,7 +793,8 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // GitHub API相關功能
-    async function uploadToGitHub(content, fileName = 'books.json') {
+    // 將函數設置為全局可訪問，以便其他模塊可以調用
+    window.uploadToGitHub = async function(content, fileName = 'books.json') {
         try {
             const statusElement = document.getElementById('uploadStatus');
             if (statusElement) {
