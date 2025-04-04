@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 為垃圾桶表格添加data-label
         const trashTableBody = document.getElementById('trashTableBody');
         if (trashTableBody) {
-            const trashHeaderLabels = ['書名', '作者', '出版社', '刪除時間', '操作'];
+            const trashHeaderLabels = ['書名', '作者', '集數', '櫃號', '行號', '出版社', '刪除原因', '刪除時間', '操作'];
             addDataLabelsToTable(trashTableBody, trashHeaderLabels);
         }
     }
@@ -640,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         
         if (trashBooks.length === 0) {
-            html = `<tr><td colspan="9" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
+            html = `<tr><td colspan="12" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
         } else {
             trashBooks.forEach(book => {
                 // 格式化日期
@@ -652,6 +652,9 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${book.id}">
                         <td>${book.title}</td>
                         <td>${book.author}</td>
+                        <td>${book.series || '-'}</td>
+                        <td>${book.cabinet || '-'}</td>
+                        <td>${book.row || '-'}</td>
                         <td>${book.publisher || '-'}</td>
                         <td>${deleteReason}</td>
                         <td>${deletedDate}</td>
