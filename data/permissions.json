@@ -12,12 +12,12 @@
   },
   "default": {
     "emptyTrash": true,
-    "exportExcel": false,
-    "exportJson": false,
+    "exportExcel": true,
+    "exportJson": true,
     "importExcel": true,
-    "githubSettings": false,
+    "githubSettings": true,
     "backupSettings": true,
     "backupHistory": true,
-    "removeDuplicates": false
+    "removeDuplicates": true
   }
 }
