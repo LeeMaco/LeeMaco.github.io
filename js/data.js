@@ -519,12 +519,17 @@ const BookData = {
         return false;
     },
     
-    // 清空垃圾桶
+    // 清空垃圾桶 - 永久刪除垃圾桶中的所有數據
     emptyTrash: function() {
         try {
             // 先獲取當前垃圾桶中的書籍數量，用於日誌記錄
             const trashBooks = this.getTrashBooks();
             const count = trashBooks.length;
+            
+            if (count === 0) {
+                console.log('垃圾桶已經是空的');
+                return true;
+            }
             
             // 清空垃圾桶數據
             localStorage.setItem(this.TRASH_KEY, JSON.stringify([]));
@@ -536,11 +541,51 @@ const BookData = {
                 return false;
             }
             
-            console.log('垃圾桶已成功清空，刪除了', count, '本書籍');
+            console.log('垃圾桶已成功清空，永久刪除了', count, '本書籍');
+            
+            // 嘗試同步到GitHub（如果啟用了自動上傳）
+            this.syncToGitHubAfterTrashEmpty();
+            
             return true;
         } catch (error) {
             console.error('清空垃圾桶時發生錯誤:', error);
             return false;
+        }
+    },
+    
+    // 清空垃圾桶後同步到GitHub
+    syncToGitHubAfterTrashEmpty: function() {
+        try {
+            // 檢查是否存在BackupManager並且啟用了自動上傳
+            if (window.BackupManager) {
+                const settings = BackupManager.getBackupSettings();
+                if (settings && settings.autoUploadToGitHub) {
+                    console.log('檢測到啟用了自動上傳到GitHub，開始同步數據...');
+                    
+                    // 獲取所有書籍數據
+                    const allBooks = this.getAllBooks();
+                    const jsonContent = JSON.stringify(allBooks, null, 2);
+                    
+                    // 檢查uploadToGitHub函數是否存在
+                    if (typeof window.uploadToGitHub === 'function') {
+                        window.uploadToGitHub(jsonContent)
+                            .then(() => {
+                                console.log('清空垃圾桶後數據同步到GitHub成功');
+                            })
+                            .catch(error => {
+                                console.error('清空垃圾桶後數據同步到GitHub失敗:', error);
+                            });
+                    } else {
+                        console.warn('uploadToGitHub函數不存在，無法同步數據');
+                    }
+                } else {
+                    console.log('未啟用自動上傳到GitHub，跳過同步');
+                }
+            } else {
+                console.log('BackupManager不存在，跳過同步');
+            }
+        } catch (error) {
+            console.error('同步到GitHub時發生錯誤:', error);
         }
     },
     
