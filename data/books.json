@@ -812,18 +812,18 @@
     "updatedAt": "2025-04-03T16:02:59.943Z"
   },
   {
-    "id": "1743696179945",
+    "id": "1743696180200",
     "title": "普希金的天使",
     "author": "齊藤千穗",
-    "series": "全",
+    "series": "1~7",
     "publisher": "長鴻",
     "description": "",
-    "cabinet": 1,
+    "cabinet": 2,
     "row": "藍",
     "isbn": "",
-    "notes": "6/10退第2箱",
-    "createdAt": "2025-04-03T16:02:59.945Z",
-    "updatedAt": "2025-04-03T16:02:59.945Z"
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:00.200Z",
+    "updatedAt": "2025-04-03T16:03:00.200Z"
   },
   {
     "id": "1743696179946",
@@ -3318,20 +3318,6 @@
     "updatedAt": "2025-04-03T16:03:00.199Z"
   },
   {
-    "id": "1743696180200",
-    "title": "普希金的天使",
-    "author": "齊藤千穗",
-    "series": "1~7",
-    "publisher": "長鴻",
-    "description": "",
-    "cabinet": 2,
-    "row": "藍",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T16:03:00.200Z",
-    "updatedAt": "2025-04-03T16:03:00.200Z"
-  },
-  {
     "id": "1743696180202",
     "title": "同居達令",
     "author": "長江朋美",
@@ -3498,20 +3484,6 @@
     "notes": "",
     "createdAt": "2025-04-03T16:03:00.217Z",
     "updatedAt": "2025-04-03T16:03:00.217Z"
-  },
-  {
-    "id": "1743696180218",
-    "title": "女王之花",
-    "author": "和泉兼好",
-    "series": "1~15",
-    "publisher": "長鴻",
-    "description": "",
-    "cabinet": 2,
-    "row": "綠",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T16:03:00.218Z",
-    "updatedAt": "2025-04-03T16:03:00.218Z"
   },
   {
     "id": "1743696180220",
@@ -15274,20 +15246,6 @@
     "updatedAt": "2025-04-03T16:03:47.150Z"
   },
   {
-    "id": "1743696227151",
-    "title": "魔力小馬",
-    "author": "藤田和日郎",
-    "series": "外傳",
-    "publisher": "大然文化",
-    "description": "",
-    "cabinet": 12,
-    "row": "紅",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T16:03:47.151Z",
-    "updatedAt": "2025-04-03T16:03:47.151Z"
-  },
-  {
     "id": "1743696227152",
     "title": "魔力小馬",
     "author": "藤田和日郎",
@@ -15722,20 +15680,6 @@
     "updatedAt": "2025-04-03T16:03:47.203Z"
   },
   {
-    "id": "1743696227204",
-    "title": "教頭當家",
-    "author": "森田真法",
-    "series": "1~22*",
-    "publisher": "大然文化",
-    "description": "",
-    "cabinet": 13,
-    "row": "藍",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T16:03:47.204Z",
-    "updatedAt": "2025-04-03T16:03:47.204Z"
-  },
-  {
     "id": "1743696227205",
     "title": "教頭當家",
     "author": "森田真法",
@@ -15932,18 +15876,18 @@
     "updatedAt": "2025-04-03T16:03:47.222Z"
   },
   {
-    "id": "1743696227223",
+    "id": "1743708507569",
     "title": "闇之盾",
     "author": "七月鏡一",
-    "series": "1~12*",
-    "publisher": "長鴻",
+    "series": "1*",
+    "publisher": "東立",
     "description": "",
-    "cabinet": 14,
-    "row": "綠",
+    "cabinet": 45,
+    "row": "藍",
     "isbn": "",
     "notes": "",
-    "createdAt": "2025-04-03T16:03:47.223Z",
-    "updatedAt": "2025-04-03T16:03:47.223Z"
+    "createdAt": "2025-04-03T19:28:27.569Z",
+    "updatedAt": "2025-04-03T19:28:27.569Z"
   },
   {
     "id": "1743696227224",
@@ -16618,18 +16562,18 @@
     "updatedAt": "2025-04-03T16:03:47.289Z"
   },
   {
-    "id": "1743696227290",
+    "id": "1743696227305",
     "title": "品川宿貓物語",
     "author": "にしだかな",
-    "series": "1~2",
+    "series": "1~3",
     "publisher": "長鴻",
     "description": "",
     "cabinet": 14,
-    "row": "綠",
+    "row": "紫",
     "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T16:03:47.290Z",
-    "updatedAt": "2025-04-03T16:03:47.290Z"
+    "notes": "缺:1~2",
+    "createdAt": "2025-04-03T16:03:47.305Z",
+    "updatedAt": "2025-04-03T16:03:47.305Z"
   },
   {
     "id": "1743696227291",
@@ -16728,20 +16672,6 @@
     "notes": "",
     "createdAt": "2025-04-03T16:03:47.302Z",
     "updatedAt": "2025-04-03T16:03:47.302Z"
-  },
-  {
-    "id": "1743696227305",
-    "title": "品川宿貓物語",
-    "author": "にしだかな",
-    "series": "1~3",
-    "publisher": "長鴻",
-    "description": "",
-    "cabinet": 14,
-    "row": "紫",
-    "isbn": "",
-    "notes": "缺:1~2",
-    "createdAt": "2025-04-03T16:03:47.305Z",
-    "updatedAt": "2025-04-03T16:03:47.305Z"
   },
   {
     "id": "1743696227306",
@@ -17708,20 +17638,6 @@
     "notes": "",
     "createdAt": "2025-04-03T16:03:47.401Z",
     "updatedAt": "2025-04-03T16:03:47.401Z"
-  },
-  {
-    "id": "1743696227402",
-    "title": "刃牙",
-    "author": "板坦會介",
-    "series": "外傳",
-    "publisher": "長鴻",
-    "description": "",
-    "cabinet": 16,
-    "row": "紫",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T16:03:47.402Z",
-    "updatedAt": "2025-04-03T16:03:47.402Z"
   },
   {
     "id": "1743696227404",
@@ -18884,20 +18800,6 @@
     "notes": "缺:1~74、87~117",
     "createdAt": "2025-04-03T16:03:47.528Z",
     "updatedAt": "2025-04-03T16:03:47.528Z"
-  },
-  {
-    "id": "1743696227530",
-    "title": "問題小子孫六",
-    "author": "貞安圭",
-    "series": "1~67",
-    "publisher": "東立",
-    "description": "",
-    "cabinet": 19,
-    "row": "粉",
-    "isbn": "",
-    "notes": "缺:60,62",
-    "createdAt": "2025-04-03T16:03:47.530Z",
-    "updatedAt": "2025-04-03T16:03:47.530Z"
   },
   {
     "id": "1743696227531",
@@ -24270,20 +24172,6 @@
     "notes": "",
     "createdAt": "2025-04-03T19:28:25.087Z",
     "updatedAt": "2025-04-03T19:28:25.087Z"
-  },
-  {
-    "id": "1743708505089",
-    "title": "MIX",
-    "author": "安達充",
-    "series": "1~18",
-    "publisher": "青文",
-    "description": "",
-    "cabinet": 28,
-    "row": "綠",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T19:28:25.089Z",
-    "updatedAt": "2025-04-03T19:28:25.089Z"
   },
   {
     "id": "1743708505091",
@@ -37460,20 +37348,6 @@
     "updatedAt": "2025-04-03T19:28:27.566Z"
   },
   {
-    "id": "1743708507569",
-    "title": "闇之盾",
-    "author": "七月鏡一",
-    "series": "1*",
-    "publisher": "東立",
-    "description": "",
-    "cabinet": 45,
-    "row": "藍",
-    "isbn": "",
-    "notes": "",
-    "createdAt": "2025-04-03T19:28:27.569Z",
-    "updatedAt": "2025-04-03T19:28:27.569Z"
-  },
-  {
     "id": "1743708507572",
     "title": "歌劇魅影",
     "author": "真崎春望",
@@ -38704,5 +38578,131 @@
     "notes": "",
     "createdAt": "2025-04-03T19:28:27.885Z",
     "updatedAt": "2025-04-03T19:28:27.885Z"
+  },
+  {
+    "id": "1743696179945",
+    "title": "普希金的天使",
+    "author": "齊藤千穗",
+    "series": "全",
+    "publisher": "長鴻",
+    "description": "",
+    "cabinet": 1,
+    "row": "藍",
+    "isbn": "",
+    "notes": "6/10退第2箱",
+    "createdAt": "2025-04-03T16:02:59.945Z",
+    "updatedAt": "2025-04-03T16:02:59.945Z"
+  },
+  {
+    "id": "1743696180218",
+    "title": "女王之花",
+    "author": "和泉兼好",
+    "series": "1~15",
+    "publisher": "長鴻",
+    "description": "",
+    "cabinet": 2,
+    "row": "綠",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:00.218Z",
+    "updatedAt": "2025-04-03T16:03:00.218Z"
+  },
+  {
+    "id": "1743696227151",
+    "title": "魔力小馬",
+    "author": "藤田和日郎",
+    "series": "外傳",
+    "publisher": "大然文化",
+    "description": "",
+    "cabinet": 12,
+    "row": "紅",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:47.151Z",
+    "updatedAt": "2025-04-03T16:03:47.151Z"
+  },
+  {
+    "id": "1743696227204",
+    "title": "教頭當家",
+    "author": "森田真法",
+    "series": "1~22*",
+    "publisher": "大然文化",
+    "description": "",
+    "cabinet": 13,
+    "row": "藍",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:47.204Z",
+    "updatedAt": "2025-04-03T16:03:47.204Z"
+  },
+  {
+    "id": "1743696227223",
+    "title": "闇之盾",
+    "author": "七月鏡一",
+    "series": "1~12*",
+    "publisher": "長鴻",
+    "description": "",
+    "cabinet": 14,
+    "row": "綠",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:47.223Z",
+    "updatedAt": "2025-04-03T16:03:47.223Z"
+  },
+  {
+    "id": "1743696227290",
+    "title": "品川宿貓物語",
+    "author": "にしだかな",
+    "series": "1~2",
+    "publisher": "長鴻",
+    "description": "",
+    "cabinet": 14,
+    "row": "綠",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:47.290Z",
+    "updatedAt": "2025-04-03T16:03:47.290Z"
+  },
+  {
+    "id": "1743696227402",
+    "title": "刃牙",
+    "author": "板坦會介",
+    "series": "外傳",
+    "publisher": "長鴻",
+    "description": "",
+    "cabinet": 16,
+    "row": "紫",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T16:03:47.402Z",
+    "updatedAt": "2025-04-03T16:03:47.402Z"
+  },
+  {
+    "id": "1743696227530",
+    "title": "問題小子孫六",
+    "author": "貞安圭",
+    "series": "1~67",
+    "publisher": "東立",
+    "description": "",
+    "cabinet": 19,
+    "row": "粉",
+    "isbn": "",
+    "notes": "缺:60,62",
+    "createdAt": "2025-04-03T16:03:47.530Z",
+    "updatedAt": "2025-04-03T16:03:47.530Z"
+  },
+  {
+    "id": "1743708505089",
+    "title": "MIX",
+    "author": "安達充",
+    "series": "1~18",
+    "publisher": "青文",
+    "description": "",
+    "cabinet": 28,
+    "row": "綠",
+    "isbn": "",
+    "notes": "",
+    "createdAt": "2025-04-03T19:28:25.089Z",
+    "updatedAt": "2025-04-03T19:28:25.089Z"
   }
 ]
