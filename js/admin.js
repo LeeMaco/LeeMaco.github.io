@@ -673,11 +673,18 @@ document.addEventListener('DOMContentLoaded', function() {
     // 清空垃圾桶
     function emptyTrash() {
         if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
-            if (BookData.emptyTrash()) {
-                loadTrashBooks();
-                alert('垃圾桶已清空');
-            } else {
-                alert('清空垃圾桶失敗，請重試');
+            try {
+                // 確保垃圾桶清空操作成功執行
+                if (BookData.emptyTrash()) {
+                    // 重新加載垃圾桶顯示
+                    loadTrashBooks();
+                    alert('垃圾桶已清空');
+                } else {
+                    alert('清空垃圾桶失敗，請重試');
+                }
+            } catch (error) {
+                console.error('清空垃圾桶時發生錯誤:', error);
+                alert('清空垃圾桶時發生錯誤: ' + error.message);
             }
         }
     }

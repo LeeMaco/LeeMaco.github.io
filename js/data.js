@@ -521,9 +521,27 @@ const BookData = {
     
     // 清空垃圾桶
     emptyTrash: function() {
-        localStorage.setItem(this.TRASH_KEY, JSON.stringify([]));
-        console.log('垃圾桶已清空');
-        return true;
+        try {
+            // 先獲取當前垃圾桶中的書籍數量，用於日誌記錄
+            const trashBooks = this.getTrashBooks();
+            const count = trashBooks.length;
+            
+            // 清空垃圾桶數據
+            localStorage.setItem(this.TRASH_KEY, JSON.stringify([]));
+            
+            // 確認垃圾桶是否真的被清空
+            const afterTrashBooks = this.getTrashBooks();
+            if (afterTrashBooks.length > 0) {
+                console.error('垃圾桶清空失敗，仍有', afterTrashBooks.length, '本書籍');
+                return false;
+            }
+            
+            console.log('垃圾桶已成功清空，刪除了', count, '本書籍');
+            return true;
+        } catch (error) {
+            console.error('清空垃圾桶時發生錯誤:', error);
+            return false;
+        }
     },
     
     // 清理垃圾桶中超過指定天數的書籍
