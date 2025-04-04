@@ -10,10 +10,6 @@ const BookData = {
         password: 'admin123'
     },
     
-    // 敏感數據的存儲鍵名
-    ADMIN_CREDENTIALS_KEY: 'adminCredentials',
-    GITHUB_TOKEN_KEY: 'githubToken',
-    
     // 存儲從JSON文件加載的書籍數據
     jsonBooks: [],
     
@@ -75,37 +71,6 @@ const BookData = {
         return this.loadBooksFromJSON();
     },
     
-    // 保存管理員憑證
-    saveAdminCredentials: function(credentials) {
-        const encryptedCredentials = CryptoUtils.encryptData(credentials);
-        localStorage.setItem(this.ADMIN_CREDENTIALS_KEY, encryptedCredentials);
-        console.log('管理員憑證已加密保存');
-    },
-    
-    // 獲取管理員憑證
-    getAdminCredentials: function() {
-        const encryptedCredentials = localStorage.getItem(this.ADMIN_CREDENTIALS_KEY);
-        if (!encryptedCredentials) return this.adminCredentials;
-        
-        const decryptedCredentials = CryptoUtils.decryptData(encryptedCredentials);
-        return decryptedCredentials || this.adminCredentials;
-    },
-    
-    // 保存GitHub訪問令牌
-    saveGitHubToken: function(token) {
-        const encryptedToken = CryptoUtils.encryptData(token);
-        localStorage.setItem(this.GITHUB_TOKEN_KEY, encryptedToken);
-        console.log('GitHub訪問令牌已加密保存');
-    },
-    
-    // 獲取GitHub訪問令牌
-    getGitHubToken: function() {
-        const encryptedToken = localStorage.getItem(this.GITHUB_TOKEN_KEY);
-        if (!encryptedToken) return null;
-        
-        return CryptoUtils.decryptData(encryptedToken);
-    },
-    
     // 從JSON文件加載書籍數據
     loadBooksFromJSON: function() {
         // 使用多種策略嘗試加載JSON數據
@@ -118,15 +83,20 @@ const BookData = {
         const currentUrl = window.location.href;
         let basePath = '';
         
-        // 從當前URL中提取基礎路徑
-        if (currentUrl.includes('.html')) {
-            // 如果URL包含HTML文件名，則移除文件名部分
-            basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-        } else {
-            // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
-            basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
+        try {
+            // 從當前URL中提取基礎路徑
+            if (currentUrl.includes('.html')) {
+                // 如果URL包含HTML文件名，則移除文件名部分
+                basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+            } else {
+                // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
+                basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
+            }
+            strategies.push(basePath + 'data/books.json');
+        } catch (error) {
+            console.error('URL解析錯誤:', error);
+            // 即使URL解析失敗，仍然保留策略1
         }
-        strategies.push(basePath + 'data/books.json');
         
         // 策略3: GitHub Pages特定路徑 (如果檢測到GitHub Pages環境)
         if (window.location.href.includes('github.io')) {
@@ -225,11 +195,23 @@ const BookData = {
     getAllBooks: function() {
         // 從localStorage獲取書籍
         const localBooks = localStorage.getItem('books');
-        const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
+        let parsedLocalBooks = [];
+        
+        try {
+            parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
+        } catch (error) {
+            console.error('解析localStorage書籍數據時發生錯誤:', error);
+            // 如果解析失敗，使用空數組並嘗試重置localStorage
+            try {
+                localStorage.setItem('books', JSON.stringify([]));
+            } catch (e) {
+                console.error('重置localStorage失敗:', e);
+            }
+        }
         
         // 確保所有本地書籍的ID都是字符串類型
         parsedLocalBooks.forEach(book => {
-            if (book.id !== undefined) {
+            if (book && book.id !== undefined) {
                 book.id = String(book.id);
             }
         });
@@ -291,146 +273,10 @@ const BookData = {
         return book || null;
     },
     
-    // 搜索索引
-    _searchIndex: null,
-    
-    // 搜索緩存
-    _cachedSearchResult: null,
-    _cachedSearchQuery: null,
-    _cachedSearchType: null,
-    _cachedSearchFilters: null,
-    
-    // 創建搜索索引
-    _createSearchIndex: function(books) {
-        console.log('創建搜索索引');
-        this._searchIndex = {
-            title: {},
-            author: {},
-            publisher: {},
-            isbn: {},
-            series: {},
-            cabinet: {},
-            row: {},
-            description: {},
-            notes: {}
-        };
-        
-        // 為每本書的每個欄位創建索引
-        books.forEach(book => {
-            if (!book) return;
-            
-            // 為每個欄位創建索引
-            Object.keys(this._searchIndex).forEach(field => {
-                if (book[field]) {
-                    const value = String(book[field]).toLowerCase();
-                    // 將每個單詞添加到索引中
-                    value.split(/\s+/).forEach(word => {
-                        if (word.length > 1) {
-                            if (!this._searchIndex[field][word]) {
-                                this._searchIndex[field][word] = [];
-                            }
-                            this._searchIndex[field][word].push(book);
-                        }
-                    });
-                }
-            });
-        });
-        
-        console.log('搜索索引創建完成');
-    },
-    
-    // 使用索引進行搜索
-    _searchWithIndex: function(query, type) {
-        console.log('使用索引搜索:', query, '類型:', type);
-        
-        // 如果搜索所有欄位
-        if (type === 'all') {
-            const results = new Set();
-            const fields = Object.keys(this._searchIndex);
-            
-            // 將查詢拆分為單詞
-            const words = query.split(/\s+/).filter(word => word.length > 1);
-            
-            // 如果沒有有效的單詞，返回所有書籍
-            if (words.length === 0) {
-                return this.getAllBooks();
-            }
-            
-            // 對每個單詞在每個欄位中搜索
-            words.forEach(word => {
-                fields.forEach(field => {
-                    const fieldIndex = this._searchIndex[field];
-                    // 查找包含該單詞的書籍
-                    Object.keys(fieldIndex).forEach(indexWord => {
-                        if (indexWord.includes(word) || word.includes(indexWord)) {
-                            fieldIndex[indexWord].forEach(book => results.add(book));
-                        }
-                    });
-                });
-            });
-            
-            return Array.from(results);
-        } else {
-            // 搜索特定欄位
-            const results = new Set();
-            const fieldIndex = this._searchIndex[type];
-            
-            if (!fieldIndex) return [];
-            
-            // 將查詢拆分為單詞
-            const words = query.split(/\s+/).filter(word => word.length > 1);
-            
-            // 如果沒有有效的單詞，返回所有書籍
-            if (words.length === 0) {
-                return this.getAllBooks();
-            }
-            
-            // 對每個單詞在指定欄位中搜索
-            words.forEach(word => {
-                Object.keys(fieldIndex).forEach(indexWord => {
-                    if (indexWord.includes(word) || word.includes(indexWord)) {
-                        fieldIndex[indexWord].forEach(book => results.add(book));
-                    }
-                });
-            });
-            
-            return Array.from(results);
-        }
-    },
-    
-    // 應用篩選器
-    _applyFilters: function(books, filters) {
-        console.log('應用篩選條件:', filters);
-        
-        return books.filter(book => {
-            // 檢查每個篩選條件
-            for (const [key, value] of Object.entries(filters)) {
-                // 如果篩選值為空，則跳過
-                if (!value) continue;
-                
-                // 如果書籍沒有該欄位或欄位值不匹配，則排除
-                if (!book[key] || String(book[key]).toLowerCase() !== String(value).toLowerCase()) {
-                    return false;
-                }
-            }
-            
-            return true;
-        });
-    },
-    
     // 搜索書籍（增強版，支持多欄位搜索和篩選）
     searchBooks: function(query, type = 'title', filters = {}) {
         try {
             console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
-            
-            // 使用緩存減少重複計算
-            if (this._cachedSearchResult && 
-                this._cachedSearchQuery === query && 
-                this._cachedSearchType === type &&
-                JSON.stringify(this._cachedSearchFilters) === JSON.stringify(filters)) {
-                console.log('使用緩存的搜索結果');
-                return this._cachedSearchResult;
-            }
             
             let books = this.getAllBooks();
             console.log('獲取到書籍總數:', books.length);
@@ -440,30 +286,42 @@ const BookData = {
                 return [];
             }
             
-            // 創建索引以加速搜索（僅在首次搜索時創建）
-            if (!this._searchIndex) {
-                this._createSearchIndex(books);
-            }
-            
-            // 使用索引進行搜索
-            let results = books;
+            // 應用關鍵字搜索
             if (query) {
                 const lowerQuery = query.toLowerCase().trim();
-                results = this._searchWithIndex(lowerQuery, type);
-            }
-            
-            // 應用篩選器
-            if (Object.keys(filters).length > 0) {
-                results = this._applyFilters(results, filters);
-            }
-            
-            // 緩存搜索結果
-            this._cachedSearchResult = results;
-            this._cachedSearchQuery = query;
-            this._cachedSearchType = type;
-            this._cachedSearchFilters = {...filters};
-            
-            return results;
+                console.log('處理後的查詢關鍵字:', lowerQuery);
+                
+                books = books.filter(book => {
+                    // 確保book存在且不為null
+                    if (!book) return false;
+                    
+                    if (type === 'all') {
+                        // 搜索所有欄位，使用安全的字符串處理和更寬鬆的比較方式
+                        return (
+                            (book.title && (String(book.title).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.title).toLowerCase()))) ||
+                            (book.author && (String(book.author).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.author).toLowerCase()))) ||
+                            (book.series && (String(book.series).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.series).toLowerCase()))) ||
+                            (book.publisher && (String(book.publisher).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.publisher).toLowerCase()))) ||
+                            (book.cabinet && (String(book.cabinet).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.cabinet).toLowerCase()))) ||
+                            (book.row && (String(book.row).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.row).toLowerCase()))) ||
+                            (book.isbn && (String(book.isbn).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.isbn).toLowerCase()))) ||
+                            (book.description && (String(book.description).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.description).toLowerCase()))) ||
+                            (book.notes && (String(book.notes).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.notes).toLowerCase())))
+                        );
+                    } else if (type === 'cabinet') {
+                        // 特別處理櫃號搜索，確保安全的字符串比較
+                        return book.cabinet && String(book.cabinet).toLowerCase() === lowerQuery;
+                    } else {
+                        // 搜索特定欄位，確保欄位存在且進行安全的字符串處理
+                        // 使用更寬鬆的比較方式，允許部分匹配
+                        if (book[type]) {
+                            const fieldValue = String(book[type]).toLowerCase();
+                            // 檢查是否包含查詢字符串，或查詢字符串包含欄位值
+                            return fieldValue.includes(lowerQuery) || lowerQuery.includes(fieldValue);
+                        }
+                        return false;
+                    }
+                });
                 
                 console.log('關鍵字搜索後的書籍數量:', books.length);
                 if (books.length === 0) {

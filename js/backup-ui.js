@@ -145,31 +145,56 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 加載備份歷史記錄
     function loadBackupHistory() {
-        const history = BackupManager.getBackupHistory();
-        let html = '';
-        
-        if (history.length === 0) {
-            html = `<tr><td colspan="5" style="text-align: center;">沒有備份記錄</td></tr>`;
-        } else {
-            history.forEach(backup => {
-                // 格式化日期
-                const backupDate = new Date(backup.timestamp).toLocaleString();
-                
-                html += `
-                    <tr data-id="${backup.id}">
-                        <td>${backupDate}</td>
-                        <td>${backup.bookCount} 本</td>
-                        <td>${backup.githubFileName ? '是' : '否'}</td>
-                        <td>
-                            <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
-                            <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
-                        </td>
-                    </tr>
-                `;
-            });
+        try {
+            const history = BackupManager.getBackupHistory();
+            let html = '';
+            
+            // 安全地處理文本，防止XSS攻擊
+            function escapeHtml(text) {
+                if (text === undefined || text === null) return '';
+                return String(text)
+                    .replace(/&/g, '&amp;')
+                    .replace(/</g, '&lt;')
+                    .replace(/>/g, '&gt;')
+                    .replace(/"/g, '&quot;')
+                    .replace(/'/g, '&#039;');
+            }
+            
+            if (!Array.isArray(history) || history.length === 0) {
+                html = `<tr><td colspan="5" style="text-align: center;">沒有備份記錄</td></tr>`;
+            } else {
+                history.forEach(backup => {
+                    if (!backup || !backup.id) return; // 跳過無效的備份
+                    
+                    try {
+                        // 格式化日期
+                        const backupDate = new Date(backup.timestamp).toLocaleString();
+                        
+                        const id = escapeHtml(backup.id);
+                        const bookCount = backup.bookCount || 0;
+                        
+                        html += `
+                            <tr data-id="${id}">
+                                <td>${backupDate}</td>
+                                <td>${bookCount} 本</td>
+                                <td>${backup.githubFileName ? '是' : '否'}</td>
+                                <td>
+                                    <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
+                                    <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
+                                </td>
+                            </tr>
+                        `;
+                    } catch (dateError) {
+                        console.error('處理備份日期時發生錯誤:', dateError);
+                    }
+                });
+            }
+            
+            backupHistoryTableBody.innerHTML = html;
+        } catch (error) {
+            console.error('加載備份歷史記錄時發生錯誤:', error);
+            backupHistoryTableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">加載備份記錄時發生錯誤</td></tr>';
         }
-        
-        backupHistoryTableBody.innerHTML = html;
     }
     
     // 更新最後備份時間顯示

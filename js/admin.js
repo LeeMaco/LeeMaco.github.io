@@ -482,6 +482,17 @@ document.addEventListener('DOMContentLoaded', function() {
         const sortField = document.getElementById('sortField').value;
         const sortOrder = document.getElementById('sortOrder').value;
         
+        // 安全地處理文本，防止XSS攻擊
+        function escapeHtml(text) {
+            if (text === undefined || text === null) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        
         // 應用關鍵字搜索
         if (searchKeyword) {
             books = books.filter(book => {

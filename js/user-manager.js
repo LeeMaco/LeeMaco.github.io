@@ -156,13 +156,38 @@ const UserManager = {
     
     // 驗證用戶登錄
     validateLogin: function(username, password) {
-        const user = this.getUserByUsername(username);
-        if (user && user.password === password) {
-            // 設置當前用戶
-            this.setCurrentUser(user);
-            return { success: true, user };
+        if (!username || !password) {
+            return { success: false, message: '用戶名和密碼不能為空' };
         }
-        return { success: false, message: '用戶名或密碼錯誤' };
+        
+        try {
+            const user = this.getUserByUsername(username);
+            if (user && user.password === password) {
+                // 創建用戶信息對象（不包含密碼）
+                const userInfo = {
+                    id: user.id,
+                    username: user.username,
+                    displayName: user.displayName || username,
+                    isSuperAdmin: !!user.isSuperAdmin
+                };
+                
+                // 保存當前用戶信息到本地存儲
+                try {
+                    localStorage.setItem(this.CURRENT_USER_KEY, JSON.stringify(userInfo));
+                    localStorage.setItem('isLoggedIn', 'true');
+                } catch (storageError) {
+                    console.error('保存用戶登錄狀態失敗:', storageError);
+                    // 即使存儲失敗，仍然允許用戶登錄
+                }
+                
+                return { success: true, user: userInfo };
+            }
+            
+            return { success: false, message: '用戶名或密碼錯誤' };
+        } catch (error) {
+            console.error('登錄驗證過程中發生錯誤:', error);
+            return { success: false, message: '登錄過程中發生錯誤，請重試' };
+        }
     },
     
     // 設置當前用戶
