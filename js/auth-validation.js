@@ -192,6 +192,7 @@ const AuthValidator = {
             modal = document.createElement('div');
             modal.id = 'passwordVerificationModal';
             modal.className = 'modal';
+            modal.style.zIndex = '1001'; // 確保對話框在最上層
             
             // 創建對話框內容
             const modalContent = document.createElement('div');
@@ -268,18 +269,14 @@ const AuthValidator = {
                     // 執行成功回調
                     if (typeof onSuccess === 'function') {
                         console.log('執行成功回調函數');
-                        // 儲存當前上下文
-                        const self = this;
-                        // 使用setTimeout確保模態框完全關閉後再執行回調
-                        setTimeout(() => {
-                            try {
-                                // 直接調用回調函數，不使用call方法改變上下文
-                                onSuccess();
-                            } catch (error) {
-                                console.error('執行回調函數時發生錯誤:', error);
-                                console.error('錯誤詳情:', error.stack);
-                            }
-                        }, 100); // 減少延遲時間，確保更快響應
+                        // 立即執行回調函數
+                        try {
+                            // 直接同步執行回調，確保立即進入對應功能界面
+                            onSuccess();
+                        } catch (error) {
+                            console.error('執行回調函數時發生錯誤:', error);
+                            console.error('錯誤詳情:', error.stack);
+                        }
                     }
                 } else {
                     // 密碼錯誤
@@ -308,11 +305,9 @@ const AuthValidator = {
         // 顯示對話框
         modal.style.display = 'block';
         
-        // 聚焦密碼輸入框
-        setTimeout(() => {
-            const passwordInput = document.getElementById('verificationPassword');
-            if (passwordInput) passwordInput.focus();
-        }, 100);
+        // 立即聚焦密碼輸入框
+        const passwordInput = document.getElementById('verificationPassword');
+        if (passwordInput) passwordInput.focus();
     }
 };
 
