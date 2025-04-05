@@ -59,331 +59,55 @@ const PermissionManager = {
     
     // 添加權限設置按鈕
     addPermissionSettingsButton: function() {
-        // 確保選擇正確的下拉菜單元素
-        const adminActions = document.querySelector('.admin-actions-menu');
-        console.log('找到管理選項下拉菜單:', adminActions); // 添加調試日誌
+        // 此函數已被禁用，不再添加權限設置按鈕
+        console.log('權限設置按鈕功能已禁用');
         
-        if (adminActions) {
-            // 在登出按鈕前添加權限設置按鈕
+        // 僅添加用戶管理按鈕（僅對超級管理員顯示）
+        const adminActions = document.querySelector('.admin-actions-menu');
+        if (adminActions && window.UserManager && UserManager.isSuperAdmin()) {
+            // 在登出按鈕前添加用戶管理按鈕
             const logoutBtn = document.getElementById('logoutBtn');
             
-            // 檢查是否已存在權限設置按鈕，避免重複添加
-            if (!document.getElementById('permissionSettingsBtn')) {
-                const permissionBtn = document.createElement('button');
-                permissionBtn.id = 'permissionSettingsBtn';
-                permissionBtn.className = 'excel-btn';
-                permissionBtn.innerHTML = '<i class="fas fa-user-lock"></i> 權限設置';
-                
-                // 添加用戶管理按鈕（僅對超級管理員顯示）
+            // 檢查是否已存在用戶管理按鈕，避免重複添加
+            if (!document.getElementById('userManagementBtn')) {
                 const userManagementBtn = document.createElement('button');
                 userManagementBtn.id = 'userManagementBtn';
                 userManagementBtn.className = 'excel-btn';
                 userManagementBtn.innerHTML = '<i class="fas fa-users-cog"></i> 用戶管理';
                 
-                // 檢查當前用戶是否為超級管理員
-                if (window.UserManager && UserManager.isSuperAdmin()) {
-                    if (logoutBtn) {
-                        adminActions.insertBefore(userManagementBtn, logoutBtn);
-                        adminActions.insertBefore(permissionBtn, userManagementBtn);
-                    } else {
-                        adminActions.appendChild(permissionBtn);
-                        adminActions.appendChild(userManagementBtn);
-                    }
-                    
-                    // 綁定用戶管理按鈕點擊事件
-                    userManagementBtn.addEventListener('click', function() {
-                        PermissionManager.showUserManagementModal();
-                    });
+                if (logoutBtn) {
+                    adminActions.insertBefore(userManagementBtn, logoutBtn);
                 } else {
-                    if (logoutBtn) {
-                        adminActions.insertBefore(permissionBtn, logoutBtn);
-                    } else {
-                        adminActions.appendChild(permissionBtn);
-                    }
+                    adminActions.appendChild(userManagementBtn);
                 }
                 
-                // 綁定權限設置按鈕點擊事件
-                permissionBtn.addEventListener('click', function() {
-                    PermissionManager.showPermissionSettingsModal();
+                // 綁定用戶管理按鈕點擊事件
+                userManagementBtn.addEventListener('click', function() {
+                    PermissionManager.showUserManagementModal();
                 });
-                
-                console.log('權限設置按鈕已添加'); // 添加調試日誌
             }
-        } else {
-            console.error('未找到管理選項下拉菜單元素'); // 添加錯誤日誌
         }
     },
     
-    // 顯示權限設置彈窗
+    // 顯示權限設置彈窗 (已禁用)
     showPermissionSettingsModal: function() {
-        // 先顯示密碼驗證彈窗
-        this.showPasswordVerificationModal();
+        console.log('權限設置功能已禁用');
+        // 不再顯示權限設置彈窗
+        return;
     },
     
-    // 顯示密碼驗證彈窗
+    // 顯示密碼驗證彈窗 (已禁用)
     showPasswordVerificationModal: function() {
-        // 檢查彈窗是否已存在
-        let passwordModal = document.getElementById('passwordVerificationModal');
-        
-        if (!passwordModal) {
-            // 創建彈窗
-            passwordModal = document.createElement('div');
-            passwordModal.id = 'passwordVerificationModal';
-            passwordModal.className = 'modal';
-            
-            // 創建彈窗內容
-            const modalContent = document.createElement('div');
-            modalContent.className = 'modal-content';
-            
-            // 創建關閉按鈕
-            const closeBtn = document.createElement('span');
-            closeBtn.className = 'close';
-            closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', function() {
-                passwordModal.style.display = 'none';
-            });
-            
-            // 創建標題
-            const title = document.createElement('h2');
-            title.textContent = '權限設置驗證';
-            
-            // 創建說明
-            const description = document.createElement('p');
-            description.textContent = '請輸入權限設置密碼以繼續';
-            
-            // 創建表單
-            const form = document.createElement('form');
-            form.id = 'passwordVerificationForm';
-            
-            // 創建密碼輸入框
-            const formGroup = document.createElement('div');
-            formGroup.className = 'form-group';
-            
-            const passwordInput = document.createElement('input');
-            passwordInput.type = 'password';
-            passwordInput.id = 'permissionPassword';
-            passwordInput.placeholder = '請輸入密碼';
-            passwordInput.required = true;
-            
-            formGroup.appendChild(passwordInput);
-            
-            // 創建提交按鈕
-            const submitBtn = document.createElement('button');
-            submitBtn.type = 'submit';
-            submitBtn.textContent = '驗證';
-            
-            // 添加到表單
-            form.appendChild(formGroup);
-            form.appendChild(submitBtn);
-            
-            // 綁定表單提交事件
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                const password = document.getElementById('permissionPassword').value;
-                
-                // 驗證密碼 (0211)
-                if (password === '0211') {
-                    // 關閉密碼驗證彈窗
-                    passwordModal.style.display = 'none';
-                    
-                    // 顯示權限設置彈窗
-                    PermissionManager.showPermissionSettingsModalAfterVerification();
-                } else {
-                    alert('密碼錯誤，請重試');
-                }
-            });
-            
-            // 組裝彈窗
-            modalContent.appendChild(closeBtn);
-            modalContent.appendChild(title);
-            modalContent.appendChild(description);
-            modalContent.appendChild(form);
-            passwordModal.appendChild(modalContent);
-            
-            // 添加彈窗到頁面
-            document.body.appendChild(passwordModal);
-            
-            // 點擊彈窗外部關閉彈窗
-            window.addEventListener('click', function(e) {
-                if (e.target === passwordModal) {
-                    passwordModal.style.display = 'none';
-                }
-            });
-        }
-        
-        // 顯示彈窗
-        passwordModal.style.display = 'block';
+        console.log('權限設置驗證功能已禁用');
+        // 不再顯示密碼驗證彈窗
+        return;
     },
     
-    // 驗證成功後顯示權限設置彈窗
+    // 驗證成功後顯示權限設置彈窗 (已禁用)
     showPermissionSettingsModalAfterVerification: function() {
-        // 檢查彈窗是否已存在
-        let permissionModal = document.getElementById('permissionSettingsModal');
-        
-        if (!permissionModal) {
-            // 創建彈窗
-            permissionModal = document.createElement('div');
-            permissionModal.id = 'permissionSettingsModal';
-            permissionModal.className = 'modal';
-            
-            // 創建彈窗內容
-            const modalContent = document.createElement('div');
-            modalContent.className = 'modal-content';
-            
-            // 創建關閉按鈕
-            const closeBtn = document.createElement('span');
-            closeBtn.className = 'close';
-            closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', function() {
-                permissionModal.style.display = 'none';
-            });
-            
-            // 創建標題
-            const title = document.createElement('h2');
-            title.textContent = '權限設置';
-            
-            // 創建說明
-            const description = document.createElement('p');
-            const currentUser = window.UserManager ? UserManager.getCurrentUser() : null;
-            if (currentUser && window.UserManager && UserManager.isSuperAdmin()) {
-                description.textContent = '您正在設置自己的權限。作為超級管理員，您可以管理其他用戶的權限。';
-            } else if (currentUser) {
-                description.textContent = `您正在設置 ${currentUser.displayName || currentUser.username} 的權限。`;
-            } else {
-                description.textContent = '請設置各功能的使用權限。';
-            }
-            
-            // 創建表單
-            const form = document.createElement('form');
-            form.id = 'permissionSettingsForm';
-            
-            // 獲取當前權限設置
-            const permissions = this.getPermissions();
-            
-            // 創建權限選項
-            const permissionOptions = [
-                { id: 'emptyTrash', label: '清空垃圾桶', value: permissions.emptyTrash },
-                { id: 'exportExcel', label: '匯出Excel', value: permissions.exportExcel },
-                { id: 'exportJson', label: '匯出JSON', value: permissions.exportJson },
-                { id: 'importExcel', label: '匯入Excel', value: permissions.importExcel },
-                { id: 'githubSettings', label: 'GitHub設置', value: permissions.githubSettings },
-                { id: 'backupSettings', label: '備份設置', value: permissions.backupSettings },
-                { id: 'backupHistory', label: '備份歷史', value: permissions.backupHistory },
-                { id: 'removeDuplicates', label: '去除重複', value: permissions.removeDuplicates }
-            ];
-            
-            // 如果是超級管理員，添加用戶管理權限選項
-            if (window.UserManager && UserManager.isSuperAdmin()) {
-                permissionOptions.push({ 
-                    id: 'userManagement', 
-                    label: '用戶管理', 
-                    value: permissions.userManagement !== undefined ? permissions.userManagement : true 
-                });
-            }
-            
-            // 添加權限選項到表單
-            permissionOptions.forEach(option => {
-                const formGroup = document.createElement('div');
-                formGroup.className = 'form-group';
-                formGroup.style.display = 'flex';
-                formGroup.style.alignItems = 'center';
-                
-                const checkbox = document.createElement('input');
-                checkbox.type = 'checkbox';
-                checkbox.id = option.id;
-                checkbox.checked = option.value;
-                checkbox.style.marginRight = '8px';
-                
-                const label = document.createElement('label');
-                label.htmlFor = option.id;
-                label.textContent = option.label;
-                
-                formGroup.appendChild(checkbox);
-                formGroup.appendChild(label);
-                form.appendChild(formGroup);
-            });
-            
-            // 創建提交按鈕
-            const submitBtn = document.createElement('button');
-            submitBtn.type = 'submit';
-            submitBtn.textContent = '保存設置';
-            form.appendChild(submitBtn);
-            
-            // 綁定表單提交事件
-            form.addEventListener('submit', function(e) {
-                e.preventDefault();
-                
-                // 獲取表單數據
-                const newPermissions = {
-                    emptyTrash: document.getElementById('emptyTrash').checked,
-                    exportExcel: document.getElementById('exportExcel').checked,
-                    exportJson: document.getElementById('exportJson').checked,
-                    importExcel: document.getElementById('importExcel').checked,
-                    githubSettings: document.getElementById('githubSettings').checked,
-                    backupSettings: document.getElementById('backupSettings').checked,
-                    backupHistory: document.getElementById('backupHistory').checked,
-                    removeDuplicates: document.getElementById('removeDuplicates').checked
-                };
-                
-                // 如果是超級管理員，添加用戶管理權限
-                if (window.UserManager && UserManager.isSuperAdmin() && document.getElementById('userManagement')) {
-                    newPermissions.userManagement = document.getElementById('userManagement').checked;
-                }
-                
-                // 保存權限設置
-                PermissionManager.savePermissions(newPermissions);
-                
-                // 應用權限設置
-                PermissionManager.applyPermissions();
-                
-                // 關閉彈窗
-                permissionModal.style.display = 'none';
-                
-                // 顯示成功消息
-                alert('權限設置已保存');
-            });
-            
-            // 組裝彈窗
-            modalContent.appendChild(closeBtn);
-            modalContent.appendChild(title);
-            modalContent.appendChild(description);
-            modalContent.appendChild(form);
-            permissionModal.appendChild(modalContent);
-            
-            // 添加彈窗到頁面
-            document.body.appendChild(permissionModal);
-            
-            // 點擊彈窗外部關閉彈窗
-            window.addEventListener('click', function(e) {
-                if (e.target === permissionModal) {
-                    permissionModal.style.display = 'none';
-                }
-            });
-        } else {
-            // 更新彈窗內容
-            const description = permissionModal.querySelector('p');
-            const currentUser = window.UserManager ? UserManager.getCurrentUser() : null;
-            if (currentUser && window.UserManager && UserManager.isSuperAdmin()) {
-                description.textContent = '您正在設置自己的權限。作為超級管理員，您可以管理其他用戶的權限。';
-            } else if (currentUser) {
-                description.textContent = `您正在設置 ${currentUser.displayName || currentUser.username} 的權限。`;
-            } else {
-                description.textContent = '請設置各功能的使用權限。';
-            }
-            
-            // 更新權限表單數據
-            const permissions = this.getPermissions();
-            const checkboxes = permissionModal.querySelectorAll('input[type="checkbox"]');
-            checkboxes.forEach(checkbox => {
-                if (permissions[checkbox.id] !== undefined) {
-                    checkbox.checked = permissions[checkbox.id];
-                }
-            });
-        }
-        
-        // 顯示彈窗
-        permissionModal.style.display = 'block';
+        console.log('權限設置功能已禁用');
+        // 不再顯示權限設置彈窗
+        return;
     },
     
     // 顯示用戶管理彈窗
