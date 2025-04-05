@@ -57,73 +57,111 @@ const AuthValidator = {
                 
                 // 添加新的點擊事件監聽器
                 const authHandler = (event) => {
+                    // 先保存事件對象的副本，因為在異步操作中原始事件對象可能不可用
+                    const eventCopy = {
+                        preventDefault: () => {},
+                        stopPropagation: () => {},
+                        target: event.target,
+                        currentTarget: event.currentTarget,
+                        type: event.type
+                    };
+                    
                     // 阻止事件冒泡和默認行為
                     event.preventDefault();
                     event.stopPropagation();
                     
                     // 顯示密碼驗證對話框
                     this.showPasswordVerificationModal(() => {
-                        // 驗證成功後，執行原始的點擊事件處理函數
-                        if (originalClickHandler) {
-                            // 直接調用原始處理函數
-                            originalClickHandler.call(button, event);
-                        } else if (originalEventListeners.length > 0) {
-                            // 如果有其他事件監聽器，則調用它們
-                            originalEventListeners.forEach(listener => {
-                                if (typeof listener === 'function') {
-                                    listener.call(button, event);
-                                }
-                            });
-                        } else {
-                            // 如果沒有原始處理函數，則直接執行相應功能
-                            // 根據按鈕ID執行相應功能
+                        console.log('密碼驗證成功，準備執行功能:', buttonId);
+                        
+                        try {
+                            // 方法1：直接執行對應功能
                             switch(buttonId) {
                                 case 'removeDuplicatesBtn':
                                     if (window.removeDuplicatesModal) {
+                                        console.log('顯示去除重複對話框');
                                         window.removeDuplicatesModal.style.display = 'block';
+                                    } else {
+                                        console.error('找不到去除重複對話框元素');
                                     }
                                     break;
                                 case 'exportExcelBtn':
-                                    if (window.exportToExcel) {
+                                    if (typeof window.exportToExcel === 'function') {
+                                        console.log('執行匯出Excel功能');
                                         window.exportToExcel();
+                                    } else {
+                                        console.error('找不到匯出Excel功能');
                                     }
                                     break;
                                 case 'exportJsonBtn':
-                                    if (window.exportToJSON) {
+                                    if (typeof window.exportToJSON === 'function') {
+                                        console.log('執行匯出JSON功能');
                                         window.exportToJSON();
+                                    } else {
+                                        console.error('找不到匯出JSON功能');
                                     }
                                     break;
                                 case 'importExcelBtn':
                                     if (window.importExcelModal) {
+                                        console.log('顯示匯入Excel對話框');
                                         window.importExcelModal.style.display = 'block';
+                                    } else {
+                                        console.error('找不到匯入Excel對話框元素');
                                     }
                                     break;
                                 case 'githubSettingsBtn':
                                     if (window.githubSettingsModal) {
+                                        console.log('顯示GitHub設置對話框');
                                         window.githubSettingsModal.style.display = 'block';
+                                    } else {
+                                        console.error('找不到GitHub設置對話框元素');
                                     }
                                     break;
                                 case 'backupSettingsBtn':
-                                    if (window.BackupUI && window.BackupUI.showBackupSettingsModal) {
+                                    if (window.BackupUI && typeof window.BackupUI.showBackupSettingsModal === 'function') {
+                                        console.log('顯示備份設置對話框');
                                         window.BackupUI.showBackupSettingsModal();
+                                    } else {
+                                        console.error('找不到備份設置功能');
                                     }
                                     break;
                                 case 'backupHistoryBtn':
-                                    if (window.BackupUI && window.BackupUI.showBackupHistoryModal) {
+                                    if (window.BackupUI && typeof window.BackupUI.showBackupHistoryModal === 'function') {
+                                        console.log('顯示備份歷史對話框');
                                         window.BackupUI.showBackupHistoryModal();
+                                    } else {
+                                        console.error('找不到備份歷史功能');
                                     }
                                     break;
                                 case 'trashBtn':
                                     if (window.trashModal) {
+                                        console.log('顯示垃圾桶對話框');
                                         window.trashModal.style.display = 'block';
-                                        if (window.loadTrashBooks) {
+                                        if (typeof window.loadTrashBooks === 'function') {
                                             window.loadTrashBooks();
                                         }
+                                    } else {
+                                        console.error('找不到垃圾桶對話框元素');
                                     }
                                     break;
                                 default:
                                     console.log('未知按鈕ID:', buttonId);
+                                    
+                                    // 嘗試執行原始處理函數
+                                    if (originalClickHandler) {
+                                        console.log('執行原始點擊處理函數');
+                                        originalClickHandler.call(button, eventCopy);
+                                    } else if (originalEventListeners.length > 0) {
+                                        console.log('執行原始事件監聽器');
+                                        originalEventListeners.forEach(listener => {
+                                            if (typeof listener === 'function') {
+                                                listener.call(button, eventCopy);
+                                            }
+                                        });
+                                    }
                             }
+                        } catch (error) {
+                            console.error('執行功能時發生錯誤:', error);
                         }
                     });
                 };
@@ -141,6 +179,7 @@ const AuthValidator = {
                 button._eventListeners.click.push(authHandler);
             }
         });
+    }
     },
     
     // 顯示密碼驗證對話框
@@ -221,16 +260,26 @@ const AuthValidator = {
                 
                 if (password === this.PASSWORD) {
                     // 密碼正確
+                    console.log('密碼驗證成功');
                     modal.style.display = 'none';
                     passwordInput.value = ''; // 清空密碼輸入框
                     errorMsg.style.display = 'none';
                     
                     // 執行成功回調
                     if (typeof onSuccess === 'function') {
+                        console.log('執行成功回調函數');
+                        // 儲存當前上下文
+                        const self = this;
                         // 使用setTimeout確保模態框完全關閉後再執行回調
                         setTimeout(() => {
-                            onSuccess();
-                        }, 50);
+                            try {
+                                // 直接調用回調函數，不使用call方法改變上下文
+                                onSuccess();
+                            } catch (error) {
+                                console.error('執行回調函數時發生錯誤:', error);
+                                console.error('錯誤詳情:', error.stack);
+                            }
+                        }, 100); // 減少延遲時間，確保更快響應
                     }
                 } else {
                     // 密碼錯誤
