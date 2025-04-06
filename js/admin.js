@@ -568,8 +568,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 html += `
                     <tr data-id="${book.id}">
-                        <td>${book.title}</td>
-                        <td>${book.author}</td>
+                        <td>${book.title || '-'}</td>
+                        <td>${book.author || '-'}</td>
                         <td>${book.series || '-'}</td>
                         <td>${book.publisher || '-'}</td>
                         <td>${book.cabinet || '-'}</td>

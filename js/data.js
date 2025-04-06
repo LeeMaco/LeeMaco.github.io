@@ -568,10 +568,14 @@ const BookData = {
         
         // 獲取垃圾桶中的書籍
         const trashBooks = this.getTrashBooks();
-        const filteredBooks = trashBooks.filter(book => String(book.id) !== bookId);
         
-        if (filteredBooks.length < trashBooks.length) {
-            localStorage.setItem(this.TRASH_KEY, JSON.stringify(filteredBooks));
+        // 查找要刪除的書籍索引
+        const bookIndex = trashBooks.findIndex(book => String(book.id) === bookId);
+        
+        if (bookIndex !== -1) {
+            // 從垃圾桶中移除書籍
+            trashBooks.splice(bookIndex, 1);
+            localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
             console.log('成功從垃圾桶永久刪除書籍，ID:', bookId);
             return true;
         }
