@@ -73,13 +73,6 @@ const BookData = {
     
     // 從JSON文件加載書籍數據
     loadBooksFromJSON: function() {
-        // 檢查緩存中是否有數據
-        if (window.CacheManager && CacheManager.has('jsonBooks')) {
-            console.log('從緩存加載JSON書籍數據');
-            this.jsonBooks = CacheManager.get('jsonBooks');
-            return Promise.resolve(this.jsonBooks);
-        }
-        
         // 使用多種策略嘗試加載JSON數據
         const strategies = [];
         
@@ -151,14 +144,6 @@ const BookData = {
                     }
                 });
                 this.jsonBooks = data;
-                
-                // 將數據存入緩存
-                if (window.CacheManager) {
-                    // 緩存JSON書籍數據，設置30分鐘過期
-                    CacheManager.set('jsonBooks', data, 30 * 60 * 1000);
-                    console.log('JSON書籍數據已存入緩存');
-                }
-                
                 return data;
             })
             .catch(error => {
@@ -203,18 +188,6 @@ const BookData = {
     
     // 獲取所有書籍（合併localStorage和JSON文件中的數據）
     getAllBooks: function() {
-        // 檢查緩存中是否有合併後的書籍數據
-        const cacheKey = 'allBooks';
-        if (window.CacheManager && CacheManager.has(cacheKey)) {
-            // 使用Logger記錄緩存命中
-            if (window.Logger) {
-                Logger.debug('從緩存獲取所有書籍數據');
-            } else {
-                console.log('從緩存獲取所有書籍數據');
-            }
-            return CacheManager.get(cacheKey);
-        }
-        
         // 從localStorage獲取書籍
         const localBooks = localStorage.getItem('books');
         const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
@@ -225,11 +198,6 @@ const BookData = {
                 book.id = String(book.id);
             }
         });
-        
-        // 使用Logger記錄操作
-        if (window.Logger) {
-            Logger.debug('從localStorage獲取書籍數據，數量:', parsedLocalBooks.length);
-        }
         
         // 確保jsonBooks不為空
         if (!this.jsonBooks || this.jsonBooks.length === 0) {
@@ -254,16 +222,6 @@ const BookData = {
         
         const allBooks = [...parsedLocalBooks, ...uniqueJsonBooks];
         console.log('合併後的書籍總數:', allBooks.length, '(localStorage:', parsedLocalBooks.length, ', JSON:', uniqueJsonBooks.length, ')');
-        
-        // 將合併後的數據存入緩存
-        if (window.CacheManager) {
-            // 緩存合併後的書籍數據，設置2分鐘過期（因為數據可能會被修改）
-            CacheManager.set('allBooks', allBooks, 2 * 60 * 1000);
-            if (window.Logger) {
-                Logger.debug('已將合併後的書籍數據存入緩存');
-            }
-        }
-        
         return allBooks;
     },
     
@@ -301,30 +259,10 @@ const BookData = {
     // 搜索書籍（增強版，支持多欄位搜索和篩選）
     searchBooks: function(query, type = 'title', filters = {}) {
         try {
-            // 使用Logger記錄搜索操作
-            if (window.Logger) {
-                Logger.info('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
-            } else {
-                console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
-            }
-            
-            // 構建緩存鍵
-            const cacheKey = `search_${type}_${query}_${JSON.stringify(filters)}`;
-            
-            // 檢查緩存中是否有搜索結果
-            if (window.CacheManager && CacheManager.has(cacheKey)) {
-                const cachedResults = CacheManager.get(cacheKey);
-                if (window.Logger) {
-                    Logger.debug('從緩存獲取搜索結果，數量:', cachedResults.length);
-                } else {
-                    console.log('從緩存獲取搜索結果，數量:', cachedResults.length);
-                }
-                return cachedResults;
-            }
+            console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
             
             let books = this.getAllBooks();
             console.log('獲取到書籍總數:', books.length);
-
             
             if (books.length === 0) {
                 console.log('書籍數據為空');
@@ -395,25 +333,9 @@ const BookData = {
             console.log('篩選後的書籍數量:', books.length);
             
             console.log('搜索結果數量:', books.length);
-            
-            // 將搜索結果存入緩存
-            if (window.CacheManager) {
-                // 構建緩存鍵
-                const cacheKey = `search_${type}_${query}_${JSON.stringify(filters)}`;
-                // 緩存搜索結果，設置1分鐘過期
-                CacheManager.set(cacheKey, books, 60 * 1000);
-                if (window.Logger) {
-                    Logger.debug('已將搜索結果存入緩存，鍵:', cacheKey);
-                }
-            }
-            
             return books;
         } catch (error) {
-            if (window.Logger) {
-                Logger.error('搜索書籍時發生錯誤:', error);
-            } else {
-                console.error('搜索書籍時發生錯誤:', error);
-            }
+            console.error('搜索書籍時發生錯誤:', error);
             return [];
         }
     },

@@ -635,42 +635,21 @@ document.addEventListener('DOMContentLoaded', function() {
         // 確保bookId是字符串類型
         const stringBookId = String(bookId);
         console.log('確認刪除書籍ID:', stringBookId, '(原始ID:', bookId, ')');
-        
-        // 先檢查書籍是否存在
-        const book = BookData.getBookById(stringBookId);
-        if (!book) {
-            console.error('未找到ID為', stringBookId, '的書籍');
-            alert('找不到指定的書籍，可能已被刪除');
-            return;
-        }
-        
-        // 設置確認對話框內容，顯示書籍標題，提升用戶體驗
-        const confirmMessage = document.getElementById('deleteConfirmMessage');
-        if (confirmMessage) {
-            confirmMessage.textContent = `確定要將「${book.title}」移至垃圾桶嗎？`;
-        }
-        
         confirmDeleteBtn.setAttribute('data-id', stringBookId);
         deleteConfirmModal.style.display = 'block';
         
         // 綁定確認刪除按鈕點擊事件
         confirmDeleteBtn.onclick = function() {
-            try {
-                // 移至垃圾桶（現在deleteBook內部調用moveToTrash）
-                if (BookData.deleteBook(stringBookId)) { // 使用字符串ID
-                    // 重新加載書籍列表
-                    loadBooks();
-                    // 關閉彈窗
-                    deleteConfirmModal.style.display = 'none';
-                    // 顯示提示
-                    alert(`「${book.title}」已移至垃圾桶`);
-                } else {
-                    console.error('刪除書籍失敗，ID:', stringBookId);
-                    alert('刪除失敗，請重試');
-                }
-            } catch (error) {
-                console.error('刪除書籍時發生錯誤:', error);
-                alert(`刪除時發生錯誤: ${error.message}`);
+            // 移至垃圾桶（現在deleteBook內部調用moveToTrash）
+            if (BookData.deleteBook(bookId)) {
+                // 重新加載書籍列表
+                loadBooks();
+                // 關閉彈窗
+                deleteConfirmModal.style.display = 'none';
+                // 顯示提示
+                alert('書籍已移至垃圾桶');
+            } else {
+                alert('刪除失敗，請重試');
             }
         };
         
@@ -739,13 +718,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusElement.textContent = '正在上傳到GitHub...';
                 statusElement.style.color = '#3498db';
             }
-
-            // 驗證JSON內容格式
-            try {
-                JSON.parse(content);
-            } catch (e) {
-                throw new Error('無效的JSON格式: ' + e.message);
-            }
             
             // 獲取GitHub個人訪問令牌
             const token = localStorage.getItem('githubToken');
@@ -806,35 +778,6 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!response.ok) {
                 const errorData = await response.json();
-                if (response.status === 409) {
-                    console.log('檢測到文件衝突，正在重新獲取最新版本...');
-                    // 重新獲取文件內容並合併
-                    const latestContent = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json'
-                        }
-                    }).then(res => res.json());
-                    
-                    if (latestContent.content) {
-                        const decodedContent = decodeURIComponent(escape(atob(latestContent.content)));
-                        if (decodedContent === content) {
-                            console.log('本地內容與遠程內容相同，無需更新');
-                            return latestContent;
-                        }
-                        // 重新上傳，使用最新的SHA
-                        uploadData.sha = latestContent.sha;
-                        return await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
-                            method: 'PUT',
-                            headers: {
-                                'Authorization': `token ${token}`,
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/vnd.github.v3+json'
-                            },
-                            body: JSON.stringify(uploadData)
-                        }).then(res => res.json());
-                    }
-                }
                 throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
             }
             
@@ -875,235 +818,118 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        // 檢查文件類型
-        const validTypes = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
-        if (!validTypes.includes(file.type) && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
-            alert('請選擇有效的Excel文件 (.xlsx 或 .xls)');
-            return;
-        }
-        
         console.log('選擇的文件:', file.name, '大小:', file.size, '類型:', file.type);
         
-        // 顯示進度指示器
-        const statusElement = document.createElement('div');
-        statusElement.id = 'importStatus';
-        statusElement.style.margin = '10px 0';
-        statusElement.style.padding = '5px';
-        statusElement.style.backgroundColor = '#f8f9fa';
-        statusElement.style.borderRadius = '4px';
-        statusElement.textContent = '準備讀取文件...';
+        const reader = new FileReader();
         
-        const formElement = document.getElementById('importExcelForm');
-        if (formElement) {
-            formElement.appendChild(statusElement);
-        }
+        // 添加錯誤處理
+        reader.onerror = function(event) {
+            console.error('FileReader錯誤:', event.target.error);
+            alert('讀取文件時發生錯誤: ' + event.target.error);
+        };
         
-        // 設置最大重試次數
-        const maxRetries = 3;
-        let retryCount = 0;
+        // 添加進度監控
+        reader.onprogress = function(event) {
+            if (event.lengthComputable) {
+                const percentLoaded = Math.round((event.loaded / event.total) * 100);
+                console.log('文件讀取進度: ' + percentLoaded + '%');
+            }
+        };
         
-        // 創建讀取函數，支持重試
-        function readFile(retry = 0) {
-            const reader = new FileReader();
-            
-            // 添加錯誤處理
-            reader.onerror = function(event) {
-                console.error(`FileReader錯誤 (嘗試 ${retry+1}/${maxRetries}):`, event.target.error);
+        reader.onload = function(e) {
+            console.log('文件讀取完成，開始處理數據');
+            try {
+                const data = new Uint8Array(e.target.result);
+                console.log('文件數據大小:', data.length, '字節');
                 
-                if (retry < maxRetries - 1) {
-                    // 更新狀態並重試
-                    statusElement.textContent = `讀取失敗，正在重試... (${retry+2}/${maxRetries})`;
-                    statusElement.style.color = '#e67e22';
-                    
-                    // 延遲後重試
-                    setTimeout(() => readFile(retry + 1), 1000);
-                } else {
-                    // 重試失敗
-                    statusElement.textContent = `讀取文件失敗: ${event.target.error}`;
-                    statusElement.style.color = '#e74c3c';
-                    alert(`讀取文件失敗 (已重試 ${maxRetries} 次): ${event.target.error}`);
-                }
-            };
-            
-            // 添加進度監控
-            reader.onprogress = function(event) {
-                if (event.lengthComputable) {
-                    const percentLoaded = Math.round((event.loaded / event.total) * 100);
-                    statusElement.textContent = `文件讀取進度: ${percentLoaded}%`;
-                    console.log('文件讀取進度: ' + percentLoaded + '%');
-                }
-            };
-
-        
-                    reader.onload = function(e) {
-                console.log('文件讀取完成，開始處理數據');
-                statusElement.textContent = '文件讀取完成，正在處理數據...';
-                statusElement.style.color = '#3498db';
+                const workbook = XLSX.read(data, { type: 'array' });
+                console.log('工作簿讀取成功，工作表數量:', workbook.SheetNames.length);
                 
-                try {
-                    const data = new Uint8Array(e.target.result);
-                    console.log('文件數據大小:', data.length, '字節');
-                    
-                    // 檢查文件大小
-                    if (data.length === 0) {
-                        throw new Error('文件為空');
-                    }
-                    
-                    statusElement.textContent = '正在解析Excel文件...';
-                    
-                    // 使用try-catch包裝XLSX操作，以捕獲可能的解析錯誤
-                    let workbook;
-                    try {
-                        workbook = XLSX.read(data, { type: 'array' });
-                    } catch (xlsxError) {
-                        console.error('Excel解析錯誤:', xlsxError);
-                        throw new Error(`Excel文件格式錯誤: ${xlsxError.message}`);
-                    }
-                    
-                    console.log('工作簿讀取成功，工作表數量:', workbook.SheetNames.length);
-                    
-                    // 檢查工作表是否存在
-                    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
-                        throw new Error('Excel文件中沒有工作表');
-                    }
-                    
-                    // 獲取第一個工作表
-                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                    console.log('工作表名稱:', workbook.SheetNames[0]);
-                    
-                    statusElement.textContent = '正在轉換數據...';
-                    
-                    // 將工作表轉換為JSON
-                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                    console.log('轉換為JSON成功，數據行數:', jsonData.length);
-                    
-                    if (jsonData.length === 0) {
-                        statusElement.textContent = '文件中沒有數據';
-                        statusElement.style.color = '#e74c3c';
-                        throw new Error('Excel文件中沒有數據或格式不正確');
-                    }
-                    
-                    // 檢查數據格式
-                    const firstRow = jsonData[0];
-                    console.log('第一行數據:', JSON.stringify(firstRow));
-                    
-                    if (!firstRow['書名'] || !firstRow['作者']) {
-                        statusElement.textContent = '文件格式不正確';
-                        statusElement.style.color = '#e74c3c';
-                        throw new Error('Excel文件格式不正確，請確保包含「書名」和「作者」欄位');
-                    }
-                    
-                    statusElement.textContent = '正在匯入數據...';
-                    
-                    // 處理匯入的數據
-                    let importCount = 0;
-                    let errorCount = 0;
-                    const books = [];
-                    const errors = [];
-                    
-                    jsonData.forEach((row, index) => {
-                        // 檢查必要欄位
-                        if (row['書名'] && row['作者']) {
-                            try {
-                                const bookData = {
-                                    id: Date.now().toString() + index, // 確保ID唯一
-                                    title: row['書名'],
-                                    author: row['作者'],
-                                    series: row['集數'] || '',
-                                    publisher: row['出版社'] || '',
-                                    description: row['描述'] || '',
-                                    cabinet: row['櫃號'] || '',
-                                    row: row['行號'] || '',
-                                    isbn: row['ISBN號'] || '',
-                                    notes: row['備註'] || ''
-                                };
-                                
-                                // 添加書籍
-                                BookData.addBook(bookData);
-                                books.push(bookData);
-                                importCount++;
-                            } catch (rowError) {
-                                console.error(`處理第${index+1}行數據時發生錯誤:`, rowError);
-                                errors.push(`第${index+1}行: ${rowError.message}`);
-                                errorCount++;
-                            }
-                        } else {
-                            console.warn(`第${index+1}行數據缺少必要欄位:`, JSON.stringify(row));
-                            errors.push(`第${index+1}行: 缺少必要欄位「書名」或「作者」`);
-                            errorCount++;
-                        }
-                    });
-                    
-                    console.log(`成功匯入 ${importCount} 本書籍，失敗 ${errorCount} 項`);
-                    
-                    // 更新狀態
-                    if (importCount > 0) {
-                        statusElement.textContent = `成功匯入 ${importCount} 本書籍${errorCount > 0 ? `，${errorCount} 項失敗` : ''}`;
-                        statusElement.style.color = errorCount > 0 ? '#f39c12' : '#2ecc71';
-                    } else {
-                        statusElement.textContent = '匯入失敗，沒有有效數據';
-                        statusElement.style.color = '#e74c3c';
-                        throw new Error('匯入失敗，沒有有效數據');
-                    }
-                    
-                    // 重新加載書籍列表
-                    loadBooks();
-                    
-                    // 如果啟用了自動上傳，則上傳到GitHub
-                    if (autoUpload) {
-                        statusElement.textContent = `匯入成功，正在上傳到GitHub...`;
+                // 獲取第一個工作表
+                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                console.log('工作表名稱:', workbook.SheetNames[0]);
+                
+                // 將工作表轉換為JSON
+                const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                console.log('轉換為JSON成功，數據行數:', jsonData.length);
+                
+                if (jsonData.length === 0) {
+                    alert('Excel文件中沒有數據或格式不正確');
+                    return;
+                }
+                
+                // 檢查數據格式
+                const firstRow = jsonData[0];
+                console.log('第一行數據:', JSON.stringify(firstRow));
+                
+                if (!firstRow['書名'] || !firstRow['作者']) {
+                    alert('Excel文件格式不正確，請確保包含「書名」和「作者」欄位');
+                    return;
+                }
+                
+                // 處理匯入的數據
+                let importCount = 0;
+                const books = [];
+                jsonData.forEach((row, index) => {
+                    // 檢查必要欄位
+                    if (row['書名'] && row['作者']) {
+                        const bookData = {
+                            id: Date.now().toString() + index, // 確保ID唯一
+                            title: row['書名'],
+                            author: row['作者'],
+                            series: row['集數'] || '',
+                            publisher: row['出版社'] || '',
+                            description: row['描述'] || '',
+                            cabinet: row['櫃號'] || '',
+                            row: row['行號'] || '',
+                            isbn: row['ISBN號'] || '',
+                            notes: row['備註'] || ''
+                        };
                         
-                        // 獲取所有書籍數據，確保上傳的是完整數據
-                        const allBooks = BookData.getAllBooks();
-                        const jsonContent = JSON.stringify(allBooks, null, 2);
-                        uploadToGitHub(jsonContent)
-                            .then(() => {
-                                console.log('自動上傳成功');
-                                statusElement.textContent = `匯入 ${importCount} 本書籍並上傳成功`;
-                                statusElement.style.color = '#2ecc71';
-                            })
-                            .catch(error => {
-                                console.error('自動上傳失敗:', error);
-                                statusElement.textContent = `匯入成功但上傳失敗: ${error.message}`;
-                                statusElement.style.color = '#f39c12';
-                                alert(`匯入成功但上傳失敗: ${error.message}`);
-                            });
+                        // 添加書籍
+                        BookData.addBook(bookData);
+                        books.push(bookData);
+                        importCount++;
+                    } else {
+                        console.warn(`第${index+1}行數據缺少必要欄位:`, JSON.stringify(row));
                     }
-                    
-                    // 關閉彈窗（延遲關閉，讓用戶有時間看到狀態）
-                    setTimeout(() => {
-                        importExcelModal.style.display = 'none';
-                    }, 3000);
-                    
-                    // 顯示匯入結果
-                    let resultMessage = `成功匯入 ${importCount} 本書籍`;
-                    if (errorCount > 0) {
-                        resultMessage += `，${errorCount} 項失敗\n\n失敗項目:\n${errors.slice(0, 5).join('\n')}`;
-                        if (errors.length > 5) {
-                            resultMessage += `\n...以及其他 ${errors.length - 5} 項錯誤`;
-                        }
-                    }
-                    resultMessage += autoUpload ? '\n\n已開始上傳到GitHub' : '';
-                    
-                    alert(resultMessage);
-                    
-                    // 重置表單
-                    fileInput.value = '';
-                } catch (error) {
-                    console.error('處理Excel數據時發生錯誤:', error);
-                    statusElement.textContent = `匯入失敗: ${error.message}`;
-                    statusElement.style.color = '#e74c3c';
-                    alert('匯入失敗：' + error.message);
+                });
+                
+                console.log(`成功匯入 ${importCount} 本書籍`);
+                
+                // 重新加載書籍列表
+                loadBooks();
+                
+                // 如果啟用了自動上傳，則上傳到GitHub
+                if (autoUpload) {
+                    // 獲取所有書籍數據，確保上傳的是完整數據
+                    const allBooks = BookData.getAllBooks();
+                    const jsonContent = JSON.stringify(allBooks, null, 2);
+                    uploadToGitHub(jsonContent)
+                        .then(() => {
+                            console.log('自動上傳成功');
+                        })
+                        .catch(error => {
+                            console.error('自動上傳失敗:', error);
+                            alert(`自動上傳失敗: ${error.message}`);
+                        });
                 }
-            };
-            
-            // 開始讀取文件
-            statusElement.textContent = '開始讀取文件...';
-            reader.readAsArrayBuffer(file);
-        }
+                
+                // 關閉彈窗
+                importExcelModal.style.display = 'none';
+                
+                // 顯示匯入結果
+                alert(`成功匯入 ${importCount} 本書籍${autoUpload ? '，並已開始上傳到GitHub' : ''}`);
+                
+                // 重置表單
+                fileInput.value = '';
+            } catch (error) {
+                console.error('處理Excel數據時發生錯誤:', error);
+                alert('匯入失敗：' + error.message);
+            }
+        };
         
-        // 開始讀取過程
         console.log('開始讀取文件...');
-        readFile(0);
+        reader.readAsArrayBuffer(file);
     }
 });
