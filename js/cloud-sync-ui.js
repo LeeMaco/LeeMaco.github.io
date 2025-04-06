@@ -184,14 +184,49 @@ document.addEventListener('DOMContentLoaded', function() {
         }
     }
     
+    // 更新同步狀態
+    function updateSyncStatus(message) {
+        console.log('同步狀態:', message);
+        const statusElement = document.getElementById('cloudSyncStatus');
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
+    }
+    
     // 授權雲服務
     function authorizeCloudService(service) {
         try {
             let result;
             
+            // 更新同步狀態
+            updateSyncStatus(`正在授權 ${service}...`);
+            
             switch (service) {
                 case CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE:
                     result = CloudSync.authorizeGoogleDrive();
+                    if (result && result.pending) {
+                        updateSyncStatus(result.message);
+                        
+                        // 添加消息監聽器以處理授權錯誤
+                        window.addEventListener('message', function handleAuthError(event) {
+                            // 檢查消息來源
+                            if (event.origin !== window.location.origin) return;
+                            
+                            try {
+                                const data = event.data;
+                                if (data.type === 'google_auth_error') {
+                                    // 移除事件監聽器
+                                    window.removeEventListener('message', handleAuthError);
+                                    
+                                    // 顯示錯誤消息
+                                    updateSyncStatus(`Google Drive授權失敗: ${data.error}`);
+                                    alert(`Google Drive授權失敗: ${data.error}`);
+                                }
+                            } catch (error) {
+                                console.error('處理授權錯誤回調時發生錯誤:', error);
+                            }
+                        });
+                    }
                     break;
                 case CloudSync.CLOUD_SERVICES.DROPBOX:
                     result = CloudSync.authorizeDropbox();
@@ -203,7 +238,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     throw new Error(`不支持的雲服務: ${service}`);
             }
             
-            if (result) {
+            if (result && !result.pending) {
                 // 更新UI
                 loadCloudSyncSettings();
                 

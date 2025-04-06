@@ -159,7 +159,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${backup.id}">
                         <td>${backupDate}</td>
                         <td>${backup.bookCount} 本</td>
-                        <td>${backup.cloudSync ? backup.cloudSync.service : (backup.githubFileName ? 'github' : '否')}</td>
+                        <td>${getCloudSyncStatus(backup)}</td>
                         <td>
                             <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
                             <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
@@ -183,6 +183,22 @@ document.addEventListener('DOMContentLoaded', function() {
             lastBackupTimeElement.textContent = lastBackupTime.toLocaleString();
         } else {
             lastBackupTimeElement.textContent = '從未備份';
+        }
+    }
+    
+    // 獲取雲同步狀態顯示
+    function getCloudSyncStatus(backup) {
+        if (backup.cloudSync) {
+            // 如果有cloudSync屬性，顯示服務名稱並首字母大寫
+            const service = backup.cloudSync.service;
+            const serviceName = service.charAt(0).toUpperCase() + service.slice(1);
+            return `<span class="sync-status success"><i class="fas fa-check-circle"></i> ${serviceName}</span>`;
+        } else if (backup.githubFileName) {
+            // 如果有githubFileName屬性但沒有cloudSync屬性，顯示GitHub
+            return `<span class="sync-status success"><i class="fas fa-check-circle"></i> GitHub</span>`;
+        } else {
+            // 如果都沒有，顯示未上傳
+            return `<span class="sync-status none"><i class="fas fa-times-circle"></i> 未上傳</span>`;
         }
     }
 });

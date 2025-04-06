@@ -560,3 +560,52 @@ footer {
         margin: 10% auto;
     }
 }
+
+/* 雲同步狀態樣式 */
+.sync-status {
+    display: inline-block;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.9em;
+}
+
+.sync-status.success {
+    background-color: #e6f7e6;
+    color: #2ecc71;
+    border: 1px solid #2ecc71;
+}
+
+.sync-status.none {
+    background-color: #f8f9fa;
+    color: #7f8c8d;
+    border: 1px solid #bdc3c7;
+}
+
+.sync-status.error {
+    background-color: #fde8e8;
+    color: #e74c3c;
+    border: 1px solid #e74c3c;
+}
+
+.sync-status.pending {
+    background-color: #fff9e6;
+    color: #f39c12;
+    border: 1px solid #f39c12;
+}
+
+.sync-status.syncing {
+    background-color: #e6f3f9;
+    color: #3498db;
+    border: 1px solid #3498db;
+    animation: pulse 1.5s infinite;
+}
+
+@keyframes pulse {
+    0% { opacity: 0.7; }
+    50% { opacity: 1; }
+    100% { opacity: 0.7; }
+}
+
+.sync-status i {
+    margin-right: 5px;
+}

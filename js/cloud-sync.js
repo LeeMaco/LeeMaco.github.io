@@ -185,21 +185,142 @@ const CloudSync = {
         }
     },
     
-    // 上傳到Google Drive
-    uploadToGoogleDrive: async function(content, fileName, settings) {
+    // 創建Google Drive文件夾
+    createGoogleDriveFolder: async function(folderName) {
         try {
-            const accessToken = settings.accessToken;
+            // 確保訪問令牌有效
+            await this.ensureValidGoogleDriveToken();
+            
+            // 獲取最新的設置
+            const settings = this.getCloudSettings();
+            const accessToken = settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken;
+            
             if (!accessToken) {
                 throw new Error('未設置Google Drive訪問令牌，請在設置中配置');
             }
             
+            this.updateSyncStatus(`正在創建Google Drive文件夾: ${folderName}...`);
+            
+            // 檢查文件夾是否已存在
+            const query = `name='${folderName}' and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+            const searchResponse = await fetch(
+                `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Accept': 'application/json'
+                }
+            });
+            
+            if (searchResponse.ok) {
+                const searchData = await searchResponse.json();
+                if (searchData.files && searchData.files.length > 0) {
+                    this.updateSyncStatus(`找到現有文件夾: ${folderName}`);
+                    return searchData.files[0].id;
+                }
+            } else if (searchResponse.status === 401) {
+                // 如果是授權錯誤，嘗試刷新令牌
+                this.updateSyncStatus('訪問令牌已過期，正在刷新...');
+                await this.refreshGoogleDriveToken();
+                // 重新調用創建文件夾方法
+                return await this.createGoogleDriveFolder(folderName);
+            } else {
+                // 處理其他API錯誤
+                const errorData = await searchResponse.json();
+                console.error('搜索Google Drive文件夾時API返回錯誤:', errorData);
+                this.updateSyncStatus('搜索文件夾時發生錯誤，嘗試繼續創建...');
+            }
+            
+            // 創建新文件夾
+            this.updateSyncStatus(`正在創建新文件夾: ${folderName}...`);
+            const response = await fetch('https://www.googleapis.com/drive/v3/files', {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    name: folderName,
+                    mimeType: 'application/vnd.google-apps.folder'
+                })
+            });
+            
+            if (!response.ok) {
+                const errorData = await response.json();
+                // 如果是授權錯誤，嘗試刷新令牌
+                if (response.status === 401) {
+                    this.updateSyncStatus('訪問令牌已過期，正在刷新...');
+                    await this.refreshGoogleDriveToken();
+                    // 重新調用創建文件夾方法
+                    return await this.createGoogleDriveFolder(folderName);
+                }
+                throw new Error(`創建文件夾失敗: ${errorData.error?.message || JSON.stringify(errorData)}`);
+            }
+            
+            const folderData = await response.json();
+            this.updateSyncStatus(`成功創建文件夾: ${folderName}`);
+            
+            // 可選：設置文件夾權限
+            try {
+                await fetch(`https://www.googleapis.com/drive/v3/files/${folderData.id}/permissions`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        role: 'reader',
+                        type: 'anyone'
+                    })
+                });
+            } catch (permError) {
+                console.warn('設置文件夾權限時發生錯誤:', permError);
+                // 不中斷流程，僅記錄警告
+            }
+            
+            return folderData.id;
+        } catch (error) {
+            console.error('創建Google Drive文件夾時發生錯誤:', error);
+            this.updateSyncStatus('創建文件夾失敗: ' + error.message);
+            throw error;
+        }
+    },
+    
+    // 上傳到Google Drive
+    uploadToGoogleDrive: async function(content, fileName, settings) {
+        try {
+            // 確保訪問令牌有效
+            await this.ensureValidGoogleDriveToken();
+            
+            // 獲取最新的設置（可能已經更新了訪問令牌）
+            const updatedSettings = this.getCloudSettings();
+            const accessToken = updatedSettings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken;
+            
+            if (!accessToken) {
+                throw new Error('未設置Google Drive訪問令牌，請在設置中配置');
+            }
+            
+            // 使用設置中的文件夾ID，如果沒有則使用root
             const folderId = settings.folderId || 'root';
+            
+            // 驗證文件夾ID
+            if (folderId !== 'root') {
+                this.updateSyncStatus('正在驗證Google Drive文件夾...');
+                const isValid = await this.validateGoogleDriveFolderId();
+                if (!isValid) {
+                    throw new Error('Google Drive文件夾ID無效，請檢查設置');
+                }
+            }
+            
+            // 更新同步狀態
+            this.updateSyncStatus('正在搜索Google Drive中的文件...');
             
             // 檢查文件是否已存在
             let fileId = null;
             try {
+                // 構建查詢參數，搜索指定文件夾中的文件
+                const query = `name='${fileName}' and '${folderId}' in parents and trashed=false`;
                 const searchResponse = await fetch(
-                    `https://www.googleapis.com/drive/v3/files?q=name='${fileName}' and '${folderId}' in parents and trashed=false`, {
+                    `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent(query)}`, {
                     headers: {
                         'Authorization': `Bearer ${accessToken}`,
                         'Accept': 'application/json'
@@ -210,10 +331,28 @@ const CloudSync = {
                     const searchData = await searchResponse.json();
                     if (searchData.files && searchData.files.length > 0) {
                         fileId = searchData.files[0].id;
+                        this.updateSyncStatus(`找到現有文件，準備更新: ${fileName}`);
+                    } else {
+                        this.updateSyncStatus(`未找到現有文件，準備創建: ${fileName}`);
                     }
+                } else {
+                    // 處理API錯誤
+                    const errorData = await searchResponse.json();
+                    console.error('搜索Google Drive文件時API返回錯誤:', errorData);
+                    
+                    // 如果是授權錯誤，嘗試刷新令牌
+                    if (searchResponse.status === 401) {
+                        this.updateSyncStatus('訪問令牌已過期，正在刷新...');
+                        await this.refreshGoogleDriveToken();
+                        // 重新調用上傳方法
+                        return await this.uploadToGoogleDrive(content, fileName, settings);
+                    }
+                    
+                    throw new Error(`搜索文件時發生錯誤: ${errorData.error?.message || JSON.stringify(errorData)}`);
                 }
             } catch (error) {
-                console.log('搜索Google Drive文件時發生錯誤:', error);
+                console.error('搜索Google Drive文件時發生錯誤:', error);
+                this.updateSyncStatus('搜索文件時發生錯誤，嘗試繼續上傳...');
             }
             
             // 準備文件元數據
@@ -222,14 +361,18 @@ const CloudSync = {
                 mimeType: 'application/json'
             };
             
+            // 如果不是root文件夾，則指定父文件夾
             if (folderId !== 'root') {
                 metadata.parents = [folderId];
             }
+            
+            this.updateSyncStatus('準備上傳數據...');
             
             // 準備表單數據
             const formData = new FormData();
             const blob = new Blob([content], { type: 'application/json' });
             
+            // 添加元數據和文件內容
             formData.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
             formData.append('file', blob);
             
@@ -237,6 +380,7 @@ const CloudSync = {
             let response;
             if (fileId) {
                 // 更新現有文件
+                this.updateSyncStatus('正在更新Google Drive文件...');
                 response = await fetch(`https://www.googleapis.com/upload/drive/v3/files/${fileId}?uploadType=multipart`, {
                     method: 'PATCH',
                     headers: {
@@ -246,6 +390,7 @@ const CloudSync = {
                 });
             } else {
                 // 創建新文件
+                this.updateSyncStatus('正在創建Google Drive文件...');
                 response = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
                     method: 'POST',
                     headers: {
@@ -255,22 +400,71 @@ const CloudSync = {
                 });
             }
             
+            // 處理響應
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(`Google Drive API錯誤: ${errorData.error.message}`);
+                
+                // 如果是授權錯誤，嘗試刷新令牌
+                if (response.status === 401) {
+                    this.updateSyncStatus('訪問令牌已過期，正在刷新...');
+                    await this.refreshGoogleDriveToken();
+                    // 重新調用上傳方法
+                    return await this.uploadToGoogleDrive(content, fileName, settings);
+                }
+                
+                this.updateSyncStatus('上傳失敗: ' + (errorData.error?.message || '未知錯誤'));
+                throw new Error(`Google Drive API錯誤: ${errorData.error?.message || JSON.stringify(errorData)}`);
             }
             
             const responseData = await response.json();
             console.log('上傳到Google Drive成功:', responseData);
             
+            // 創建共享鏈接（如果需要）
+            let webViewLink = '';
+            try {
+                this.updateSyncStatus('正在創建共享鏈接...');
+                const shareResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${responseData.id}/permissions`, {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        role: 'reader',
+                        type: 'anyone'
+                    })
+                });
+                
+                if (shareResponse.ok) {
+                    // 獲取文件的webViewLink
+                    const fileInfoResponse = await fetch(`https://www.googleapis.com/drive/v3/files/${responseData.id}?fields=webViewLink,webContentLink`, {
+                        headers: {
+                            'Authorization': `Bearer ${accessToken}`
+                        }
+                    });
+                    
+                    if (fileInfoResponse.ok) {
+                        const fileInfo = await fileInfoResponse.json();
+                        webViewLink = fileInfo.webViewLink || fileInfo.webContentLink || '';
+                    }
+                }
+            } catch (error) {
+                console.warn('創建共享鏈接時發生錯誤:', error);
+                // 不中斷流程，僅記錄警告
+            }
+            
+            this.updateSyncStatus('Google Drive同步完成!');
+            
             return {
                 success: true,
                 service: this.CLOUD_SERVICES.GOOGLE_DRIVE,
                 fileId: responseData.id,
-                fileName: fileName
+                fileName: fileName,
+                webViewLink: webViewLink
             };
         } catch (error) {
             console.error('上傳到Google Drive時發生錯誤:', error);
+            this.updateSyncStatus('Google Drive同步失敗: ' + error.message);
             throw error;
         }
     },
@@ -394,24 +588,222 @@ const CloudSync = {
     
     // 授權Google Drive
     authorizeGoogleDrive: function() {
-        // 這裡需要實現OAuth2授權流程
-        // 由於瀏覽器環境的限制，實際應用中可能需要後端支持
-        alert('Google Drive授權功能需要後端支持，此處為示例實現');
+        // Google OAuth2 參數
+        const clientId = '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com'; // 請替換為您的實際Google API客戶端ID
+        const redirectUri = window.location.origin + '/admin.html';
+        const scope = 'https://www.googleapis.com/auth/drive.file';
         
-        // 模擬授權成功後的回調
-        const mockAuthResult = {
-            access_token: 'mock_access_token',
-            refresh_token: 'mock_refresh_token',
-            expires_in: 3600
+        // 生成隨機狀態值以防止CSRF攻擊
+        const state = Math.random().toString(36).substring(2);
+        localStorage.setItem('google_auth_state', state);
+        
+        // 構建授權URL
+        const authUrl = 'https://accounts.google.com/o/oauth2/v2/auth' +
+            '?client_id=' + encodeURIComponent(clientId) +
+            '&redirect_uri=' + encodeURIComponent(redirectUri) +
+            '&response_type=code' +
+            '&scope=' + encodeURIComponent(scope) +
+            '&access_type=offline' +
+            '&state=' + encodeURIComponent(state) +
+            '&prompt=consent';
+        
+        // 打開授權窗口
+        window.open(authUrl, 'google_auth', 'width=600,height=700');
+        
+        // 設置消息監聽器以接收授權碼
+        const handleAuthCallback = (event) => {
+            // 檢查消息來源
+            if (event.origin !== window.location.origin) return;
+            
+            try {
+                const data = event.data;
+                if (data.type === 'google_auth_callback') {
+                    // 移除事件監聽器
+                    window.removeEventListener('message', handleAuthCallback);
+                    
+                    // 驗證狀態以防止CSRF攻擊
+                    const savedState = localStorage.getItem('google_auth_state');
+                    if (data.state !== savedState) {
+                        throw new Error('授權狀態不匹配，可能存在安全風險');
+                    }
+                    
+                    // 使用授權碼交換訪問令牌
+                    this.exchangeCodeForToken(data.code, clientId, redirectUri)
+                        .then(authResult => {
+                            // 更新設置
+                            const settings = this.getCloudSettings();
+                            settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken = authResult.access_token;
+                            settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].refreshToken = authResult.refresh_token;
+                            settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].tokenExpiry = Date.now() + (authResult.expires_in * 1000);
+                            this.saveCloudSettings(settings);
+                            
+                            // 顯示成功消息
+                            alert('Google Drive授權成功！');
+                            
+                            // 驗證文件夾ID
+                            this.validateGoogleDriveFolderId();
+                        })
+                        .catch(error => {
+                            console.error('獲取訪問令牌時發生錯誤:', error);
+                            alert('Google Drive授權失敗: ' + error.message);
+                        });
+                }
+            } catch (error) {
+                console.error('處理授權回調時發生錯誤:', error);
+                alert('處理授權回調時發生錯誤: ' + error.message);
+            }
         };
         
-        // 更新設置
+        window.addEventListener('message', handleAuthCallback);
+        
+        return {
+            pending: true,
+            message: '正在等待Google授權...',
+        };
+    },
+    
+    // 使用授權碼交換訪問令牌
+    exchangeCodeForToken: async function(code, clientId, redirectUri) {
+        // 注意：在實際應用中，此請求應在後端進行以保護客戶端密鑰
+        // 由於這是前端應用，我們直接與Google OAuth API通信
+        // 實際應用中應考慮使用代理服務器以保護客戶端密鑰
+        const tokenEndpoint = 'https://oauth2.googleapis.com/token';
+        
+        // 創建表單數據
+        const formData = new URLSearchParams();
+        formData.append('code', code);
+        formData.append('client_id', clientId);
+        formData.append('client_secret', 'YOUR_CLIENT_SECRET'); // 在實際應用中，應從安全的環境變量或後端獲取
+        formData.append('redirect_uri', redirectUri);
+        formData.append('grant_type', 'authorization_code');
+        
+        const response = await fetch(tokenEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            console.error('獲取訪問令牌失敗:', errorData);
+            throw new Error(`獲取訪問令牌失敗: ${errorData.error || '未知錯誤'}`);
+        }
+        
+        return await response.json();
+    },
+    
+    // 刷新Google Drive訪問令牌
+    refreshGoogleDriveToken: async function() {
         const settings = this.getCloudSettings();
-        settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken = mockAuthResult.access_token;
-        settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].refreshToken = mockAuthResult.refresh_token;
+        const refreshToken = settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].refreshToken;
+        
+        if (!refreshToken) {
+            throw new Error('沒有可用的刷新令牌，請重新授權Google Drive');
+        }
+        
+        // 直接與Google OAuth API通信
+        const tokenEndpoint = 'https://oauth2.googleapis.com/token';
+        
+        // 創建表單數據
+        const formData = new URLSearchParams();
+        formData.append('client_id', '1234567890-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com'); // 請替換為您的實際Google API客戶端ID
+        formData.append('client_secret', 'YOUR_CLIENT_SECRET'); // 在實際應用中，應從安全的環境變量或後端獲取
+        formData.append('refresh_token', refreshToken);
+        formData.append('grant_type', 'refresh_token');
+        
+        const response = await fetch(tokenEndpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/x-www-form-urlencoded'
+            },
+            body: formData
+        });
+        
+        if (!response.ok) {
+            const errorData = await response.json();
+            throw new Error(`刷新訪問令牌失敗: ${errorData.error}`);
+        }
+        
+        const tokenData = await response.json();
+        
+        // 更新設置
+        settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken = tokenData.access_token;
+        settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].tokenExpiry = Date.now() + (tokenData.expires_in * 1000);
         this.saveCloudSettings(settings);
         
-        return mockAuthResult;
+        return tokenData;
+    },
+    
+    // 驗證Google Drive文件夾ID
+    validateGoogleDriveFolderId: async function() {
+        try {
+            const settings = this.getCloudSettings();
+            const folderId = settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].folderId;
+            
+            // 如果沒有設置文件夾ID，則使用根目錄
+            if (!folderId || folderId === 'root') {
+                return true;
+            }
+            
+            // 檢查訪問令牌是否有效
+            await this.ensureValidGoogleDriveToken();
+            
+            const accessToken = settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken;
+            
+            // 檢查文件夾是否存在
+            const response = await fetch(`https://www.googleapis.com/drive/v3/files/${folderId}?fields=id,name,mimeType`, {
+                headers: {
+                    'Authorization': `Bearer ${accessToken}`
+                }
+            });
+            
+            if (!response.ok) {
+                if (response.status === 404) {
+                    throw new Error('指定的Google Drive文件夾不存在');
+                } else {
+                    const errorData = await response.json();
+                    throw new Error(`驗證文件夾ID時發生錯誤: ${errorData.error.message}`);
+                }
+            }
+            
+            const folderData = await response.json();
+            
+            // 檢查是否為文件夾
+            if (folderData.mimeType !== 'application/vnd.google-apps.folder') {
+                throw new Error('指定的ID不是一個文件夾');
+            }
+            
+            console.log('Google Drive文件夾驗證成功:', folderData.name);
+            return true;
+        } catch (error) {
+            console.error('驗證Google Drive文件夾ID時發生錯誤:', error);
+            alert(`驗證Google Drive文件夾失敗: ${error.message}`);
+            return false;
+        }
+    },
+    
+    // 確保Google Drive訪問令牌有效
+    ensureValidGoogleDriveToken: async function() {
+        const settings = this.getCloudSettings();
+        const tokenExpiry = settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].tokenExpiry || 0;
+        
+        // 如果令牌即將過期（5分鐘內），則刷新
+        if (Date.now() > tokenExpiry - 300000) {
+            await this.refreshGoogleDriveToken();
+        }
+        
+        return settings.services[this.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken;
+    },
+    
+    // 更新同步狀態
+    updateSyncStatus: function(message) {
+        console.log('同步狀態:', message);
+        const statusElement = document.getElementById('cloudSyncStatus');
+        if (statusElement) {
+            statusElement.textContent = message;
+        }
     },
     
     // 授權Dropbox
