@@ -739,6 +739,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 statusElement.textContent = '正在上傳到GitHub...';
                 statusElement.style.color = '#3498db';
             }
+
+            // 驗證JSON內容格式
+            try {
+                JSON.parse(content);
+            } catch (e) {
+                throw new Error('無效的JSON格式: ' + e.message);
+            }
             
             // 獲取GitHub個人訪問令牌
             const token = localStorage.getItem('githubToken');
@@ -799,6 +806,35 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!response.ok) {
                 const errorData = await response.json();
+                if (response.status === 409) {
+                    console.log('檢測到文件衝突，正在重新獲取最新版本...');
+                    // 重新獲取文件內容並合併
+                    const latestContent = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json'
+                        }
+                    }).then(res => res.json());
+                    
+                    if (latestContent.content) {
+                        const decodedContent = decodeURIComponent(escape(atob(latestContent.content)));
+                        if (decodedContent === content) {
+                            console.log('本地內容與遠程內容相同，無需更新');
+                            return latestContent;
+                        }
+                        // 重新上傳，使用最新的SHA
+                        uploadData.sha = latestContent.sha;
+                        return await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/vnd.github.v3+json'
+                            },
+                            body: JSON.stringify(uploadData)
+                        }).then(res => res.json());
+                    }
+                }
                 throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
             }
             
