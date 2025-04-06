@@ -517,8 +517,11 @@ document.addEventListener('DOMContentLoaded', function() {
             const row = e.target.closest('tr');
             if (!row) return;
             
-            const bookId = row.dataset.id;
+            // 確保ID是字符串類型
+            const bookId = String(row.dataset.id);
             if (!bookId) return;
+            
+            console.log('垃圾桶操作，書籍ID:', bookId);
             
             // 處理恢復按鈕點擊
             if (e.target.classList.contains('restore-btn') || e.target.parentElement.classList.contains('restore-btn')) {
@@ -537,11 +540,13 @@ document.addEventListener('DOMContentLoaded', function() {
             // 處理永久刪除按鈕點擊
             if (e.target.classList.contains('permanent-delete-btn') || e.target.parentElement.classList.contains('permanent-delete-btn')) {
                 if (confirm('確定要永久刪除這本書嗎？此操作無法撤銷！')) {
+                    console.log('嘗試永久刪除書籍，ID:', bookId);
                     if (BookData.deleteFromTrash(bookId)) {
                         // 重新加載垃圾桶
                         loadTrashBooks();
                         alert('書籍已永久刪除');
                     } else {
+                        console.error('刪除失敗，書籍ID:', bookId);
                         alert('刪除失敗，請重試');
                     }
                 }

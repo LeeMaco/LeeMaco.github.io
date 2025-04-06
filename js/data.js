@@ -564,19 +564,32 @@ const BookData = {
     deleteFromTrash: function(id) {
         // 確保ID是字符串類型
         const bookId = String(id);
-        console.log('從垃圾桶永久刪除書籍，ID:', bookId);
+        console.log('從垃圾桶永久刪除書籍，ID:', bookId, '(原始ID類型:', typeof id, ')');
         
         // 獲取垃圾桶中的書籍
         const trashBooks = this.getTrashBooks();
+        console.log('垃圾桶中書籍數量:', trashBooks.length);
         
-        // 查找要刪除的書籍索引
-        const bookIndex = trashBooks.findIndex(book => String(book.id) === bookId);
+        // 輸出垃圾桶中所有書籍的ID，用於調試
+        if (trashBooks.length > 0) {
+            console.log('垃圾桶中的書籍ID列表:', trashBooks.map(book => {
+                return { id: book.id, idType: typeof book.id, stringId: String(book.id) };
+            }));
+        }
+        
+        // 查找要刪除的書籍索引，確保使用字符串比較
+        const bookIndex = trashBooks.findIndex(book => {
+            // 確保book.id存在且轉換為字符串進行比較
+            return book && book.id !== undefined && String(book.id) === bookId;
+        });
+        
+        console.log('找到的書籍索引:', bookIndex);
         
         if (bookIndex !== -1) {
             // 從垃圾桶中移除書籍
-            trashBooks.splice(bookIndex, 1);
+            const removedBook = trashBooks.splice(bookIndex, 1)[0];
             localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
-            console.log('成功從垃圾桶永久刪除書籍，ID:', bookId);
+            console.log('成功從垃圾桶永久刪除書籍:', removedBook);
             return true;
         }
         
