@@ -200,40 +200,30 @@ document.addEventListener('DOMContentLoaded', function() {
         bookFormModal.style.display = 'block';
     });
     
-    // 綁定去除重複按鈕點擊事件
-    removeDuplicatesBtn.addEventListener('click', function() {
-        // 顯示去重彈窗
-        removeDuplicatesModal.style.display = 'block';
-        // 清空之前的狀態信息
-        duplicateStatus.textContent = '';
-    });
+    // 定義功能函數，這些函數將在密碼驗證成功後被調用
+    // 這些函數將被AuthValidator使用
     
-    // 綁定匯出Excel按鈕點擊事件
-    exportExcelBtn.addEventListener('click', function() {
+    // 去除重複功能
+    window.removeDuplicatesModal = removeDuplicatesModal;
+    
+    // 匯出Excel功能
+    window.exportToExcel = function() {
         exportToExcel();
-    });
+    };
     
-    // 綁定匯出JSON按鈕點擊事件
-    const exportJsonBtn = document.getElementById('exportJsonBtn');
-    exportJsonBtn.addEventListener('click', function() {
+    // 匯出JSON功能
+    window.exportToJSON = function() {
         exportToJSON();
-    });
+    };
     
-    // 綁定匯入Excel按鈕點擊事件
-    importExcelBtn.addEventListener('click', function() {
-        importExcelModal.style.display = 'block';
-    });
+    // 匯入Excel功能
+    window.importExcelModal = importExcelModal;
     
-    // 綁定GitHub設置按鈕點擊事件
-    githubSettingsBtn.addEventListener('click', function() {
-        // 顯示GitHub設置彈窗
-        githubSettingsModal.style.display = 'block';
-        
-        // 填充已保存的設置
-        document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
-        document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
-        document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
-    });
+    // GitHub設置功能
+    window.githubSettingsModal = githubSettingsModal;
+    
+    // 注意：這些按鈕的點擊事件現在由AuthValidator處理
+    // 不再直接為這些按鈕添加事件監聽器，避免與AuthValidator衝突
     
     // 綁定匯入Excel表單提交事件
     importExcelForm.addEventListener('submit', function(e) {
@@ -483,15 +473,7 @@ document.addEventListener('DOMContentLoaded', function() {
         const sortOrder = document.getElementById('sortOrder').value;
         
         // 安全地處理文本，防止XSS攻擊
-        function escapeHtml(text) {
-            if (text === undefined || text === null) return '';
-            return String(text)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
+        import { escapeHtml } from './security.js';
         
         // 應用關鍵字搜索
         if (searchKeyword) {

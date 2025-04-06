@@ -96,11 +96,18 @@ const PermissionManager = {
         return;
     },
     
-    // 顯示密碼驗證彈窗 (已禁用)
-    showPasswordVerificationModal: function() {
-        console.log('權限設置驗證功能已禁用');
-        // 不再顯示密碼驗證彈窗
-        return;
+    // 顯示密碼驗證彈窗
+    showPasswordVerificationModal: function(callback) {
+        // 使用AuthValidator的密碼驗證功能
+        if (window.AuthValidator && typeof AuthValidator.showPasswordVerificationModal === 'function') {
+            AuthValidator.showPasswordVerificationModal(callback);
+        } else {
+            console.error('AuthValidator未定義或showPasswordVerificationModal方法不存在');
+            // 如果AuthValidator不可用，則直接執行回調
+            if (typeof callback === 'function') {
+                callback();
+            }
+        }
     },
     
     // 驗證成功後顯示權限設置彈窗 (已禁用)

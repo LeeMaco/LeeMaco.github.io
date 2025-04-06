@@ -334,14 +334,24 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!book) return;
         
         // 安全地處理文本，防止XSS攻擊
-        function escapeHtml(text) {
-            if (!text) return '';
-            return String(text)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
+        import { escapeHtml } from './security.js';
+
+        // 防抖函数
+        function debounce(func, delay) {
+            let timeoutId;
+            return function(...args) {
+                clearTimeout(timeoutId);
+                timeoutId = setTimeout(() => {
+                    func.apply(this, args);
+                }, delay);
+            };
+        }
+
+        // 增强错误处理
+        function handleError(error) {
+            console.error('Error:', error);
+            alert(`加载数据失败: ${error.message || '未知错误'}`);
+            return null;
         }
         
         let html = `

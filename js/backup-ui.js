@@ -19,30 +19,35 @@ document.addEventListener('DOMContentLoaded', function() {
     const createBackupBtn = document.getElementById('createBackupBtn');
     const clearBackupHistoryBtn = document.getElementById('clearBackupHistoryBtn');
     
-    // 綁定備份設置按鈕點擊事件
-    backupSettingsBtn.addEventListener('click', function() {
-        // 顯示備份設置彈窗
-        backupSettingsModal.style.display = 'block';
+    // 為AuthValidator提供備份設置和歷史功能
+    // 創建BackupUI對象，供AuthValidator調用
+    window.BackupUI = {
+        showBackupSettingsModal: function() {
+            // 顯示備份設置彈窗
+            backupSettingsModal.style.display = 'block';
+            
+            // 填充已保存的設置
+            const settings = BackupManager.getBackupSettings();
+            document.getElementById('backupEnabled').checked = settings.enabled;
+            document.getElementById('backupInterval').value = settings.interval;
+            document.getElementById('autoUploadToGitHub').checked = settings.autoUploadToGitHub;
+            document.getElementById('maxBackupCount').value = settings.maxBackupCount;
+            
+            // 更新最後備份時間顯示
+            updateLastBackupTimeDisplay();
+        },
         
-        // 填充已保存的設置
-        const settings = BackupManager.getBackupSettings();
-        document.getElementById('backupEnabled').checked = settings.enabled;
-        document.getElementById('backupInterval').value = settings.interval;
-        document.getElementById('autoUploadToGitHub').checked = settings.autoUploadToGitHub;
-        document.getElementById('maxBackupCount').value = settings.maxBackupCount;
-        
-        // 更新最後備份時間顯示
-        updateLastBackupTimeDisplay();
-    });
+        showBackupHistoryModal: function() {
+            // 顯示備份歷史彈窗
+            backupHistoryModal.style.display = 'block';
+            
+            // 加載備份歷史記錄
+            loadBackupHistory();
+        }
+    };
     
-    // 綁定備份歷史按鈕點擊事件
-    backupHistoryBtn.addEventListener('click', function() {
-        // 顯示備份歷史彈窗
-        backupHistoryModal.style.display = 'block';
-        
-        // 加載備份歷史記錄
-        loadBackupHistory();
-    });
+    // 注意：備份設置和歷史按鈕的點擊事件現在由AuthValidator處理
+    // 不再直接為這些按鈕添加事件監聽器，避免與AuthValidator衝突
     
     // 綁定備份設置表單提交事件
     backupSettingsForm.addEventListener('submit', function(e) {
@@ -91,6 +96,65 @@ document.addEventListener('DOMContentLoaded', function() {
             BackupManager.clearBackupHistory();
             loadBackupHistory();
             alert('備份歷史記錄已清空');
+        }
+    });
+
+    // 添加批量恢復按鈕
+    const bulkRestoreBtn = document.createElement('button');
+    bulkRestoreBtn.className = 'excel-btn';
+    bulkRestoreBtn.innerHTML = '<i class="fas fa-undo"></i> 批量恢復';
+    bulkRestoreBtn.style.marginLeft = '10px';
+    clearBackupHistoryBtn.parentNode.insertBefore(bulkRestoreBtn, clearBackupHistoryBtn.nextSibling);
+
+    // 綁定批量恢復按鈕點擊事件
+    bulkRestoreBtn.addEventListener('click', function() {
+        const selectedBackups = Array.from(document.querySelectorAll('.backup-checkbox:checked'))
+            .map(checkbox => checkbox.getAttribute('data-id'));
+            
+        if (selectedBackups.length === 0) {
+            alert('請選擇至少一個備份進行恢復');
+            return;
+        }
+
+        if (confirm(`確定要恢復選中的 ${selectedBackups.length} 個備份嗎？當前數據將被覆蓋！`)) {
+            // 顯示進度條
+            const progressModal = document.createElement('div');
+            progressModal.className = 'modal';
+            progressModal.style.display = 'block';
+            progressModal.innerHTML = `
+                <div class="modal-content" style="width: 60%;">
+                    <h3>正在恢復備份...</h3>
+                    <div class="progress-container">
+                        <div class="progress-bar" style="width: 0%"></div>
+                    </div>
+                    <p class="progress-text">0/${selectedBackups.length} 完成</p>
+                </div>
+            `;
+            document.body.appendChild(progressModal);
+
+            // 逐個恢復備份
+            let completed = 0;
+            selectedBackups.forEach((backupId, index) => {
+                if (BackupManager.restoreBackup(backupId)) {
+                    completed++;
+                    const progress = Math.round((completed / selectedBackups.length) * 100);
+                    const progressBar = progressModal.querySelector('.progress-bar');
+                    const progressText = progressModal.querySelector('.progress-text');
+                    progressBar.style.width = `${progress}%`;
+                    progressText.textContent = `${completed}/${selectedBackups.length} 完成`;
+                }
+            });
+
+            // 完成後關閉進度條
+            setTimeout(() => {
+                progressModal.style.display = 'none';
+                document.body.removeChild(progressModal);
+                
+                // 重新加載書籍列表
+                loadBooks();
+                
+                alert(`已成功恢復 ${completed} 個備份`);
+            }, 500);
         }
     });
     
@@ -150,15 +214,7 @@ document.addEventListener('DOMContentLoaded', function() {
             let html = '';
             
             // 安全地處理文本，防止XSS攻擊
-            function escapeHtml(text) {
-                if (text === undefined || text === null) return '';
-                return String(text)
-                    .replace(/&/g, '&amp;')
-                    .replace(/</g, '&lt;')
-                    .replace(/>/g, '&gt;')
-                    .replace(/"/g, '&quot;')
-                    .replace(/'/g, '&#039;');
-            }
+            import { escapeHtml } from './security.js';
             
             if (!Array.isArray(history) || history.length === 0) {
                 html = `<tr><td colspan="5" style="text-align: center;">沒有備份記錄</td></tr>`;
@@ -179,6 +235,7 @@ document.addEventListener('DOMContentLoaded', function() {
                                 <td>${bookCount} 本</td>
                                 <td>${backup.githubFileName ? '是' : '否'}</td>
                                 <td>
+                                    <input type="checkbox" class="backup-checkbox" data-id="${id}">
                                     <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
                                     <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
                                 </td>
