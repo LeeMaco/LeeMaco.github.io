@@ -6,7 +6,6 @@
     <title>書籍管理系統 - 管理頁面</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/error.css">
-    <link rel="stylesheet" href="css/mobile.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
@@ -24,21 +23,16 @@
             <div class="admin-header">
                 <h2>書籍管理</h2>
                 <div class="admin-actions">
-                    <button class="admin-actions-toggle" id="adminActionsToggle">
-                        <i class="fas fa-cog"></i> 管理選項 <i class="fas fa-chevron-down"></i>
-                    </button>
-                    <div class="admin-actions-menu">
-                        <button id="addBookBtn" class="add-btn"><i class="fas fa-plus"></i> 新增書籍</button>
-                        <button id="removeDuplicatesBtn" class="excel-btn"><i class="fas fa-broom"></i> 去除重複</button>
-                        <button id="exportExcelBtn" class="excel-btn"><i class="fas fa-file-export"></i> 匯出Excel</button>
-                        <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
-                        <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
-                        <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
-                        <button id="backupSettingsBtn" class="excel-btn"><i class="fas fa-cog"></i> 備份設置</button>
-                        <button id="backupHistoryBtn" class="excel-btn"><i class="fas fa-history"></i> 備份歷史</button>
-                        <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
-                        <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
-                    </div>
+                    <button id="addBookBtn" class="add-btn"><i class="fas fa-plus"></i> 新增書籍</button>
+                    <button id="removeDuplicatesBtn" class="excel-btn"><i class="fas fa-broom"></i> 去除重複</button>
+                    <button id="exportExcelBtn" class="excel-btn"><i class="fas fa-file-export"></i> 匯出Excel</button>
+                    <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
+                    <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
+                    <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
+                    <button id="backupSettingsBtn" class="excel-btn"><i class="fas fa-cog"></i> 備份設置</button>
+                    <button id="backupHistoryBtn" class="excel-btn"><i class="fas fa-history"></i> 備份歷史</button>
+                    <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
+                    <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
                 </div>
             </div>
             
@@ -207,9 +201,6 @@
                         <tr>
                             <th>書名</th>
                             <th>作者</th>
-                            <th>集數</th>
-                            <th>櫃號</th>
-                            <th>行號</th>
                             <th>出版社</th>
                             <th>刪除原因</th>
                             <th>刪除時間</th>
@@ -376,7 +367,6 @@
     <script src="js/data.js"></script>
     <script src="js/user-manager.js"></script>
     <script src="js/permissions.js"></script>
-    <script src="js/auth-validation.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/backup.js"></script>
     <script src="js/backup-ui.js"></script>

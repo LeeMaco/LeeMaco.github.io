@@ -4,22 +4,6 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // 移動端下拉菜單控制
-    const adminActionsToggle = document.getElementById('adminActionsToggle');
-    const adminActionsMenu = document.querySelector('.admin-actions-menu');
-    
-    if (adminActionsToggle && adminActionsMenu) {
-        adminActionsToggle.addEventListener('click', function() {
-            adminActionsMenu.classList.toggle('show');
-        });
-        
-        // 點擊菜單外部時關閉菜單
-        document.addEventListener('click', function(event) {
-            if (!event.target.closest('.admin-actions') && adminActionsMenu.classList.contains('show')) {
-                adminActionsMenu.classList.remove('show');
-            }
-        });
-    }
     // 檢查是否已登入
     if (!localStorage.getItem('isLoggedIn')) {
         // 未登入則跳轉到首頁
@@ -70,66 +54,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 加載並顯示所有書籍
     loadBooks();
     
-    // 為表格添加響應式支持
-    addResponsiveTableSupport();
-    
     // 初始化篩選選項
     initFilterOptions();
     
     // 初始化垃圾桶表格事件處理
     initTrashTableEvents();
-    
-    // 添加響應式表格支持函數
-    function addResponsiveTableSupport() {
-        // 為表格行添加data-label屬性的函數
-        function addDataLabelsToTable(tableBody, headerLabels) {
-            // 監聽DOM變化，當表格內容更新時添加data-label
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        mutation.addedNodes.forEach(function(node) {
-                            if (node.nodeName === 'TR') {
-                                const cells = node.querySelectorAll('td');
-                                cells.forEach(function(cell, index) {
-                                    if (index < headerLabels.length) {
-                                        cell.setAttribute('data-label', headerLabels[index]);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                });
-            });
-            
-            // 開始觀察表格變化
-            observer.observe(tableBody, { childList: true });
-            
-            // 處理已存在的行
-            const existingRows = tableBody.querySelectorAll('tr');
-            existingRows.forEach(function(row) {
-                const cells = row.querySelectorAll('td');
-                cells.forEach(function(cell, index) {
-                    if (index < headerLabels.length) {
-                        cell.setAttribute('data-label', headerLabels[index]);
-                    }
-                });
-            });
-        }
-        
-        // 為主表格添加data-label
-        const bookTableBody = document.getElementById('bookTableBody');
-        if (bookTableBody) {
-            const headerLabels = ['書名', '作者', '集數', '出版社', '櫃號', '行號', '創建時間', '操作'];
-            addDataLabelsToTable(bookTableBody, headerLabels);
-        }
-        
-        // 為垃圾桶表格添加data-label
-        const trashTableBody = document.getElementById('trashTableBody');
-        if (trashTableBody) {
-            const trashHeaderLabels = ['書名', '作者', '集數', '櫃號', '行號', '出版社', '刪除原因', '刪除時間', '操作'];
-            addDataLabelsToTable(trashTableBody, trashHeaderLabels);
-        }
-    }
     
     // 綁定垃圾桶按鈕點擊事件
     if (trashBtn) {
@@ -200,30 +129,40 @@ document.addEventListener('DOMContentLoaded', function() {
         bookFormModal.style.display = 'block';
     });
     
-    // 定義功能函數，這些函數將在密碼驗證成功後被調用
-    // 這些函數將被AuthValidator使用
+    // 綁定去除重複按鈕點擊事件
+    removeDuplicatesBtn.addEventListener('click', function() {
+        // 顯示去重彈窗
+        removeDuplicatesModal.style.display = 'block';
+        // 清空之前的狀態信息
+        duplicateStatus.textContent = '';
+    });
     
-    // 去除重複功能
-    window.removeDuplicatesModal = removeDuplicatesModal;
-    
-    // 匯出Excel功能
-    window.exportToExcel = function() {
+    // 綁定匯出Excel按鈕點擊事件
+    exportExcelBtn.addEventListener('click', function() {
         exportToExcel();
-    };
+    });
     
-    // 匯出JSON功能
-    window.exportToJSON = function() {
+    // 綁定匯出JSON按鈕點擊事件
+    const exportJsonBtn = document.getElementById('exportJsonBtn');
+    exportJsonBtn.addEventListener('click', function() {
         exportToJSON();
-    };
+    });
     
-    // 匯入Excel功能
-    window.importExcelModal = importExcelModal;
+    // 綁定匯入Excel按鈕點擊事件
+    importExcelBtn.addEventListener('click', function() {
+        importExcelModal.style.display = 'block';
+    });
     
-    // GitHub設置功能
-    window.githubSettingsModal = githubSettingsModal;
-    
-    // 注意：這些按鈕的點擊事件現在由AuthValidator處理
-    // 不再直接為這些按鈕添加事件監聽器，避免與AuthValidator衝突
+    // 綁定GitHub設置按鈕點擊事件
+    githubSettingsBtn.addEventListener('click', function() {
+        // 顯示GitHub設置彈窗
+        githubSettingsModal.style.display = 'block';
+        
+        // 填充已保存的設置
+        document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
+        document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
+        document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
+    });
     
     // 綁定匯入Excel表單提交事件
     importExcelForm.addEventListener('submit', function(e) {
@@ -472,9 +411,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const sortField = document.getElementById('sortField').value;
         const sortOrder = document.getElementById('sortOrder').value;
         
-        // 安全地處理文本，防止XSS攻擊
-        import { escapeHtml } from './security.js';
-        
         // 應用關鍵字搜索
         if (searchKeyword) {
             books = books.filter(book => {
@@ -622,7 +558,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         
         if (trashBooks.length === 0) {
-            html = `<tr><td colspan="12" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
+            html = `<tr><td colspan="9" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
         } else {
             trashBooks.forEach(book => {
                 // 格式化日期
@@ -634,9 +570,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${book.id}">
                         <td>${book.title}</td>
                         <td>${book.author}</td>
-                        <td>${book.series || '-'}</td>
-                        <td>${book.cabinet || '-'}</td>
-                        <td>${book.row || '-'}</td>
                         <td>${book.publisher || '-'}</td>
                         <td>${deleteReason}</td>
                         <td>${deletedDate}</td>
@@ -655,18 +588,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 清空垃圾桶
     function emptyTrash() {
         if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
-            try {
-                // 確保垃圾桶清空操作成功執行
-                if (BookData.emptyTrash()) {
-                    // 重新加載垃圾桶顯示
-                    loadTrashBooks();
-                    alert('垃圾桶已清空');
-                } else {
-                    alert('清空垃圾桶失敗，請重試');
-                }
-            } catch (error) {
-                console.error('清空垃圾桶時發生錯誤:', error);
-                alert('清空垃圾桶時發生錯誤: ' + error.message);
+            if (BookData.emptyTrash()) {
+                loadTrashBooks();
+                alert('垃圾桶已清空');
+            } else {
+                alert('清空垃圾桶失敗，請重試');
             }
         }
     }
@@ -785,8 +711,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // GitHub API相關功能
-    // 將函數設置為全局可訪問，以便其他模塊可以調用
-    window.uploadToGitHub = async function(content, fileName = 'books.json') {
+    async function uploadToGitHub(content, fileName = 'books.json') {
         try {
             const statusElement = document.getElementById('uploadStatus');
             if (statusElement) {

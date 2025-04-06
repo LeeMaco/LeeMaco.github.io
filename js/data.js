@@ -83,20 +83,15 @@ const BookData = {
         const currentUrl = window.location.href;
         let basePath = '';
         
-        try {
-            // 從當前URL中提取基礎路徑
-            if (currentUrl.includes('.html')) {
-                // 如果URL包含HTML文件名，則移除文件名部分
-                basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-            } else {
-                // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
-                basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
-            }
-            strategies.push(basePath + 'data/books.json');
-        } catch (error) {
-            console.error('URL解析錯誤:', error);
-            // 即使URL解析失敗，仍然保留策略1
+        // 從當前URL中提取基礎路徑
+        if (currentUrl.includes('.html')) {
+            // 如果URL包含HTML文件名，則移除文件名部分
+            basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+        } else {
+            // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
+            basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
         }
+        strategies.push(basePath + 'data/books.json');
         
         // 策略3: GitHub Pages特定路徑 (如果檢測到GitHub Pages環境)
         if (window.location.href.includes('github.io')) {
@@ -195,23 +190,11 @@ const BookData = {
     getAllBooks: function() {
         // 從localStorage獲取書籍
         const localBooks = localStorage.getItem('books');
-        let parsedLocalBooks = [];
-        
-        try {
-            parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
-        } catch (error) {
-            console.error('解析localStorage書籍數據時發生錯誤:', error);
-            // 如果解析失敗，使用空數組並嘗試重置localStorage
-            try {
-                localStorage.setItem('books', JSON.stringify([]));
-            } catch (e) {
-                console.error('重置localStorage失敗:', e);
-            }
-        }
+        const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
         
         // 確保所有本地書籍的ID都是字符串類型
         parsedLocalBooks.forEach(book => {
-            if (book && book.id !== undefined) {
+            if (book.id !== undefined) {
                 book.id = String(book.id);
             }
         });
@@ -519,74 +502,11 @@ const BookData = {
         return false;
     },
     
-    // 清空垃圾桶 - 永久刪除垃圾桶中的所有數據
+    // 清空垃圾桶
     emptyTrash: function() {
-        try {
-            // 先獲取當前垃圾桶中的書籍數量，用於日誌記錄
-            const trashBooks = this.getTrashBooks();
-            const count = trashBooks.length;
-            
-            if (count === 0) {
-                console.log('垃圾桶已經是空的');
-                return true;
-            }
-            
-            // 清空垃圾桶數據
-            localStorage.setItem(this.TRASH_KEY, JSON.stringify([]));
-            
-            // 確認垃圾桶是否真的被清空
-            const afterTrashBooks = this.getTrashBooks();
-            if (afterTrashBooks.length > 0) {
-                console.error('垃圾桶清空失敗，仍有', afterTrashBooks.length, '本書籍');
-                return false;
-            }
-            
-            console.log('垃圾桶已成功清空，永久刪除了', count, '本書籍');
-            
-            // 嘗試同步到GitHub（如果啟用了自動上傳）
-            this.syncToGitHubAfterTrashEmpty();
-            
-            return true;
-        } catch (error) {
-            console.error('清空垃圾桶時發生錯誤:', error);
-            return false;
-        }
-    },
-    
-    // 清空垃圾桶後同步到GitHub
-    syncToGitHubAfterTrashEmpty: function() {
-        try {
-            // 檢查是否存在BackupManager並且啟用了自動上傳
-            if (window.BackupManager) {
-                const settings = BackupManager.getBackupSettings();
-                if (settings && settings.autoUploadToGitHub) {
-                    console.log('檢測到啟用了自動上傳到GitHub，開始同步數據...');
-                    
-                    // 獲取所有書籍數據
-                    const allBooks = this.getAllBooks();
-                    const jsonContent = JSON.stringify(allBooks, null, 2);
-                    
-                    // 檢查uploadToGitHub函數是否存在
-                    if (typeof window.uploadToGitHub === 'function') {
-                        window.uploadToGitHub(jsonContent)
-                            .then(() => {
-                                console.log('清空垃圾桶後數據同步到GitHub成功');
-                            })
-                            .catch(error => {
-                                console.error('清空垃圾桶後數據同步到GitHub失敗:', error);
-                            });
-                    } else {
-                        console.warn('uploadToGitHub函數不存在，無法同步數據');
-                    }
-                } else {
-                    console.log('未啟用自動上傳到GitHub，跳過同步');
-                }
-            } else {
-                console.log('BackupManager不存在，跳過同步');
-            }
-        } catch (error) {
-            console.error('同步到GitHub時發生錯誤:', error);
-        }
+        localStorage.setItem(this.TRASH_KEY, JSON.stringify([]));
+        console.log('垃圾桶已清空');
+        return true;
     },
     
     // 清理垃圾桶中超過指定天數的書籍
