@@ -7,66 +7,6 @@
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/error.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
-    <script>
-    // 處理Google授權回調
-    window.onload = function() {
-        // 檢查URL中是否包含授權碼
-        const urlParams = new URLSearchParams(window.location.search);
-        const code = urlParams.get('code');
-        const state = urlParams.get('state');
-        const error = urlParams.get('error');
-        
-        // 處理授權錯誤
-        if (error) {
-            // 清除URL參數，避免重複處理
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            // 顯示錯誤消息
-            if (window.opener) {
-                window.opener.postMessage({
-                    type: 'google_auth_error',
-                    error: error
-                }, window.location.origin);
-                
-                // 顯示錯誤消息
-                document.body.innerHTML = `<div style="text-align:center;margin-top:50px;">
-                    <h2>Google Drive授權失敗</h2>
-                    <p>錯誤信息: ${error}</p>
-                    <p>請關閉此窗口並重試。</p>
-                </div>`;
-                
-                // 5秒後關閉窗口
-                setTimeout(function() {
-                    window.close();
-                }, 5000);
-            }
-            return;
-        }
-        
-        // 處理成功授權
-        if (code && state) {
-            // 清除URL參數，避免重複處理
-            window.history.replaceState({}, document.title, window.location.pathname);
-            
-            // 將授權碼發送給父窗口
-            if (window.opener) {
-                window.opener.postMessage({
-                    type: 'google_auth_callback',
-                    code: code,
-                    state: state
-                }, window.location.origin);
-                
-                // 顯示成功消息
-                document.body.innerHTML = '<div style="text-align:center;margin-top:50px;"><h2>Google Drive授權成功！</h2><p>請返回主窗口繼續操作。</p></div>';
-                
-                // 3秒後關閉窗口
-                setTimeout(function() {
-                    window.close();
-                }, 3000);
-            }
-        }
-    };
-    </script>
 </head>
 <body>
     <header>
@@ -89,7 +29,6 @@
                     <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
                     <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
                     <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
-                    <button id="cloudSyncSettingsBtn" class="excel-btn"><i class="fas fa-cloud"></i> 雲同步設置</button>
                     <button id="backupSettingsBtn" class="excel-btn"><i class="fas fa-cog"></i> 備份設置</button>
                     <button id="backupHistoryBtn" class="excel-btn"><i class="fas fa-history"></i> 備份歷史</button>
                     <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
@@ -262,10 +201,7 @@
                         <tr>
                             <th>書名</th>
                             <th>作者</th>
-                            <th>集數</th>
                             <th>出版社</th>
-                            <th>櫃號</th>
-                            <th>行號</th>
                             <th>刪除原因</th>
                             <th>刪除時間</th>
                             <th>操作</th>
@@ -420,165 +356,6 @@
             </div>
         </div>
     </div>
-    
-    <!-- 雲同步設置彈窗 -->
-    <div id="cloudSyncSettingsModal" class="modal">
-        <div class="modal-content">
-            <span class="close">&times;</span>
-            <h2>雲同步設置</h2>
-            <p>請選擇並配置您想要使用的雲存儲服務。</p>
-            <form id="cloudSyncSettingsForm">
-                <div class="form-group" style="display: flex; align-items: center;">
-                    <input type="checkbox" id="cloudSyncEnabled" style="margin-right: 8px;">
-                    <label for="cloudSyncEnabled">啟用雲同步</label>
-                </div>
-                <div class="form-group" style="display: flex; align-items: center;">
-                    <input type="checkbox" id="autoSyncEnabled" style="margin-right: 8px;">
-                    <label for="autoSyncEnabled">自動同步（數據變更時）</label>
-                </div>
-                <div class="form-group">
-                    <label for="cloudServiceSelector">選擇雲服務：</label>
-                    <select id="cloudServiceSelector">
-                        <option value="github">GitHub</option>
-                        <option value="google_drive">Google Drive</option>
-                        <option value="dropbox">Dropbox</option>
-                        <option value="onedrive">OneDrive</option>
-                    </select>
-                </div>
-                
-                <div id="cloudServiceSettings">
-                    <!-- GitHub設置 -->
-                    <div id="githubSettings" class="service-settings">
-                        <h3>GitHub設置</h3>
-                        <div class="form-group" style="display: flex; align-items: center;">
-                            <input type="checkbox" id="githubEnabled" style="margin-right: 8px;">
-                            <label for="githubEnabled">啟用GitHub</label>
-                        </div>
-                        <div class="form-group">
-                            <label for="githubToken">個人訪問令牌 (PAT)：</label>
-                            <input type="password" id="githubToken" placeholder="輸入您的GitHub個人訪問令牌">
-                        </div>
-                        <div class="form-group">
-                            <label for="githubRepo">倉庫名稱：</label>
-                            <input type="text" id="githubRepo" placeholder="格式：用戶名/倉庫名">
-                        </div>
-                        <div class="form-group">
-                            <label for="githubBranch">分支名稱：</label>
-                            <input type="text" id="githubBranch" placeholder="例如：main 或 master" value="main">
-                        </div>
-                    </div>
-                    
-                    <!-- Google Drive設置 -->
-                    <div id="google_driveSettings" class="service-settings" style="display: none;">
-                        <h3>Google Drive設置</h3>
-                        <div class="form-group">
-                            <button type="button" id="authorizeGoogleDriveBtn" class="authorize-btn" data-service="google_drive">授權Google Drive</button>
-                            <button type="button" id="testGoogleDriveBtn" onclick="testGoogleDriveSync()" style="margin-left: 10px;">測試Google Drive同步</button>
-                        </div>
-                        <script>
-                            // 測試Google Drive同步功能
-                            function testGoogleDriveSync() {
-                                // 獲取設置
-                                const settings = CloudSync.getCloudSettings();
-                                
-                                // 檢查Google Drive是否已啟用
-                                if (!settings || !settings.services[CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE].enabled) {
-                                    alert('請先啟用Google Drive同步並保存設置');
-                                    return;
-                                }
-                                
-                                // 檢查是否已授權
-                                if (!settings.services[CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken) {
-                                    alert('請先點擊「授權Google Drive」按鈕進行授權');
-                                    return;
-                                }
-                                
-                                // 更新同步狀態
-                                document.getElementById('cloudSyncStatus').textContent = '正在測試Google Drive同步...';
-                                
-                                // 創建測試數據
-                                const testData = {
-                                    test: true,
-                                    timestamp: new Date().toISOString(),
-                                    message: '這是一個Google Drive同步測試'
-                                };
-                                
-                                // 上傳測試數據
-                                CloudSync.uploadToGoogleDrive(
-                                    JSON.stringify(testData, null, 2),
-                                    'test-sync.json',
-                                    settings.services[CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE]
-                                )
-                                .then(result => {
-                                    if (result.success) {
-                                        let message = '測試成功！文件已上傳到Google Drive';
-                                        if (result.webViewLink) {
-                                            message += `，<a href="${result.webViewLink}" target="_blank">點擊查看</a>`;
-                                        }
-                                        document.getElementById('cloudSyncStatus').innerHTML = message;
-                                    }
-                                })
-                                .catch(error => {
-                                    document.getElementById('cloudSyncStatus').textContent = '測試失敗: ' + error.message;
-                                });
-                            }
-                        </script>
-                        <div class="form-group" style="display: flex; align-items: center;">
-                            <input type="checkbox" id="googleDriveEnabled" style="margin-right: 8px;">
-                            <label for="googleDriveEnabled">啟用Google Drive</label>
-                        </div>
-                        <div class="form-group">
-                            <label for="googleDriveFolderId">文件夾ID（可選）：</label>
-                            <input type="text" id="googleDriveFolderId" placeholder="留空則使用根目錄">
-                        </div>
-                        <div class="form-group">
-                            <button type="button" class="authorize-btn" data-service="google_drive">授權Google Drive</button>
-                        </div>
-                    </div>
-                    
-                    <!-- Dropbox設置 -->
-                    <div id="dropboxSettings" class="service-settings" style="display: none;">
-                        <h3>Dropbox設置</h3>
-                        <div class="form-group" style="display: flex; align-items: center;">
-                            <input type="checkbox" id="dropboxEnabled" style="margin-right: 8px;">
-                            <label for="dropboxEnabled">啟用Dropbox</label>
-                        </div>
-                        <div class="form-group">
-                            <label for="dropboxFolderPath">文件夾路徑（可選）：</label>
-                            <input type="text" id="dropboxFolderPath" placeholder="例如：/備份 (留空則使用根目錄)">
-                        </div>
-                        <div class="form-group">
-                            <button type="button" class="authorize-btn" data-service="dropbox">授權Dropbox</button>
-                        </div>
-                    </div>
-                    
-                    <!-- OneDrive設置 -->
-                    <div id="onedriveSettings" class="service-settings" style="display: none;">
-                        <h3>OneDrive設置</h3>
-                        <div class="form-group" style="display: flex; align-items: center;">
-                            <input type="checkbox" id="onedriveEnabled" style="margin-right: 8px;">
-                            <label for="onedriveEnabled">啟用OneDrive</label>
-                        </div>
-                        <div class="form-group">
-                            <label for="onedriveFolderId">文件夾ID（可選）：</label>
-                            <input type="text" id="onedriveFolderId" placeholder="留空則使用根目錄">
-                        </div>
-                        <div class="form-group">
-                            <button type="button" class="authorize-btn" data-service="onedrive">授權OneDrive</button>
-                        </div>
-                    </div>
-                </div>
-                
-                <div id="cloudSyncStatus" style="margin-top: 10px; font-weight: bold;"></div>
-                
-                <div class="form-group" style="margin-top: 20px; display: flex; justify-content: space-between;">
-                    <button type="button" onclick="testCloudSync()" style="background-color: #3498db;">測試同步</button>
-                    <button type="button" onclick="testGoogleDriveSync()" style="background-color: #4285F4;">測試Google Drive同步</button>
-                    <button type="submit">保存設置</button>
-                </div>
-            </form>
-        </div>
-    </div>
 
     <footer>
         <div class="container">
@@ -587,107 +364,11 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="js/logger.js"></script>
-    <script src="js/cache.js"></script>
     <script src="js/data.js"></script>
     <script src="js/user-manager.js"></script>
     <script src="js/permissions.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/backup.js"></script>
     <script src="js/backup-ui.js"></script>
-    <script src="js/cloud-sync.js"></script>
-    <script src="js/cloud-sync-ui.js"></script>
-    <script>
-    // 測試Google Drive同步功能
-    async function testGoogleDriveSync() {
-        try {
-            // 獲取雲同步設置
-            const settings = CloudSync.getCloudSettings();
-            
-            // 檢查Google Drive是否已啟用
-            if (!settings || !settings.services[CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE].enabled) {
-                alert('請先啟用Google Drive同步並保存設置');
-                return;
-            }
-            
-            // 檢查是否已授權
-            if (!settings.services[CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE].accessToken) {
-                alert('請先點擊「授權Google Drive」按鈕進行授權');
-                return;
-            }
-            
-            // 更新同步狀態
-            document.getElementById('cloudSyncStatus').textContent = '正在測試Google Drive同步...';
-            
-            // 創建測試數據
-            const testData = {
-                test: true,
-                timestamp: new Date().toISOString(),
-                message: '這是一個Google Drive同步測試'
-            };
-            
-            // 上傳測試數據
-            const result = await CloudSync.uploadToGoogleDrive(
-                JSON.stringify(testData, null, 2),
-                'test-sync.json',
-                settings.services[CloudSync.CLOUD_SERVICES.GOOGLE_DRIVE]
-            );
-            
-            // 顯示結果
-            if (result.success) {
-                let message = '測試成功！文件已上傳到Google Drive';
-                if (result.webViewLink) {
-                    message += `<br><a href="${result.webViewLink}" target="_blank">點擊查看文件</a>`;
-                }
-                document.getElementById('cloudSyncStatus').innerHTML = message;
-            } else {
-                document.getElementById('cloudSyncStatus').textContent = '測試失敗：' + (result.error || '未知錯誤');
-            }
-        } catch (error) {
-            console.error('測試Google Drive同步時發生錯誤:', error);
-            document.getElementById('cloudSyncStatus').textContent = '測試失敗：' + error.message;
-        }
-    }
-    
-    // 測試雲同步功能
-    async function testCloudSync() {
-        try {
-            // 獲取雲同步設置
-            const settings = CloudSync.getCloudSettings();
-            
-            if (!settings || !settings.enabled) {
-                alert('請先啟用雲同步並保存設置');
-                return;
-            }
-            
-            // 創建測試數據
-            const testData = {
-                test: true,
-                timestamp: new Date().toISOString(),
-                message: '這是一個雲同步測試'
-            };
-            
-            // 更新同步狀態
-            document.getElementById('cloudSyncStatus').textContent = '正在測試雲同步...';
-            
-            // 上傳測試數據
-            const result = await CloudSync.uploadToCloud(JSON.stringify(testData, null, 2), 'test-sync.json');
-            
-            // 顯示結果
-            if (result.success) {
-                let message = `測試成功！文件已上傳到${result.service}`;
-                if (result.url) {
-                    message += `<br><a href="${result.url}" target="_blank">點擊查看文件</a>`;
-                }
-                document.getElementById('cloudSyncStatus').innerHTML = message;
-            } else {
-                document.getElementById('cloudSyncStatus').textContent = '測試失敗：' + (result.error || '未知錯誤');
-            }
-        } catch (error) {
-            console.error('測試雲同步時發生錯誤:', error);
-            document.getElementById('cloudSyncStatus').textContent = '測試失敗：' + error.message;
-        }
-    }
-    </script>
 </body>
 </html>
