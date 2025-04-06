@@ -333,16 +333,27 @@ document.addEventListener('DOMContentLoaded', function() {
         const book = BookData.getBookById(bookId);
         if (!book) return;
         
+        // 安全地處理文本，防止XSS攻擊
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#039;');
+        }
+        
         let html = `
-            <h2>${book.title}</h2>
+            <h2>${escapeHtml(book.title)}</h2>
             <div class="book-detail-content">
-                <p><strong>作者：</strong>${book.author}</p>
-                ${book.series ? `<p><strong>集數：</strong>${book.series}</p>` : ''}
-                <p><strong>位置：</strong>櫃號 ${book.cabinet || '未知'}, 行號 ${book.row || '未知'}</p>
-                <p><strong>出版社：</strong>${book.publisher || '未知'}</p>
-                <p><strong>ISBN號：</strong>${book.isbn || '未知'}</p>
-                ${book.description ? `<p><strong>描述：</strong>${book.description}</p>` : ''}
-                ${book.notes ? `<p><strong>備註：</strong>${book.notes}</p>` : ''}
+                <p><strong>作者：</strong>${escapeHtml(book.author)}</p>
+                ${book.series ? `<p><strong>集數：</strong>${escapeHtml(book.series)}</p>` : ''}
+                <p><strong>位置：</strong>櫃號 ${escapeHtml(book.cabinet || '未知')}, 行號 ${escapeHtml(book.row || '未知')}</p>
+                <p><strong>出版社：</strong>${escapeHtml(book.publisher || '未知')}</p>
+                <p><strong>ISBN號：</strong>${escapeHtml(book.isbn || '未知')}</p>
+                ${book.description ? `<p><strong>描述：</strong>${escapeHtml(book.description)}</p>` : ''}
+                ${book.notes ? `<p><strong>備註：</strong>${escapeHtml(book.notes)}</p>` : ''}
             </div>
         `;
         
