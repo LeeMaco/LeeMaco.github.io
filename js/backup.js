@@ -132,9 +132,9 @@ const BackupManager = {
             // 獲取備份設置
             const settings = this.getBackupSettings();
             
-            // 如果啟用了自動上傳到GitHub，則上傳
-            if (settings.autoUploadToGitHub) {
-                this.uploadBackupToGitHub(backup);
+            // 如果啟用了自動上傳到雲存儲，則上傳
+            if (settings.autoUploadToGitHub || (window.CloudSync && CloudSync.getCloudSettings()?.autoSync)) {
+                this.uploadBackupToCloud(backup);
             }
             
             console.log('備份創建成功，書籍數量:', books.length);
@@ -172,10 +172,68 @@ const BackupManager = {
         }
     },
     
-    // 上傳備份到GitHub
-    uploadBackupToGitHub: function(backup) {
+    // 上傳備份到雲存儲
+    uploadBackupToCloud: function(backup) {
         try {
-            console.log('開始上傳備份到GitHub...');
+            console.log('開始上傳備份到雲存儲...');
+            
+            // 檢查是否有雲同步設置
+            if (!window.CloudSync) {
+                console.error('雲同步模塊未加載，無法上傳');
+                return false;
+            }
+            
+            const cloudSettings = CloudSync.getCloudSettings();
+            if (!cloudSettings || !cloudSettings.enabled) {
+                console.log('雲同步功能未啟用，嘗試使用傳統GitHub上傳');
+                return this.uploadBackupToGitHubLegacy(backup);
+            }
+            
+            // 準備備份數據
+            const jsonContent = JSON.stringify(backup.data, null, 2);
+            const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
+            
+            // 使用CloudSync模塊上傳
+            CloudSync.uploadToCloud(jsonContent, fileName)
+                .then((result) => {
+                    console.log('備份上傳到雲存儲成功:', result);
+                    
+                    // 更新備份記錄
+                    const history = this.getBackupHistory();
+                    const backupIndex = history.findIndex(b => b.id === backup.id);
+                    
+                    if (backupIndex !== -1) {
+                        // 根據不同的雲服務保存相關信息
+                        if (result.service === CloudSync.CLOUD_SERVICES.GITHUB) {
+                            history[backupIndex].githubFileName = fileName;
+                        }
+                        
+                        // 添加通用的雲同步信息
+                        history[backupIndex].cloudSync = {
+                            service: result.service,
+                            timestamp: new Date().toISOString(),
+                            fileName: fileName,
+                            url: result.url || ''
+                        };
+                        
+                        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                    }
+                })
+                .catch(error => {
+                    console.error('備份上傳到雲存儲失敗:', error);
+                });
+            
+            return true;
+        } catch (error) {
+            console.error('上傳備份到雲存儲時發生錯誤:', error);
+            return false;
+        }
+    },
+    
+    // 傳統方式上傳備份到GitHub (向下兼容)
+    uploadBackupToGitHubLegacy: function(backup) {
+        try {
+            console.log('使用傳統方式上傳備份到GitHub...');
             
             // 檢查是否有GitHub設置
             const token = localStorage.getItem('githubToken');

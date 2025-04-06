@@ -29,6 +29,7 @@
                     <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
                     <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
                     <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
+                    <button id="cloudSyncSettingsBtn" class="excel-btn"><i class="fas fa-cloud"></i> 雲同步設置</button>
                     <button id="backupSettingsBtn" class="excel-btn"><i class="fas fa-cog"></i> 備份設置</button>
                     <button id="backupHistoryBtn" class="excel-btn"><i class="fas fa-history"></i> 備份歷史</button>
                     <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
@@ -356,6 +357,112 @@
             </div>
         </div>
     </div>
+    
+    <!-- 雲同步設置彈窗 -->
+    <div id="cloudSyncSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>雲同步設置</h2>
+            <p>請選擇並配置您想要使用的雲存儲服務。</p>
+            <form id="cloudSyncSettingsForm">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="cloudSyncEnabled" style="margin-right: 8px;">
+                    <label for="cloudSyncEnabled">啟用雲同步</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="autoSyncEnabled" style="margin-right: 8px;">
+                    <label for="autoSyncEnabled">自動同步（數據變更時）</label>
+                </div>
+                <div class="form-group">
+                    <label for="cloudServiceSelector">選擇雲服務：</label>
+                    <select id="cloudServiceSelector">
+                        <option value="github">GitHub</option>
+                        <option value="google_drive">Google Drive</option>
+                        <option value="dropbox">Dropbox</option>
+                        <option value="onedrive">OneDrive</option>
+                    </select>
+                </div>
+                
+                <div id="cloudServiceSettings">
+                    <!-- GitHub設置 -->
+                    <div id="githubSettings" class="service-settings">
+                        <h3>GitHub設置</h3>
+                        <div class="form-group" style="display: flex; align-items: center;">
+                            <input type="checkbox" id="githubEnabled" style="margin-right: 8px;">
+                            <label for="githubEnabled">啟用GitHub</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="githubToken">個人訪問令牌 (PAT)：</label>
+                            <input type="password" id="githubToken" placeholder="輸入您的GitHub個人訪問令牌">
+                        </div>
+                        <div class="form-group">
+                            <label for="githubRepo">倉庫名稱：</label>
+                            <input type="text" id="githubRepo" placeholder="格式：用戶名/倉庫名">
+                        </div>
+                        <div class="form-group">
+                            <label for="githubBranch">分支名稱：</label>
+                            <input type="text" id="githubBranch" placeholder="例如：main 或 master" value="main">
+                        </div>
+                    </div>
+                    
+                    <!-- Google Drive設置 -->
+                    <div id="google_driveSettings" class="service-settings" style="display: none;">
+                        <h3>Google Drive設置</h3>
+                        <div class="form-group" style="display: flex; align-items: center;">
+                            <input type="checkbox" id="googleDriveEnabled" style="margin-right: 8px;">
+                            <label for="googleDriveEnabled">啟用Google Drive</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="googleDriveFolderId">文件夾ID（可選）：</label>
+                            <input type="text" id="googleDriveFolderId" placeholder="留空則使用根目錄">
+                        </div>
+                        <div class="form-group">
+                            <button type="button" class="authorize-btn" data-service="google_drive">授權Google Drive</button>
+                        </div>
+                    </div>
+                    
+                    <!-- Dropbox設置 -->
+                    <div id="dropboxSettings" class="service-settings" style="display: none;">
+                        <h3>Dropbox設置</h3>
+                        <div class="form-group" style="display: flex; align-items: center;">
+                            <input type="checkbox" id="dropboxEnabled" style="margin-right: 8px;">
+                            <label for="dropboxEnabled">啟用Dropbox</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="dropboxFolderPath">文件夾路徑（可選）：</label>
+                            <input type="text" id="dropboxFolderPath" placeholder="例如：/備份 (留空則使用根目錄)">
+                        </div>
+                        <div class="form-group">
+                            <button type="button" class="authorize-btn" data-service="dropbox">授權Dropbox</button>
+                        </div>
+                    </div>
+                    
+                    <!-- OneDrive設置 -->
+                    <div id="onedriveSettings" class="service-settings" style="display: none;">
+                        <h3>OneDrive設置</h3>
+                        <div class="form-group" style="display: flex; align-items: center;">
+                            <input type="checkbox" id="onedriveEnabled" style="margin-right: 8px;">
+                            <label for="onedriveEnabled">啟用OneDrive</label>
+                        </div>
+                        <div class="form-group">
+                            <label for="onedriveFolderId">文件夾ID（可選）：</label>
+                            <input type="text" id="onedriveFolderId" placeholder="留空則使用根目錄">
+                        </div>
+                        <div class="form-group">
+                            <button type="button" class="authorize-btn" data-service="onedrive">授權OneDrive</button>
+                        </div>
+                    </div>
+                </div>
+                
+                <div id="cloudSyncStatus" style="margin-top: 10px; font-weight: bold;"></div>
+                
+                <div class="form-group" style="margin-top: 20px; display: flex; justify-content: space-between;">
+                    <button type="button" onclick="testCloudSync()" style="background-color: #3498db;">測試同步</button>
+                    <button type="submit">保存設置</button>
+                </div>
+            </form>
+        </div>
+    </div>
 
     <footer>
         <div class="container">
@@ -364,11 +471,15 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/cache.js"></script>
     <script src="js/data.js"></script>
     <script src="js/user-manager.js"></script>
     <script src="js/permissions.js"></script>
     <script src="js/admin.js"></script>
     <script src="js/backup.js"></script>
     <script src="js/backup-ui.js"></script>
+    <script src="js/cloud-sync.js"></script>
+    <script src="js/cloud-sync-ui.js"></script>
 </body>
 </html>

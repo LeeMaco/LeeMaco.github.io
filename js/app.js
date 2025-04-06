@@ -129,10 +129,19 @@ document.addEventListener('DOMContentLoaded', function() {
     function displaySuggestions(suggestions) {
         searchSuggestions.innerHTML = '';
         
+        // 檢查是否有建議結果
+        if (!suggestions || suggestions.length === 0) {
+            searchSuggestions.style.display = 'none';
+            return;
+        }
+        
+        // 使用文檔片段提高性能
+        const fragment = document.createDocumentFragment();
+        
         suggestions.forEach(suggestion => {
             const item = document.createElement('div');
             item.className = 'suggestion-item';
-            item.textContent = suggestion.text;
+            item.textContent = suggestion.text || '';
             
             item.addEventListener('click', function() {
                 searchInput.value = suggestion.text;
@@ -141,9 +150,10 @@ document.addEventListener('DOMContentLoaded', function() {
                 performSearch();
             });
             
-            searchSuggestions.appendChild(item);
+            fragment.appendChild(item);
         });
         
+        searchSuggestions.appendChild(fragment);
         searchSuggestions.style.display = 'block';
     }
     
