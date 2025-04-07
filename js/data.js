@@ -73,13 +73,6 @@ const BookData = {
     
     // 從JSON文件加載書籍數據
     loadBooksFromJSON: function() {
-        // 檢查緩存中是否有數據
-        if (window.CacheManager && CacheManager.has('jsonBooks')) {
-            console.log('從緩存加載JSON書籍數據');
-            this.jsonBooks = CacheManager.get('jsonBooks');
-            return Promise.resolve(this.jsonBooks);
-        }
-        
         // 使用多種策略嘗試加載JSON數據
         const strategies = [];
         
@@ -136,30 +129,29 @@ const BookData = {
         });
         
         return Promise.any(fetchPromises)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('無法加載JSON文件: ' + response.statusText);
-                }
-                return response.json();
-            })
             .then(data => {
+                if (!data || !Array.isArray(data)) {
+                    console.warn('加載的JSON數據格式不正確，預期為數組');
+                    // 如果數據不是數組，則返回空數組
+                    return [];
+                }
+                
                 console.log('從JSON文件加載了', data.length, '本書籍');
                 // 確保所有JSON書籍的ID都是字符串類型
                 data.forEach(book => {
-                    if (book.id !== undefined) {
+                    if (book && book.id !== undefined) {
                         book.id = String(book.id);
                     }
                 });
-                this.jsonBooks = data;
                 
-                // 將數據存入緩存
-                if (window.CacheManager) {
-                    // 緩存JSON書籍數據，設置30分鐘過期
-                    CacheManager.set('jsonBooks', data, 30 * 60 * 1000);
-                    console.log('JSON書籍數據已存入緩存');
+                // 過濾掉無效的書籍數據
+                const validBooks = data.filter(book => book && book.title && book.id);
+                if (validBooks.length < data.length) {
+                    console.warn(`過濾掉了 ${data.length - validBooks.length} 本無效書籍數據`);
                 }
                 
-                return data;
+                this.jsonBooks = validBooks;
+                return validBooks;
             })
             .catch(error => {
                 console.error('加載JSON書籍數據時發生錯誤:', error);
@@ -185,36 +177,41 @@ const BookData = {
                             return response.json();
                         })
                         .then(data => {
+                            if (!data || !Array.isArray(data)) {
+                                console.warn('備用方法加載的JSON數據格式不正確，預期為數組');
+                                this.jsonBooks = [];
+                                return [];
+                            }
+                            
                             console.log('使用備用方法成功加載了', data.length, '本書籍');
-                            this.jsonBooks = data;
-                            return data;
+                            // 確保所有JSON書籍的ID都是字符串類型
+                            data.forEach(book => {
+                                if (book && book.id !== undefined) {
+                                    book.id = String(book.id);
+                                }
+                            });
+                            
+                            // 過濾掉無效的書籍數據
+                            const validBooks = data.filter(book => book && book.title && book.id);
+                            this.jsonBooks = validBooks;
+                            return validBooks;
                         })
                         .catch(fallbackError => {
                             console.error('備用方法也失敗:', fallbackError);
                             this.jsonBooks = [];
-                            throw new Error(`無法加載書籍數據。原始錯誤: ${error.message}, 備用方法錯誤: ${fallbackError.message}`);
+                            // 不拋出錯誤，而是返回空數組，避免阻止應用程序繼續運行
+                            return [];
                         });
                 }
                 
                 this.jsonBooks = [];
-                throw error; // 重新拋出錯誤，以便上層捕獲
+                // 不拋出錯誤，而是返回空數組，避免阻止應用程序繼續運行
+                return [];
             });
     },
     
     // 獲取所有書籍（合併localStorage和JSON文件中的數據）
     getAllBooks: function() {
-        // 檢查緩存中是否有合併後的書籍數據
-        const cacheKey = 'allBooks';
-        if (window.CacheManager && CacheManager.has(cacheKey)) {
-            // 使用Logger記錄緩存命中
-            if (window.Logger) {
-                Logger.debug('從緩存獲取所有書籍數據');
-            } else {
-                console.log('從緩存獲取所有書籍數據');
-            }
-            return CacheManager.get(cacheKey);
-        }
-        
         // 從localStorage獲取書籍
         const localBooks = localStorage.getItem('books');
         const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
@@ -225,11 +222,6 @@ const BookData = {
                 book.id = String(book.id);
             }
         });
-        
-        // 使用Logger記錄操作
-        if (window.Logger) {
-            Logger.debug('從localStorage獲取書籍數據，數量:', parsedLocalBooks.length);
-        }
         
         // 確保jsonBooks不為空
         if (!this.jsonBooks || this.jsonBooks.length === 0) {
@@ -254,16 +246,6 @@ const BookData = {
         
         const allBooks = [...parsedLocalBooks, ...uniqueJsonBooks];
         console.log('合併後的書籍總數:', allBooks.length, '(localStorage:', parsedLocalBooks.length, ', JSON:', uniqueJsonBooks.length, ')');
-        
-        // 將合併後的數據存入緩存
-        if (window.CacheManager) {
-            // 緩存合併後的書籍數據，設置2分鐘過期（因為數據可能會被修改）
-            CacheManager.set('allBooks', allBooks, 2 * 60 * 1000);
-            if (window.Logger) {
-                Logger.debug('已將合併後的書籍數據存入緩存');
-            }
-        }
-        
         return allBooks;
     },
     
@@ -301,69 +283,57 @@ const BookData = {
     // 搜索書籍（增強版，支持多欄位搜索和篩選）
     searchBooks: function(query, type = 'title', filters = {}) {
         try {
-            // 使用Logger記錄搜索操作
-            if (window.Logger) {
-                Logger.info('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
-            } else {
-                console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
-            }
-            
-            // 構建緩存鍵
-            const cacheKey = `search_${type}_${query}_${JSON.stringify(filters)}`;
-            
-            // 檢查緩存中是否有搜索結果
-            if (window.CacheManager && CacheManager.has(cacheKey)) {
-                const cachedResults = CacheManager.get(cacheKey);
-                if (window.Logger) {
-                    Logger.debug('從緩存獲取搜索結果，數量:', cachedResults.length);
-                } else {
-                    console.log('從緩存獲取搜索結果，數量:', cachedResults.length);
-                }
-                return cachedResults;
-            }
+            console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
             
             let books = this.getAllBooks();
             console.log('獲取到書籍總數:', books.length);
-
             
-            if (books.length === 0) {
+            if (!books || books.length === 0) {
                 console.log('書籍數據為空');
                 return [];
             }
             
+            // 過濾無效的書籍數據
+            books = books.filter(book => book && typeof book === 'object' && book.title);
+            
             // 應用關鍵字搜索
-            if (query) {
+            if (query && typeof query === 'string' && query.trim() !== '') {
                 const lowerQuery = query.toLowerCase().trim();
                 console.log('處理後的查詢關鍵字:', lowerQuery);
                 
                 books = books.filter(book => {
-                    // 確保book存在且不為null
-                    if (!book) return false;
-                    
-                    if (type === 'all') {
-                        // 搜索所有欄位，使用安全的字符串處理和更寬鬆的比較方式
-                        return (
-                            (book.title && (String(book.title).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.title).toLowerCase()))) ||
-                            (book.author && (String(book.author).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.author).toLowerCase()))) ||
-                            (book.series && (String(book.series).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.series).toLowerCase()))) ||
-                            (book.publisher && (String(book.publisher).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.publisher).toLowerCase()))) ||
-                            (book.cabinet && (String(book.cabinet).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.cabinet).toLowerCase()))) ||
-                            (book.row && (String(book.row).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.row).toLowerCase()))) ||
-                            (book.isbn && (String(book.isbn).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.isbn).toLowerCase()))) ||
-                            (book.description && (String(book.description).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.description).toLowerCase()))) ||
-                            (book.notes && (String(book.notes).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.notes).toLowerCase())))
-                        );
-                    } else if (type === 'cabinet') {
-                        // 特別處理櫃號搜索，確保安全的字符串比較
-                        return book.cabinet && String(book.cabinet).toLowerCase() === lowerQuery;
-                    } else {
-                        // 搜索特定欄位，確保欄位存在且進行安全的字符串處理
-                        // 使用更寬鬆的比較方式，允許部分匹配
-                        if (book[type]) {
-                            const fieldValue = String(book[type]).toLowerCase();
-                            // 檢查是否包含查詢字符串，或查詢字符串包含欄位值
-                            return fieldValue.includes(lowerQuery) || lowerQuery.includes(fieldValue);
+                    try {
+                        // 確保book存在且不為null
+                        if (!book) return false;
+                        
+                        if (type === 'all') {
+                            // 搜索所有欄位，使用安全的字符串處理和更寬鬆的比較方式
+                            return (
+                                (book.title && (String(book.title).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.title).toLowerCase()))) ||
+                                (book.author && (String(book.author).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.author).toLowerCase()))) ||
+                                (book.series && (String(book.series).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.series).toLowerCase()))) ||
+                                (book.publisher && (String(book.publisher).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.publisher).toLowerCase()))) ||
+                                (book.cabinet && (String(book.cabinet).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.cabinet).toLowerCase()))) ||
+                                (book.row && (String(book.row).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.row).toLowerCase()))) ||
+                                (book.isbn && (String(book.isbn).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.isbn).toLowerCase()))) ||
+                                (book.description && (String(book.description).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.description).toLowerCase()))) ||
+                                (book.notes && (String(book.notes).toLowerCase().includes(lowerQuery) || lowerQuery.includes(String(book.notes).toLowerCase())))
+                            );
+                        } else if (type === 'cabinet') {
+                            // 特別處理櫃號搜索，確保安全的字符串比較
+                            return book.cabinet && String(book.cabinet).toLowerCase() === lowerQuery;
+                        } else {
+                            // 搜索特定欄位，確保欄位存在且進行安全的字符串處理
+                            // 使用更寬鬆的比較方式，允許部分匹配
+                            if (book[type]) {
+                                const fieldValue = String(book[type]).toLowerCase();
+                                // 檢查是否包含查詢字符串，或查詢字符串包含欄位值
+                                return fieldValue.includes(lowerQuery) || lowerQuery.includes(fieldValue);
+                            }
+                            return false;
                         }
+                    } catch (filterError) {
+                        console.error('處理書籍過濾時發生錯誤:', filterError, '書籍:', book);
                         return false;
                     }
                 });
@@ -375,45 +345,43 @@ const BookData = {
             }
             
             // 應用篩選條件
-            if (filters && Object.keys(filters).length > 0) {
+            if (filters && typeof filters === 'object' && Object.keys(filters).length > 0) {
                 books = books.filter(book => {
-                    // 確保book存在且不為null
-                    if (!book) return false;
-                    
-                    for (const key in filters) {
-                        if (filters[key]) {
-                            // 確保所有比較都使用字符串比較，避免類型不一致問題
-                            if (!book[key] || String(book[key]).toLowerCase() !== String(filters[key]).toLowerCase()) {
-                                return false;
+                    try {
+                        // 確保book存在且不為null
+                        if (!book) return false;
+                        
+                        for (const key in filters) {
+                            if (filters[key]) {
+                                // 確保所有比較都使用字符串比較，避免類型不一致問題
+                                if (!book[key] || String(book[key]).toLowerCase() !== String(filters[key]).toLowerCase()) {
+                                    return false;
+                                }
                             }
                         }
+                        return true;
+                    } catch (filterError) {
+                        console.error('處理篩選條件時發生錯誤:', filterError, '書籍:', book);
+                        return false;
                     }
-                    return true;
                 });
             }
             
             console.log('篩選後的書籍數量:', books.length);
             
-            console.log('搜索結果數量:', books.length);
-            
-            // 將搜索結果存入緩存
-            if (window.CacheManager) {
-                // 構建緩存鍵
-                const cacheKey = `search_${type}_${query}_${JSON.stringify(filters)}`;
-                // 緩存搜索結果，設置1分鐘過期
-                CacheManager.set(cacheKey, books, 60 * 1000);
-                if (window.Logger) {
-                    Logger.debug('已將搜索結果存入緩存，鍵:', cacheKey);
+            // 確保所有返回的書籍都有有效的ID
+            books.forEach(book => {
+                if (!book.id) {
+                    book.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                } else {
+                    book.id = String(book.id);
                 }
-            }
+            });
             
+            console.log('搜索結果數量:', books.length);
             return books;
         } catch (error) {
-            if (window.Logger) {
-                Logger.error('搜索書籍時發生錯誤:', error);
-            } else {
-                console.error('搜索書籍時發生錯誤:', error);
-            }
+            console.error('搜索書籍時發生錯誤:', error);
             return [];
         }
     },
@@ -491,18 +459,32 @@ const BookData = {
             return false;
         }
         
-        // 從書籍列表中移除
-        const books = this.getAllBooks();
-        const filteredBooks = books.filter(b => String(b.id) !== bookId);
+        // 從localStorage中獲取書籍列表
+        const localBooks = localStorage.getItem('books');
+        const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
         
-        // 添加刪除時間戳
-        book.deletedAt = new Date().toISOString();
+        // 從書籍列表中移除
+        const filteredBooks = parsedLocalBooks.filter(b => String(b.id) !== bookId);
+        
+        // 創建書籍的副本，避免引用問題
+        const bookCopy = JSON.parse(JSON.stringify(book));
+        
+        // 添加刪除時間戳和原因
+        bookCopy.deletedAt = new Date().toISOString();
+        bookCopy.deleteReason = '手動刪除';
         
         // 獲取垃圾桶中的書籍
         const trashBooks = this.getTrashBooks();
         
-        // 添加到垃圾桶
-        trashBooks.push(book);
+        // 檢查垃圾桶中是否已存在相同ID的書籍
+        const existingIndex = trashBooks.findIndex(b => String(b.id) === bookId);
+        if (existingIndex !== -1) {
+            // 如果已存在，則更新該書籍
+            trashBooks[existingIndex] = bookCopy;
+        } else {
+            // 否則添加到垃圾桶
+            trashBooks.push(bookCopy);
+        }
         
         // 保存更新後的書籍列表和垃圾桶
         localStorage.setItem('books', JSON.stringify(filteredBooks));
@@ -544,16 +526,27 @@ const BookData = {
         
         // 移除刪除時間戳
         delete book.deletedAt;
+        delete book.deleteReason; // 同時移除刪除原因標記
         
         // 更新修改時間
         book.updatedAt = new Date().toISOString();
         
-        // 獲取當前書籍列表並添加恢復的書籍
-        const books = this.getAllBooks();
-        books.push(book);
+        // 獲取當前書籍列表
+        const localBooks = localStorage.getItem('books');
+        const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
+        
+        // 檢查是否已存在相同ID的書籍，避免重複
+        const existingIndex = parsedLocalBooks.findIndex(b => String(b.id) === String(book.id));
+        if (existingIndex !== -1) {
+            // 如果已存在，則更新該書籍
+            parsedLocalBooks[existingIndex] = book;
+        } else {
+            // 否則添加到列表
+            parsedLocalBooks.push(book);
+        }
         
         // 保存更新後的書籍列表和垃圾桶
-        localStorage.setItem('books', JSON.stringify(books));
+        localStorage.setItem('books', JSON.stringify(parsedLocalBooks));
         localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
         
         console.log('成功從垃圾桶恢復書籍，ID:', bookId);
@@ -591,23 +584,67 @@ const BookData = {
     cleanupTrash: function(days = 30) {
         console.log(`開始清理垃圾桶中超過 ${days} 天的書籍`);
         
-        const trashBooks = this.getTrashBooks();
-        const now = new Date();
-        const cleanedBooks = trashBooks.filter(book => {
-            if (!book.deletedAt) return true; // 如果沒有刪除時間，保留
+        try {
+            const trashBooks = this.getTrashBooks();
+            if (!trashBooks || !Array.isArray(trashBooks)) {
+                console.error('垃圾桶數據格式不正確');
+                return 0;
+            }
             
-            const deletedDate = new Date(book.deletedAt);
-            const diffTime = now - deletedDate;
-            const diffDays = diffTime / (1000 * 60 * 60 * 24);
+            const now = new Date();
+            const cleanedBooks = [];
+            const removedBooks = [];
             
-            return diffDays <= days; // 保留未超過指定天數的書籍
-        });
-        
-        const removedCount = trashBooks.length - cleanedBooks.length;
-        localStorage.setItem(this.TRASH_KEY, JSON.stringify(cleanedBooks));
-        
-        console.log(`垃圾桶清理完成，刪除了 ${removedCount} 本超過 ${days} 天的書籍`);
-        return removedCount;
+            // 檢查每本書籍
+            trashBooks.forEach(book => {
+                // 確保book是有效對象
+                if (!book || typeof book !== 'object') {
+                    return;
+                }
+                
+                // 如果沒有刪除時間，添加當前時間作為刪除時間
+                if (!book.deletedAt) {
+                    book.deletedAt = now.toISOString();
+                    cleanedBooks.push(book);
+                    return;
+                }
+                
+                try {
+                    const deletedDate = new Date(book.deletedAt);
+                    const diffTime = now - deletedDate;
+                    const diffDays = diffTime / (1000 * 60 * 60 * 24);
+                    
+                    if (diffDays <= days) {
+                        // 保留未超過指定天數的書籍
+                        cleanedBooks.push(book);
+                    } else {
+                        // 記錄被移除的書籍
+                        removedBooks.push(book);
+                    }
+                } catch (dateError) {
+                    console.error('處理書籍刪除日期時發生錯誤:', dateError);
+                    // 如果日期處理出錯，保留該書籍
+                    book.deletedAt = now.toISOString(); // 重置刪除時間
+                    cleanedBooks.push(book);
+                }
+            });
+            
+            // 保存更新後的垃圾桶
+            localStorage.setItem(this.TRASH_KEY, JSON.stringify(cleanedBooks));
+            
+            const removedCount = removedBooks.length;
+            console.log(`垃圾桶清理完成，刪除了 ${removedCount} 本超過 ${days} 天的書籍`);
+            
+            // 如果有被移除的書籍，記錄詳細信息
+            if (removedCount > 0) {
+                console.log('被永久刪除的書籍:', removedBooks.map(book => `${book.title} (ID: ${book.id})`).join(', '));
+            }
+            
+            return removedCount;
+        } catch (error) {
+            console.error('清理垃圾桶時發生錯誤:', error);
+            return 0;
+        }
     },
     
     // 驗證管理員登錄
@@ -626,84 +663,131 @@ const BookData = {
     removeDuplicateBooks: function(criteria = ['title', 'author', 'isbn']) {
         console.log('開始移除重複書籍，判斷標準:', criteria);
         
-        // 獲取所有書籍
-        const allBooks = this.getAllBooks();
-        console.log('原始書籍總數:', allBooks.length);
-        
-        if (allBooks.length <= 1) {
-            console.log('書籍數量不足，無需去重');
-            return { removed: 0, total: allBooks.length };
-        }
-        
-        // 用於存儲唯一書籍的Map
-        const uniqueBooks = new Map();
-        // 用於存儲被移除的書籍
-        const removedBooks = [];
-        
-        // 遍歷所有書籍，根據指定的標準生成唯一鍵
-        allBooks.forEach(book => {
-            // 生成唯一鍵，基於指定的標準欄位
-            let key = criteria.map(field => {
-                // 確保欄位存在且轉換為小寫字符串
-                return book[field] ? String(book[field]).toLowerCase() : '';
-            }).join('|');
+        try {
+            // 從localStorage獲取書籍，避免使用getAllBooks可能引入的JSON書籍
+            const localBooks = localStorage.getItem('books');
+            const allBooks = localBooks ? JSON.parse(localBooks) : [];
             
-            // 如果是空鍵（所有標準欄位都為空），則使用ID作為鍵
-            if (key === '' || key.split('|').every(part => part === '')) {
-                key = String(book.id);
+            console.log('原始書籍總數:', allBooks.length);
+            
+            if (allBooks.length <= 1) {
+                console.log('書籍數量不足，無需去重');
+                return { removed: 0, total: allBooks.length };
             }
             
-            // 如果該鍵已存在，表示找到重複書籍
-            if (uniqueBooks.has(key)) {
-                // 比較創建時間，保留最新的記錄
-                const existingBook = uniqueBooks.get(key);
-                const existingTime = existingBook.createdAt ? new Date(existingBook.createdAt).getTime() : 0;
-                const currentTime = book.createdAt ? new Date(book.createdAt).getTime() : 0;
-                
-                // 如果當前書籍比已存在的書籍更新，則替換
-                if (currentTime > existingTime) {
-                    removedBooks.push(existingBook);
-                    uniqueBooks.set(key, book);
-                } else {
-                    removedBooks.push(book);
+            // 確保所有書籍的ID都是字符串類型
+            allBooks.forEach(book => {
+                if (book && book.id !== undefined) {
+                    book.id = String(book.id);
                 }
-            } else {
-                // 如果該鍵不存在，則添加到唯一書籍Map中
-                uniqueBooks.set(key, book);
-            }
-        });
-        
-        // 將唯一書籍轉換為數組
-        const uniqueBookArray = Array.from(uniqueBooks.values());
-        console.log('去重後的書籍數量:', uniqueBookArray.length);
-        console.log('移除的重複書籍數量:', removedBooks.length);
-        
-        // 更新localStorage中的書籍數據
-        localStorage.setItem('books', JSON.stringify(uniqueBookArray));
-        
-        // 將移除的書籍添加到垃圾桶
-        if (removedBooks.length > 0) {
-            // 獲取垃圾桶中的書籍
-            const trashBooks = this.getTrashBooks();
-            
-            // 為每本移除的書籍添加刪除時間
-            removedBooks.forEach(book => {
-                book.deletedAt = new Date().toISOString();
-                book.deleteReason = '自動去重'; // 標記刪除原因
             });
             
-            // 添加到垃圾桶
-            trashBooks.push(...removedBooks);
-            localStorage.setItem(this.TRASH_KEY, JSON.stringify(trashBooks));
-            console.log('已將', removedBooks.length, '本重複書籍移至垃圾桶');
+            // 用於存儲唯一書籍的Map
+            const uniqueBooks = new Map();
+            // 用於存儲被移除的書籍
+            const removedBooks = [];
+            
+            // 遍歷所有書籍，根據指定的標準生成唯一鍵
+            allBooks.forEach(book => {
+                // 確保book是有效對象
+                if (!book || typeof book !== 'object') {
+                    return;
+                }
+                
+                // 生成唯一鍵，基於指定的標準欄位
+                let key = criteria.map(field => {
+                    // 確保欄位存在且轉換為小寫字符串
+                    return book[field] ? String(book[field]).toLowerCase() : '';
+                }).join('|');
+                
+                // 如果是空鍵（所有標準欄位都為空），則使用ID作為鍵
+                if (key === '' || key.split('|').every(part => part === '')) {
+                    key = String(book.id);
+                }
+                
+                // 如果該鍵已存在，表示找到重複書籍
+                if (uniqueBooks.has(key)) {
+                    // 比較創建時間，保留最新的記錄
+                    const existingBook = uniqueBooks.get(key);
+                    const existingTime = existingBook.createdAt ? new Date(existingBook.createdAt).getTime() : 0;
+                    const currentTime = book.createdAt ? new Date(book.createdAt).getTime() : 0;
+                    
+                    // 如果當前書籍比已存在的書籍更新，則替換
+                    if (currentTime > existingTime) {
+                        // 創建副本，避免引用問題
+                        const existingBookCopy = JSON.parse(JSON.stringify(existingBook));
+                        removedBooks.push(existingBookCopy);
+                        uniqueBooks.set(key, book);
+                    } else {
+                        // 創建副本，避免引用問題
+                        const bookCopy = JSON.parse(JSON.stringify(book));
+                        removedBooks.push(bookCopy);
+                    }
+                } else {
+                    // 如果該鍵不存在，則添加到唯一書籍Map中
+                    uniqueBooks.set(key, book);
+                }
+            });
+            
+            // 將唯一書籍轉換為數組
+            const uniqueBookArray = Array.from(uniqueBooks.values());
+            console.log('去重後的書籍數量:', uniqueBookArray.length);
+            console.log('移除的重複書籍數量:', removedBooks.length);
+            
+            // 更新localStorage中的書籍數據
+            localStorage.setItem('books', JSON.stringify(uniqueBookArray));
+            
+            // 將移除的書籍添加到垃圾桶
+            if (removedBooks.length > 0) {
+                // 獲取垃圾桶中的書籍
+                const trashBooks = this.getTrashBooks();
+                
+                // 為每本移除的書籍添加刪除時間和原因
+                const now = new Date().toISOString();
+                const processedRemovedBooks = removedBooks.map(book => {
+                    // 確保每本書都有ID
+                    if (!book.id) {
+                        book.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                    }
+                    
+                    // 添加刪除時間和原因
+                    book.deletedAt = now;
+                    book.deleteReason = '自動去重';
+                    return book;
+                });
+                
+                // 檢查垃圾桶中是否已存在相同ID的書籍
+                const updatedTrashBooks = [...trashBooks];
+                processedRemovedBooks.forEach(book => {
+                    const existingIndex = updatedTrashBooks.findIndex(b => String(b.id) === String(book.id));
+                    if (existingIndex !== -1) {
+                        // 如果已存在，則更新該書籍
+                        updatedTrashBooks[existingIndex] = book;
+                    } else {
+                        // 否則添加到垃圾桶
+                        updatedTrashBooks.push(book);
+                    }
+                });
+                
+                // 保存更新後的垃圾桶
+                localStorage.setItem(this.TRASH_KEY, JSON.stringify(updatedTrashBooks));
+                console.log('已將', processedRemovedBooks.length, '本重複書籍移至垃圾桶');
+            }
+            
+            // 返回去重結果
+            return {
+                removed: removedBooks.length,
+                total: uniqueBookArray.length,
+                removedBooks: removedBooks
+            };
+        } catch (error) {
+            console.error('去重過程中發生錯誤:', error);
+            return {
+                removed: 0,
+                total: 0,
+                error: error.message
+            };
         }
-        
-        // 返回去重結果
-        return {
-            removed: removedBooks.length,
-            total: uniqueBookArray.length,
-            removedBooks: removedBooks
-        };
     }
 };
 

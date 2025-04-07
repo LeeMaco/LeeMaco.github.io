@@ -110,7 +110,15 @@ document.addEventListener('DOMContentLoaded', function() {
                     backupHistoryModal.style.display = 'none';
                     
                     // 重新加載書籍列表
-                    loadBooks();
+                    if (typeof loadBooks === 'function') {
+                        loadBooks();
+                    } else {
+                        // 如果在非管理頁面，則重新加載頁面以顯示最新數據
+                        window.location.reload();
+                    }
+                    
+                    // 更新最後備份時間顯示
+                    updateLastBackupTimeDisplay();
                     
                     alert('備份已恢復，書籍列表已更新');
                 } else {

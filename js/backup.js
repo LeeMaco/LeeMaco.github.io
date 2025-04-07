@@ -161,8 +161,28 @@ const BackupManager = {
                 return false;
             }
             
+            // 確保所有書籍ID都是字符串類型
+            if (backup.data && Array.isArray(backup.data)) {
+                backup.data.forEach(book => {
+                    if (book.id !== undefined) {
+                        book.id = String(book.id);
+                    }
+                });
+            }
+            
             // 恢復書籍數據
             localStorage.setItem('books', JSON.stringify(backup.data));
+            
+            // 更新最後恢復時間
+            const now = new Date();
+            backup.lastRestored = now.toISOString();
+            
+            // 更新備份歷史記錄
+            const backupIndex = history.findIndex(b => b.id === backupId);
+            if (backupIndex !== -1) {
+                history[backupIndex] = backup;
+                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+            }
             
             console.log('備份恢復成功，書籍數量:', backup.data.length);
             return true;
