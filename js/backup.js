@@ -544,56 +544,125 @@ const BackupManager = {
                     statusElement.style.color = '#3498db';
                 }
                 
-                // 使用現有的uploadToGitHub函數上傳
-                uploadToGitHub(jsonContent, fileName)
-                    .then((result) => {
-                        console.log('備份上傳到GitHub成功，文件名:', fileName);
-                        
-                        // 更新備份記錄，添加GitHub文件名和上傳狀態
-                        const history = this.getBackupHistory();
-                        const backupIndex = history.findIndex(b => b.id === backup.id);
-                        
-                        if (backupIndex !== -1) {
-                            history[backupIndex].githubFileName = fileName;
-                            history[backupIndex].uploadedToGitHub = true;
-                            history[backupIndex].uploadTime = new Date().toISOString();
-                            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                // 使用GitHubUploader模塊上傳
+                if (typeof GitHubUploader !== 'undefined' && GitHubUploader.uploadToGitHub) {
+                    // 使用新的GitHubUploader模塊上傳
+                    GitHubUploader.uploadToGitHub(jsonContent, fileName, {
+                        onProgress: (progressData) => {
+                            if (statusElement) {
+                                statusElement.textContent = progressData.message;
+                                statusElement.style.color = progressData.status === GitHubUploader.UPLOAD_STATUS.FAILED ? '#e74c3c' : '#3498db';
+                            }
+                        },
+                        onSuccess: (result) => {
+                            console.log('備份上傳到GitHub成功，文件名:', fileName);
+                            
+                            // 更新備份記錄，添加GitHub文件名和上傳狀態
+                            const history = this.getBackupHistory();
+                            const backupIndex = history.findIndex(b => b.id === backup.id);
+                            
+                            if (backupIndex !== -1) {
+                                history[backupIndex].githubFileName = fileName;
+                                history[backupIndex].uploadedToGitHub = true;
+                                history[backupIndex].uploadTime = new Date().toISOString();
+                                
+                                // 刪除上傳錯誤信息（如果有）
+                                if (history[backupIndex].uploadError) {
+                                    delete history[backupIndex].uploadError;
+                                }
+                                
+                                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                            }
+                            
+                            // 顯示成功消息
+                            if (statusElement) {
+                                statusElement.textContent = '備份已成功上傳到GitHub';
+                                statusElement.style.color = '#2ecc71';
+                                setTimeout(() => {
+                                    statusElement.textContent = '';
+                                }, 5000);
+                            }
+                            
+                            resolve(result);
+                        },
+                        onError: (error) => {
+                            console.error('備份上傳到GitHub失敗:', error);
+                            
+                            // 更新備份記錄，標記上傳失敗
+                            const history = this.getBackupHistory();
+                            const backupIndex = history.findIndex(b => b.id === backup.id);
+                            
+                            if (backupIndex !== -1) {
+                                history[backupIndex].uploadError = error.message || '上傳失敗';
+                                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                            }
+                            
+                            // 顯示詳細錯誤消息
+                            if (statusElement) {
+                                statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
+                                statusElement.style.color = '#e74c3c';
+                                setTimeout(() => {
+                                    statusElement.textContent = '';
+                                }, 8000);
+                            }
+                            
+                            reject(error); // 拋出錯誤，以便外部捕獲
                         }
-                        
-                        // 顯示成功消息
-                        if (statusElement) {
-                            statusElement.textContent = '備份已成功上傳到GitHub';
-                            statusElement.style.color = '#2ecc71';
-                            setTimeout(() => {
-                                statusElement.textContent = '';
-                            }, 5000);
-                        }
-                        
-                        resolve(result);
-                    })
-                    .catch(error => {
-                        console.error('備份上傳到GitHub失敗:', error);
-                        
-                        // 更新備份記錄，標記上傳失敗
-                        const history = this.getBackupHistory();
-                        const backupIndex = history.findIndex(b => b.id === backup.id);
-                        
-                        if (backupIndex !== -1) {
-                            history[backupIndex].uploadError = error.message || '上傳失敗';
-                            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
-                        }
-                        
-                        // 顯示詳細錯誤消息
-                        if (statusElement) {
-                            statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
-                            statusElement.style.color = '#e74c3c';
-                            setTimeout(() => {
-                                statusElement.textContent = '';
-                            }, 8000);
-                        }
-                        
-                        reject(error); // 拋出錯誤，以便外部捕獲
+                    }).catch(error => {
+                        reject(error);
                     });
+                } else {
+                    // 使用舊的uploadToGitHub函數上傳（向後兼容）
+                    uploadToGitHub(jsonContent, fileName)
+                        .then((result) => {
+                            console.log('備份上傳到GitHub成功，文件名:', fileName);
+                            
+                            // 更新備份記錄，添加GitHub文件名和上傳狀態
+                            const history = this.getBackupHistory();
+                            const backupIndex = history.findIndex(b => b.id === backup.id);
+                            
+                            if (backupIndex !== -1) {
+                                history[backupIndex].githubFileName = fileName;
+                                history[backupIndex].uploadedToGitHub = true;
+                                history[backupIndex].uploadTime = new Date().toISOString();
+                                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                            }
+                            
+                            // 顯示成功消息
+                            if (statusElement) {
+                                statusElement.textContent = '備份已成功上傳到GitHub';
+                                statusElement.style.color = '#2ecc71';
+                                setTimeout(() => {
+                                    statusElement.textContent = '';
+                                }, 5000);
+                            }
+                            
+                            resolve(result);
+                        })
+                        .catch(error => {
+                            console.error('備份上傳到GitHub失敗:', error);
+                            
+                            // 更新備份記錄，標記上傳失敗
+                            const history = this.getBackupHistory();
+                            const backupIndex = history.findIndex(b => b.id === backup.id);
+                            
+                            if (backupIndex !== -1) {
+                                history[backupIndex].uploadError = error.message || '上傳失敗';
+                                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                            }
+                            
+                            // 顯示詳細錯誤消息
+                            if (statusElement) {
+                                statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
+                                statusElement.style.color = '#e74c3c';
+                                setTimeout(() => {
+                                    statusElement.textContent = '';
+                                }, 8000);
+                            }
+                            
+                            reject(error); // 拋出錯誤，以便外部捕獲
+                        });
+                }
             } catch (error) {
                 console.error('上傳備份到GitHub時發生錯誤:', error);
                 

@@ -186,7 +186,44 @@ document.addEventListener('DOMContentLoaded', function() {
                 alert('備份已刪除');
             }
         }
-    });
+        
+        // 處理上傳按鈕點擊
+        if (e.target.classList.contains('upload-btn') || e.target.parentElement.classList.contains('upload-btn')) {
+            if (confirm('確定要上傳此備份到GitHub嗎？')) {
+                // 禁用按鈕，防止重複點擊
+                const uploadBtn = e.target.classList.contains('upload-btn') ? e.target : e.target.parentElement;
+                uploadBtn.disabled = true;
+                uploadBtn.style.opacity = '0.7';
+                uploadBtn.style.cursor = 'not-allowed';
+                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
+                
+                // 顯示上傳狀態
+                const statusElement = document.getElementById('backupStatus');
+                if (statusElement) {
+                    statusElement.textContent = '正在準備上傳到GitHub...';
+                    statusElement.style.color = '#3498db';
+                }
+                
+                // 調用手動上傳函數
+                GitHubUploader.manualUploadBackup(backupId)
+                    .then(() => {
+                        // 重新加載備份歷史記錄
+                        loadBackupHistory();
+                        alert('備份已成功上傳到GitHub');
+                    })
+                    .catch(error => {
+                        console.error('手動上傳備份失敗:', error);
+                        alert(`上傳失敗: ${error.message || '未知錯誤，請重試'}`);
+                        
+                        // 恢復按鈕狀態
+                        uploadBtn.disabled = false;
+                        uploadBtn.style.opacity = '1';
+                        uploadBtn.style.cursor = 'pointer';
+                        uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i>';
+                    });
+            }
+        }
+    });}
     
     // 綁定彈窗關閉按鈕點擊事件
     document.querySelectorAll('.modal .close').forEach(closeBtn => {
@@ -218,10 +255,11 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${backup.id}">
                         <td>${backupDate}</td>
                         <td>${backup.bookCount} 本</td>
-                        <td>${backup.githubFileName ? '是' : '否'}</td>
+                        <td>${backup.githubFileName ? '是' : (backup.uploadError ? `<span title="${backup.uploadError}" style="color: #e74c3c;">否</span>` : '否')}</td>
                         <td>
                             <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
                             <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
+                            ${!backup.githubFileName ? `<button class="upload-btn" title="上傳到GitHub"><i class="fas fa-cloud-upload-alt"></i></button>` : ''}
                         </td>
                     </tr>
                 `;
