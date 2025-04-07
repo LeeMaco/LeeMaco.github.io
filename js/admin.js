@@ -300,64 +300,98 @@ document.addEventListener('DOMContentLoaded', function() {
     removeDuplicatesForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        // 獲取選中的判斷標準
-        const criteria = [];
-        if (document.getElementById('criteriaTitle').checked) criteria.push('title');
-        if (document.getElementById('criteriaAuthor').checked) criteria.push('author');
-        if (document.getElementById('criteriaISBN').checked) criteria.push('isbn');
-        if (document.getElementById('criteriaPublisher').checked) criteria.push('publisher');
-        if (document.getElementById('criteriaSeries').checked) criteria.push('series');
-        
-        // 確保至少選擇了一個標準
-        if (criteria.length === 0) {
-            duplicateStatus.textContent = '請至少選擇一個判斷標準';
+        try {
+            // 顯示處理中狀態
+            duplicateStatus.textContent = '正在處理中...';
+            duplicateStatus.style.color = 'blue';
+            
+            // 獲取選中的判斷標準
+            const criteria = [];
+            if (document.getElementById('criteriaTitle').checked) criteria.push('title');
+            if (document.getElementById('criteriaAuthor').checked) criteria.push('author');
+            if (document.getElementById('criteriaISBN').checked) criteria.push('isbn');
+            if (document.getElementById('criteriaPublisher').checked) criteria.push('publisher');
+            if (document.getElementById('criteriaSeries').checked) criteria.push('series');
+            
+            // 確保至少選擇了一個標準
+            if (criteria.length === 0) {
+                duplicateStatus.textContent = '請至少選擇一個判斷標準';
+                duplicateStatus.style.color = 'red';
+                return;
+            }
+            
+            console.log('開始去重，使用標準:', criteria);
+            
+            // 執行去重操作
+            const result = BookData.removeDuplicateBooks(criteria);
+            
+            // 檢查結果是否包含錯誤
+            if (result.error) {
+                throw new Error(result.error);
+            }
+            
+            console.log('去重結果:', result);
+            
+            // 顯示去重結果
+            duplicateStatus.textContent = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
+            duplicateStatus.style.color = 'green';
+            
+            // 重新加載書籍列表
+            loadBooks();
+            
+            // 檢查是否需要上傳到GitHub
+            const token = localStorage.getItem('githubToken');
+            const repo = localStorage.getItem('githubRepo');
+            
+            if (token && repo) {
+                // 自動上傳到GitHub
+                const books = BookData.getAllBooks();
+                const jsonContent = JSON.stringify(books, null, 2);
+                
+                // 創建上傳狀態元素
+                let statusElement = document.getElementById('uploadStatus');
+                if (!statusElement) {
+                    statusElement = document.createElement('div');
+                    statusElement.id = 'uploadStatus';
+                    statusElement.style.position = 'fixed';
+                    statusElement.style.bottom = '20px';
+                    statusElement.style.right = '20px';
+                    statusElement.style.padding = '10px 15px';
+                    statusElement.style.backgroundColor = '#f8f9fa';
+                    statusElement.style.border = '1px solid #ddd';
+                    statusElement.style.borderRadius = '4px';
+                    statusElement.style.zIndex = '1000';
+                    statusElement.style.fontWeight = 'bold';
+                    document.body.appendChild(statusElement);
+                }
+                
+                statusElement.textContent = '正在上傳到GitHub...';
+                statusElement.style.backgroundColor = '#f8f9fa';
+                
+                // 上傳到GitHub
+                uploadToGitHub(jsonContent)
+                    .then(() => {
+                        console.log('去重後的書籍數據上傳成功');
+                        statusElement.textContent = '上傳成功！';
+                        statusElement.style.backgroundColor = '#d4edda';
+                        setTimeout(() => {
+                            statusElement.style.display = 'none';
+                        }, 3000);
+                    })
+                    .catch(error => {
+                        console.error('去重後的書籍數據上傳失敗:', error);
+                        statusElement.textContent = `上傳失敗: ${error.message}`;
+                        statusElement.style.backgroundColor = '#f8d7da';
+                    });
+            }
+            
+            // 關閉彈窗
+            removeDuplicatesModal.style.display = 'none';
+        } catch (error) {
+            console.error('去重過程中發生錯誤:', error);
+            duplicateStatus.textContent = `去重失敗: ${error.message}`;
             duplicateStatus.style.color = 'red';
-            return;
         }
-        
-        // 執行去重操作
-        const result = BookData.removeDuplicateBooks(criteria);
-        
-        // 顯示去重結果
-        duplicateStatus.textContent = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
-        duplicateStatus.style.color = 'green';
-        
-        // 重新加載書籍列表
-        loadBooks();
-        
-        // 自動上傳到GitHub（如果有設置）
-        const books = BookData.getAllBooks();
-        const jsonContent = JSON.stringify(books, null, 2);
-        
-        // 創建上傳狀態元素
-        let statusElement = document.getElementById('uploadStatus');
-        if (!statusElement) {
-            statusElement = document.createElement('div');
-            statusElement.id = 'uploadStatus';
-            statusElement.style.position = 'fixed';
-            statusElement.style.bottom = '20px';
-            statusElement.style.right = '20px';
-            statusElement.style.padding = '10px 15px';
-            statusElement.style.backgroundColor = '#f8f9fa';
-            statusElement.style.border = '1px solid #ddd';
-            statusElement.style.borderRadius = '4px';
-            statusElement.style.zIndex = '1000';
-            statusElement.style.fontWeight = 'bold';
-            document.body.appendChild(statusElement);
-        }
-        
-        // 上傳到GitHub
-        uploadToGitHub(jsonContent)
-            .then(() => {
-                console.log('去重後的書籍數據上傳成功');
-            })
-            .catch(error => {
-                console.error('去重後的書籍數據上傳失敗:', error);
-                alert(`上傳失敗: ${error.message}`);
-            });
-        
-        // 關閉彈窗
-        removeDuplicatesModal.style.display = 'none';
     });
     
     
