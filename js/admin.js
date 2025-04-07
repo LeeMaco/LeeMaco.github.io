@@ -827,22 +827,33 @@ document.addEventListener('DOMContentLoaded', function() {
             // 獲取分支名稱
             const branch = localStorage.getItem('githubBranch') || 'main';
             
-            // 檢查文件是否已存在，獲取SHA
+            // 檢查文件是否已存在，獲取最新的SHA
             let fileSha = '';
+            let fileExists = false;
             try {
                 const checkResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
                     headers: {
                         'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
+                        'Accept': 'application/vnd.github.v3+json',
+                        'If-None-Match': ''
                     }
                 });
                 
                 if (checkResponse.status === 200) {
                     const fileData = await checkResponse.json();
                     fileSha = fileData.sha;
+                    fileExists = true;
+                    console.log(`文件已存在，獲取到SHA: ${fileSha}`);
+                } else if (checkResponse.status === 404) {
+                    console.log('文件不存在，將創建新文件');
+                } else {
+                    console.warn(`檢查文件時收到非預期狀態碼: ${checkResponse.status}`);
+                    const errorData = await checkResponse.json();
+                    console.warn('API響應:', errorData);
                 }
             } catch (error) {
-                console.log('文件不存在，將創建新文件');
+                console.warn('檢查文件是否存在時發生錯誤:', error);
+                // 繼續執行，嘗試創建文件
             }
             
             // 準備上傳數據
@@ -853,11 +864,13 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             // 如果文件已存在，添加SHA
-            if (fileSha) {
+            if (fileExists && fileSha) {
                 uploadData.sha = fileSha;
+                console.log('添加SHA到上傳數據');
             }
             
             // 上傳到GitHub
+            console.log(`正在上傳到 data/${fileName}，文件${fileExists ? '更新' : '創建'}`);
             const response = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
                 method: 'PUT',
                 headers: {
@@ -870,7 +883,60 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
+                console.error('GitHub API錯誤詳情:', errorData);
+                
+                // 處理409衝突錯誤 - 嘗試重新獲取SHA並再次上傳
+                if (response.status === 409) {
+                    console.log('檢測到文件衝突(409)，嘗試重新獲取SHA並再次上傳...');
+                    
+                    // 重新獲取最新的SHA
+                    const refreshResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3+json',
+                            'Cache-Control': 'no-cache'
+                        }
+                    });
+                    
+                    if (refreshResponse.ok) {
+                        const refreshData = await refreshResponse.json();
+                        uploadData.sha = refreshData.sha;
+                        console.log(`已更新SHA: ${refreshData.sha}，重新嘗試上傳`);
+                        
+                        // 使用更新的SHA再次嘗試上傳
+                        const retryResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/vnd.github.v3+json'
+                            },
+                            body: JSON.stringify(uploadData)
+                        });
+                        
+                        if (!retryResponse.ok) {
+                            const retryErrorData = await retryResponse.json();
+                            throw new Error(`重試上傳失敗: ${retryResponse.status} - ${retryErrorData.message}`);
+                        }
+                        
+                        const retryResult = await retryResponse.json();
+                        console.log('重試上傳成功:', retryResult);
+                        
+                        if (statusElement) {
+                            statusElement.textContent = '上傳成功！';
+                            statusElement.style.color = '#2ecc71';
+                            setTimeout(() => {
+                                statusElement.textContent = '';
+                            }, 5000);
+                        }
+                        
+                        return retryResult;
+                    } else {
+                        throw new Error(`重新獲取SHA失敗: ${refreshResponse.status}`);
+                    }
+                } else {
+                    throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
+                }
             }
             
             const result = await response.json();

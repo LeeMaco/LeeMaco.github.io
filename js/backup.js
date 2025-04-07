@@ -212,20 +212,51 @@ const BackupManager = {
             
             // 使用現有的uploadToGitHub函數上傳
             uploadToGitHub(jsonContent, fileName)
-                .then(() => {
+                .then((result) => {
                     console.log('備份上傳到GitHub成功，文件名:', fileName);
                     
-                    // 更新備份記錄，添加GitHub文件名
+                    // 更新備份記錄，添加GitHub文件名和上傳狀態
                     const history = this.getBackupHistory();
                     const backupIndex = history.findIndex(b => b.id === backup.id);
                     
                     if (backupIndex !== -1) {
                         history[backupIndex].githubFileName = fileName;
+                        history[backupIndex].uploadedToGitHub = true;
+                        history[backupIndex].uploadTime = new Date().toISOString();
                         localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                    }
+                    
+                    // 顯示成功消息
+                    const statusElement = document.getElementById('backupStatus');
+                    if (statusElement) {
+                        statusElement.textContent = '備份已成功上傳到GitHub';
+                        statusElement.style.color = '#2ecc71';
+                        setTimeout(() => {
+                            statusElement.textContent = '';
+                        }, 5000);
                     }
                 })
                 .catch(error => {
                     console.error('備份上傳到GitHub失敗:', error);
+                    
+                    // 更新備份記錄，標記上傳失敗
+                    const history = this.getBackupHistory();
+                    const backupIndex = history.findIndex(b => b.id === backup.id);
+                    
+                    if (backupIndex !== -1) {
+                        history[backupIndex].uploadError = error.message || '上傳失敗';
+                        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                    }
+                    
+                    // 顯示錯誤消息
+                    const statusElement = document.getElementById('backupStatus');
+                    if (statusElement) {
+                        statusElement.textContent = `備份上傳失敗: ${error.message}`;
+                        statusElement.style.color = '#e74c3c';
+                        setTimeout(() => {
+                            statusElement.textContent = '';
+                        }, 8000);
+                    }
                 });
             
             return true;
