@@ -4,6 +4,8 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    // 檢查是否支持UI反饋模塊
+    const hasFeedback = typeof UIFeedback !== 'undefined';
     // 獲取DOM元素
     const searchInput = document.getElementById('searchInput');
     const searchType = document.getElementById('searchType');
@@ -177,7 +179,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 執行高級搜索
     function performAdvancedSearch() {
         // 顯示搜尋中的提示
-        searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
+        if (hasFeedback) {
+            UIFeedback.showLoading('正在搜尋中，請稍候...');
+        } else {
+            searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
+        }
         
         try {
             // 收集搜索條件
@@ -189,7 +195,12 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 檢查是否有輸入任何搜索條件
             if (!title && !author && !publisher && !cabinet && !row) {
-                searchResults.innerHTML = '<p class="no-results">請輸入至少一個搜索條件</p>';
+                if (hasFeedback) {
+                    UIFeedback.hideLoading();
+                    UIFeedback.showWarning('請輸入至少一個搜索條件');
+                } else {
+                    searchResults.innerHTML = '<p class="no-results">請輸入至少一個搜索條件</p>';
+                }
                 return;
             }
             
@@ -226,9 +237,23 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('高級搜索結果數量:', results.length);
             displaySearchResults(results);
             
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                if (results.length === 0) {
+                    UIFeedback.showInfo('沒有找到符合條件的書籍');
+                } else {
+                    UIFeedback.showSuccess(`找到 ${results.length} 本符合條件的書籍`);
+                }
+            }
+            
         } catch (error) {
             console.error('高級搜索過程中發生錯誤:', error);
-            searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                UIFeedback.showError('搜索過程中發生錯誤，請稍後再試');
+            } else {
+                searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
+            }
         }
     }
     
@@ -238,12 +263,20 @@ document.addEventListener('DOMContentLoaded', function() {
         const type = searchType.value;
         
         if (query === '') {
-            searchResults.innerHTML = '<p class="no-results">請輸入關鍵字進行查詢</p>';
+            if (hasFeedback) {
+                UIFeedback.showWarning('請輸入關鍵字進行查詢');
+            } else {
+                searchResults.innerHTML = '<p class="no-results">請輸入關鍵字進行查詢</p>';
+            }
             return;
         }
         
         // 顯示搜尋中的提示
-        searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
+        if (hasFeedback) {
+            UIFeedback.showLoading('正在搜尋中，請稍候...');
+        } else {
+            searchResults.innerHTML = '<p class="searching"><i class="fas fa-spinner fa-spin"></i> 正在搜尋中，請稍候...</p>';
+        }
         
         try {
             console.log('執行搜索，關鍵字:', query, '類型:', type);
@@ -266,6 +299,15 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.log('搜索結果數量:', results.length);
                 displaySearchResults(results);
                 
+                if (hasFeedback) {
+                    UIFeedback.hideLoading();
+                    if (results.length === 0) {
+                        UIFeedback.showInfo('沒有找到符合條件的書籍');
+                    } else {
+                        UIFeedback.showSuccess(`找到 ${results.length} 本符合條件的書籍`);
+                    }
+                }
+                
                 // 如果在GitHub Pages環境中成功搜索，添加提示
                 if (isGitHubPages && results.length > 0) {
                     const successNote = document.createElement('div');
@@ -277,23 +319,34 @@ document.addEventListener('DOMContentLoaded', function() {
                 console.error('搜索或加載數據時發生錯誤:', error);
                 // 顯示更詳細的錯誤信息
                 const errorMessage = error.message || '未知錯誤';
-                searchResults.innerHTML = `
-                    <div class="error-message">
-                        <p class="no-results"><i class="fas fa-exclamation-triangle"></i> 搜索過程中發生錯誤：</p>
-                        <p class="error-details">${errorMessage}</p>
-                        <p>可能原因：</p>
-                        <ul>
-                            <li>無法加載書籍數據文件</li>
-                            <li>數據格式不正確</li>
-                            <li>網絡連接問題</li>
-                        </ul>
-                        <p>如果您在GitHub Pages上瀏覽，請確保data/books.json文件已正確上傳。</p>
-                    </div>
-                `;
+                
+                if (hasFeedback) {
+                    UIFeedback.hideLoading();
+                    UIFeedback.showError(`搜索過程中發生錯誤: ${errorMessage}`);
+                } else {
+                    searchResults.innerHTML = `
+                        <div class="error-message">
+                            <p class="no-results"><i class="fas fa-exclamation-triangle"></i> 搜索過程中發生錯誤：</p>
+                            <p class="error-details">${errorMessage}</p>
+                            <p>可能原因：</p>
+                            <ul>
+                                <li>無法加載書籍數據文件</li>
+                                <li>數據格式不正確</li>
+                                <li>網絡連接問題</li>
+                            </ul>
+                            <p>如果您在GitHub Pages上瀏覽，請確保data/books.json文件已正確上傳。</p>
+                        </div>
+                    `;
+                }
             });
         } catch (error) {
             console.error('搜索過程中發生錯誤:', error);
-            searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                UIFeedback.showError('搜索過程中發生錯誤，請稍後再試');
+            } else {
+                searchResults.innerHTML = '<p class="no-results"><i class="fas fa-exclamation-circle"></i> 搜索過程中發生錯誤，請稍後再試</p>';
+            }
         }
     }
     
@@ -319,6 +372,16 @@ document.addEventListener('DOMContentLoaded', function() {
         
         searchResults.innerHTML = html;
         
+        // 添加淡入效果
+        setTimeout(() => {
+            document.querySelectorAll('.book-card').forEach((card, index) => {
+                setTimeout(() => {
+                    card.style.opacity = '0';
+                    card.style.animation = 'fadeIn 0.5s forwards';
+                }, index * 50);
+            });
+        }, 0);
+        
         // 綁定書籍卡片點擊事件
         document.querySelectorAll('.book-card').forEach(card => {
             card.addEventListener('click', function() {
@@ -326,12 +389,29 @@ document.addEventListener('DOMContentLoaded', function() {
                 showBookDetail(bookId);
             });
         });
+        
+        // 隱藏加載指示器
+        if (hasFeedback) {
+            UIFeedback.hideLoading();
+        }
     }
     
     // 顯示書籍詳情
     function showBookDetail(bookId) {
+        // 顯示加載中
+        if (hasFeedback) {
+            UIFeedback.showLoading('加載書籍詳情...');
+        }
+        
         const book = BookData.getBookById(bookId);
-        if (!book) return;
+        
+        if (!book) {
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                UIFeedback.showError('無法找到該書籍');
+            }
+            return;
+        }
         
         let html = `
             <h2>${book.title}</h2>
@@ -347,6 +427,12 @@ document.addEventListener('DOMContentLoaded', function() {
         `;
         
         bookDetailContent.innerHTML = html;
+        
+        // 隱藏加載中
+        if (hasFeedback) {
+            UIFeedback.hideLoading();
+        }
+        
         bookDetailModal.style.display = 'block';
     }
     
@@ -362,25 +448,54 @@ document.addEventListener('DOMContentLoaded', function() {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         
+        // 表單驗證
+        if (hasFeedback) {
+            const loginBtn = this.querySelector('button[type="submit"]');
+            
+            // 設置驗證規則
+            const rules = {
+                'username': {
+                    required: true,
+                    requiredMessage: '請輸入帳號'
+                },
+                'password': {
+                    required: true,
+                    requiredMessage: '請輸入密碼'
+                }
+            };
+            
+            // 驗證表單
+            if (!UIFeedback.validateForm(this, rules)) {
+                return;
+            }
+            
+            // 顯示按鈕加載狀態
+            UIFeedback.setButtonLoading(loginBtn, '登入中...');
+        }
+        
         // 使用UserManager進行登錄驗證
-        if (window.UserManager) {
-            const result = UserManager.validateLogin(username, password);
-            if (result.success) {
+        const result = UserManager.validateLogin(username, password);
+        
+        if (result.success) {
+            if (hasFeedback) {
+                UIFeedback.showSuccess('登入成功，正在跳轉...');
+            }
+            
+            // 延遲跳轉，讓用戶看到成功消息
+            setTimeout(() => {
                 // 跳轉到管理頁面
                 window.location.href = 'admin.html';
+            }, 1000);
+        } else {
+            if (hasFeedback) {
+                // 恢復按鈕狀態
+                const loginBtn = this.querySelector('button[type="submit"]');
+                UIFeedback.resetButton(loginBtn);
+                
+                // 顯示錯誤消息
+                UIFeedback.showError(result.message || '帳號或密碼錯誤');
             } else {
                 alert(result.message || '帳號或密碼錯誤');
-            }
-        } else {
-            // 向下兼容：使用BookData進行驗證
-            if (BookData.validateAdmin(username, password)) {
-                // 設置登入狀態
-                localStorage.setItem('isLoggedIn', 'true');
-                
-                // 跳轉到管理頁面
-                window.location.href = 'admin.html';
-            } else {
-                alert('帳號或密碼錯誤！');
             }
         }
     });

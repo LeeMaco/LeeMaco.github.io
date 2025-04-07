@@ -4,6 +4,9 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
+    // 檢查是否支持UI反饋模塊
+    const hasFeedback = typeof UIFeedback !== 'undefined';
+    
     // 檢查是否已登入
     if (!localStorage.getItem('isLoggedIn')) {
         // 未登入則跳轉到首頁
@@ -209,6 +212,36 @@ document.addEventListener('DOMContentLoaded', function() {
             notes: document.getElementById('notes').value
         };
         
+        // 表單驗證
+        if (hasFeedback) {
+            const submitBtn = this.querySelector('button[type="submit"]');
+            
+            // 設置驗證規則
+            const rules = {
+                'title': {
+                    required: true,
+                    requiredMessage: '請輸入書名'
+                },
+                'author': {
+                    required: true,
+                    requiredMessage: '請輸入作者'
+                },
+                'isbn': {
+                    pattern: /^[\d-]*$/,
+                    message: 'ISBN只能包含數字和連字符'
+                }
+            };
+            
+            // 驗證表單
+            if (!UIFeedback.validateForm(this, rules)) {
+                return;
+            }
+            
+            // 顯示按鈕加載狀態
+            UIFeedback.setButtonLoading(submitBtn, '儲存中...');
+            UIFeedback.showLoading('正在儲存書籍資料...');
+        }
+        
         try {
             let savedBook;
             // 保存數據
@@ -229,17 +262,38 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
             console.log('書籍保存成功:', savedBook);
+            
+            // 顯示成功消息
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                UIFeedback.showSuccess(bookId ? '書籍更新成功' : '書籍添加成功');
+                
+                // 恢復按鈕狀態
+                const submitBtn = this.querySelector('button[type="submit"]');
+                UIFeedback.resetButton(submitBtn);
+            }
+            
+            // 重新加載書籍列表
+            loadBooks();
+            
+            // 關閉彈窗
+            bookFormModal.style.display = 'none';
+            
         } catch (error) {
             console.error('保存書籍時發生錯誤:', error);
-            alert('保存書籍時發生錯誤: ' + error.message);
+            
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                UIFeedback.showError('保存書籍時發生錯誤: ' + error.message);
+                
+                // 恢復按鈕狀態
+                const submitBtn = this.querySelector('button[type="submit"]');
+                UIFeedback.resetButton(submitBtn);
+            } else {
+                alert('保存書籍時發生錯誤: ' + error.message);
+            }
             return; // 中止後續操作
         }
-        
-        // 重新加載書籍列表
-        loadBooks();
-        
-        // 關閉彈窗
-        bookFormModal.style.display = 'none';
     });
     
     // 綁定去重表單提交事件
@@ -330,9 +384,30 @@ document.addEventListener('DOMContentLoaded', function() {
     confirmDeleteBtn.addEventListener('click', function() {
         const bookId = confirmDeleteBtn.getAttribute('data-id');
         if (bookId) {
-            BookData.deleteBook(bookId);
-            loadBooks();
-            deleteConfirmModal.style.display = 'none';
+            if (hasFeedback) {
+                UIFeedback.setButtonLoading(this, '刪除中...');
+                UIFeedback.showLoading('正在刪除書籍...');
+            }
+            
+            const result = BookData.deleteBook(bookId);
+            
+            if (result) {
+                if (hasFeedback) {
+                    UIFeedback.hideLoading();
+                    UIFeedback.showSuccess('書籍已成功移至垃圾桶');
+                    UIFeedback.resetButton(this);
+                }
+                loadBooks();
+                deleteConfirmModal.style.display = 'none';
+            } else {
+                if (hasFeedback) {
+                    UIFeedback.hideLoading();
+                    UIFeedback.showError('刪除書籍失敗');
+                    UIFeedback.resetButton(this);
+                } else {
+                    alert('刪除書籍失敗');
+                }
+            }
         }
     });
     
