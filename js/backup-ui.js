@@ -68,20 +68,53 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定創建備份按鈕點擊事件
     createBackupBtn.addEventListener('click', function() {
-        // 創建備份
-        const backup = BackupManager.createBackup();
-        
-        if (backup) {
-            // 重新加載備份歷史記錄
-            loadBackupHistory();
+        try {
+            // 創建備份前清空狀態消息
+            const statusElement = document.getElementById('backupStatus');
+            if (statusElement) {
+                statusElement.textContent = '正在創建備份...';
+                statusElement.style.color = '#3498db';
+            }
             
-            // 更新最後備份時間顯示
-            updateLastBackupTimeDisplay();
+            // 創建備份
+            const backup = BackupManager.createBackup();
             
-            // 顯示成功消息
-            alert('備份創建成功');
-        } else {
-            alert('備份創建失敗，請重試');
+            if (backup) {
+                // 重新加載備份歷史記錄
+                loadBackupHistory();
+                
+                // 更新最後備份時間顯示
+                updateLastBackupTimeDisplay();
+                
+                // 顯示成功消息
+                if (statusElement) {
+                    statusElement.textContent = '備份創建成功';
+                    statusElement.style.color = '#2ecc71';
+                    setTimeout(() => {
+                        statusElement.textContent = '';
+                    }, 5000);
+                }
+                
+                alert('備份創建成功');
+            } else {
+                // 如果backupStatus元素已經有錯誤消息，則使用該消息
+                const errorMsg = statusElement && statusElement.textContent.includes('失敗') 
+                    ? statusElement.textContent 
+                    : '備份創建失敗，請重試';
+                
+                alert(errorMsg);
+            }
+        } catch (error) {
+            console.error('創建備份按鈕處理時發生錯誤:', error);
+            
+            // 顯示錯誤消息
+            const statusElement = document.getElementById('backupStatus');
+            if (statusElement) {
+                statusElement.textContent = `備份創建失敗: ${error.message || '未知錯誤'}`;
+                statusElement.style.color = '#e74c3c';
+            }
+            
+            alert(`備份創建失敗: ${error.message || '未知錯誤'}`);
         }
     });
     

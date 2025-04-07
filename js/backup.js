@@ -115,6 +115,11 @@ const BackupManager = {
             // 獲取所有書籍數據
             const books = BookData.getAllBooks();
             
+            // 檢查書籍數據是否有效
+            if (!books || !Array.isArray(books)) {
+                throw new Error('無法獲取有效的書籍數據');
+            }
+            
             // 創建備份對象
             const backup = {
                 id: Date.now().toString(),
@@ -141,6 +146,17 @@ const BackupManager = {
             return backup;
         } catch (error) {
             console.error('創建備份時發生錯誤:', error);
+            
+            // 顯示錯誤消息
+            const statusElement = document.getElementById('backupStatus');
+            if (statusElement) {
+                statusElement.textContent = `備份創建失敗: ${error.message}`;
+                statusElement.style.color = '#e74c3c';
+                setTimeout(() => {
+                    statusElement.textContent = '';
+                }, 8000);
+            }
+            
             return null;
         }
     },
@@ -197,18 +213,29 @@ const BackupManager = {
         try {
             console.log('開始上傳備份到GitHub...');
             
+            // 檢查備份對象是否有效
+            if (!backup || !backup.data) {
+                throw new Error('備份數據無效');
+            }
+            
             // 檢查是否有GitHub設置
             const token = localStorage.getItem('githubToken');
             const repo = localStorage.getItem('githubRepo');
             
             if (!token || !repo) {
-                console.error('未設置GitHub訪問令牌或倉庫信息，無法上傳');
-                return false;
+                throw new Error('未設置GitHub訪問令牌或倉庫信息，無法上傳');
             }
             
             // 準備備份數據
             const jsonContent = JSON.stringify(backup.data, null, 2);
             const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
+            
+            // 顯示上傳中狀態
+            const statusElement = document.getElementById('backupStatus');
+            if (statusElement) {
+                statusElement.textContent = '正在上傳備份到GitHub...';
+                statusElement.style.color = '#3498db';
+            }
             
             // 使用現有的uploadToGitHub函數上傳
             uploadToGitHub(jsonContent, fileName)
@@ -227,7 +254,6 @@ const BackupManager = {
                     }
                     
                     // 顯示成功消息
-                    const statusElement = document.getElementById('backupStatus');
                     if (statusElement) {
                         statusElement.textContent = '備份已成功上傳到GitHub';
                         statusElement.style.color = '#2ecc71';
@@ -235,6 +261,8 @@ const BackupManager = {
                             statusElement.textContent = '';
                         }, 5000);
                     }
+                    
+                    return result;
                 })
                 .catch(error => {
                     console.error('備份上傳到GitHub失敗:', error);
@@ -248,20 +276,32 @@ const BackupManager = {
                         localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
                     }
                     
-                    // 顯示錯誤消息
-                    const statusElement = document.getElementById('backupStatus');
+                    // 顯示詳細錯誤消息
                     if (statusElement) {
-                        statusElement.textContent = `備份上傳失敗: ${error.message}`;
+                        statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
                         statusElement.style.color = '#e74c3c';
                         setTimeout(() => {
                             statusElement.textContent = '';
                         }, 8000);
                     }
+                    
+                    throw error; // 重新拋出錯誤，以便外部捕獲
                 });
             
             return true;
         } catch (error) {
             console.error('上傳備份到GitHub時發生錯誤:', error);
+            
+            // 顯示錯誤消息
+            const statusElement = document.getElementById('backupStatus');
+            if (statusElement) {
+                statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
+                statusElement.style.color = '#e74c3c';
+                setTimeout(() => {
+                    statusElement.textContent = '';
+                }, 8000);
+            }
+            
             return false;
         }
     },
