@@ -10,8 +10,14 @@ const BackupManager = {
     // 備份歷史記錄的存儲鍵名
     BACKUP_HISTORY_KEY: 'backup_history',
     
+    // 備份數據的存儲鍵前綴
+    BACKUP_DATA_PREFIX: 'backup_data_',
+    
     // 最後一次備份時間的存儲鍵名
     LAST_BACKUP_KEY: 'last_backup_time',
+    
+    // 備份分片大小（字節）
+    BACKUP_CHUNK_SIZE: 1024 * 1024, // 1MB
     
     // 備份間隔選項（毫秒）
     BACKUP_INTERVALS: {
@@ -106,43 +112,240 @@ const BackupManager = {
         return history ? JSON.parse(history) : [];
     },
     
+    // 壓縮數據
+    compressData: function(data) {
+        try {
+            // 將數據轉換為JSON字符串
+            const jsonString = JSON.stringify(data);
+            // 使用LZString進行壓縮
+            if (typeof LZString !== 'undefined') {
+                return LZString.compressToUTF16(jsonString);
+            } else {
+                console.warn('LZString庫未加載，無法壓縮數據');
+                return jsonString;
+            }
+        } catch (error) {
+            console.error('壓縮數據時發生錯誤:', error);
+            return JSON.stringify(data);
+        }
+    },
+    
+    // 解壓數據
+    decompressData: function(compressedData) {
+        try {
+            // 檢查是否是壓縮數據
+            if (typeof LZString !== 'undefined' && typeof compressedData === 'string') {
+                try {
+                    // 嘗試解壓
+                    const decompressed = LZString.decompressFromUTF16(compressedData);
+                    if (decompressed) {
+                        return JSON.parse(decompressed);
+                    }
+                } catch (e) {
+                    // 如果解壓失敗，可能是未壓縮的JSON字符串
+                    console.warn('解壓數據失敗，嘗試直接解析JSON:', e);
+                }
+            }
+            // 直接解析JSON
+            return JSON.parse(compressedData);
+        } catch (error) {
+            console.error('解壓數據時發生錯誤:', error);
+            return null;
+        }
+    },
+    
+    // 將數據分片存儲
+    storeDataInChunks: function(key, data) {
+        try {
+            // 壓縮數據
+            const compressedData = this.compressData(data);
+            
+            // 計算需要的分片數量
+            const totalChunks = Math.ceil(compressedData.length / this.BACKUP_CHUNK_SIZE);
+            
+            // 存儲分片信息
+            const chunkInfo = {
+                totalChunks: totalChunks,
+                timestamp: new Date().toISOString(),
+                size: compressedData.length
+            };
+            
+            localStorage.setItem(`${key}_info`, JSON.stringify(chunkInfo));
+            
+            // 存儲每個分片
+            for (let i = 0; i < totalChunks; i++) {
+                const start = i * this.BACKUP_CHUNK_SIZE;
+                const end = Math.min(start + this.BACKUP_CHUNK_SIZE, compressedData.length);
+                const chunk = compressedData.substring(start, end);
+                
+                try {
+                    localStorage.setItem(`${key}_chunk_${i}`, chunk);
+                } catch (e) {
+                    throw new Error(`存儲分片 ${i+1}/${totalChunks} 失敗: ${e.message}`);
+                }
+            }
+            
+            return true;
+        } catch (error) {
+            console.error('分片存儲數據時發生錯誤:', error);
+            throw error;
+        }
+    },
+    
+    // 從分片中讀取數據
+    loadDataFromChunks: function(key) {
+        try {
+            // 讀取分片信息
+            const chunkInfoStr = localStorage.getItem(`${key}_info`);
+            if (!chunkInfoStr) {
+                return null;
+            }
+            
+            const chunkInfo = JSON.parse(chunkInfoStr);
+            const totalChunks = chunkInfo.totalChunks;
+            
+            // 讀取並合併所有分片
+            let compressedData = '';
+            for (let i = 0; i < totalChunks; i++) {
+                const chunk = localStorage.getItem(`${key}_chunk_${i}`);
+                if (!chunk) {
+                    throw new Error(`無法讀取分片 ${i+1}/${totalChunks}`);
+                }
+                compressedData += chunk;
+            }
+            
+            // 解壓數據
+            return this.decompressData(compressedData);
+        } catch (error) {
+            console.error('從分片讀取數據時發生錯誤:', error);
+            return null;
+        }
+    },
+    
+    // 刪除分片數據
+    deleteChunkedData: function(key) {
+        try {
+            // 讀取分片信息
+            const chunkInfoStr = localStorage.getItem(`${key}_info`);
+            if (!chunkInfoStr) {
+                return false;
+            }
+            
+            const chunkInfo = JSON.parse(chunkInfoStr);
+            const totalChunks = chunkInfo.totalChunks;
+            
+            // 刪除所有分片
+            for (let i = 0; i < totalChunks; i++) {
+                localStorage.removeItem(`${key}_chunk_${i}`);
+            }
+            
+            // 刪除分片信息
+            localStorage.removeItem(`${key}_info`);
+            
+            return true;
+        } catch (error) {
+            console.error('刪除分片數據時發生錯誤:', error);
+            return false;
+        }
+    },
+    
     // 添加備份歷史記錄
     addBackupHistory: function(backup) {
-        const history = this.getBackupHistory();
-        const settings = this.getBackupSettings();
-        
-        // 添加新的備份記錄
-        history.unshift(backup);
-        
-        // 如果超過最大備份數量，則刪除最舊的備份
-        if (settings.maxBackupCount > 0 && history.length > settings.maxBackupCount) {
-            history.splice(settings.maxBackupCount);
+        try {
+            const history = this.getBackupHistory();
+            const settings = this.getBackupSettings();
+            
+            // 創建不包含完整數據的歷史記錄
+            const backupMeta = {
+                id: backup.id,
+                timestamp: backup.timestamp,
+                bookCount: backup.bookCount,
+                dataKey: `${this.BACKUP_DATA_PREFIX}${backup.id}`
+            };
+            
+            // 添加新的備份記錄
+            history.unshift(backupMeta);
+            
+            // 如果超過最大備份數量，則刪除最舊的備份
+            if (settings.maxBackupCount > 0 && history.length > settings.maxBackupCount) {
+                // 獲取要刪除的備份
+                const backupsToDelete = history.splice(settings.maxBackupCount);
+                
+                // 刪除對應的備份數據
+                backupsToDelete.forEach(oldBackup => {
+                    if (oldBackup.dataKey) {
+                        this.deleteChunkedData(oldBackup.dataKey);
+                    }
+                });
+            }
+            
+            // 保存更新後的歷史記錄
+            try {
+                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+            } catch (e) {
+                throw new Error(`無法保存備份歷史記錄: ${e.message}`);
+            }
+            
+            // 單獨存儲備份數據
+            try {
+                this.storeDataInChunks(backupMeta.dataKey, backup.data);
+            } catch (e) {
+                throw new Error(`無法存儲備份數據: ${e.message}`);
+            }
+            
+            console.log('備份歷史記錄已更新，當前備份數量:', history.length);
+            return history;
+        } catch (error) {
+            console.error('添加備份歷史記錄時發生錯誤:', error);
+            throw error;
         }
-        
-        // 保存更新後的歷史記錄
-        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
-        console.log('備份歷史記錄已更新，當前備份數量:', history.length);
-        
-        return history;
     },
     
     // 刪除備份歷史記錄
     deleteBackupHistory: function(backupId) {
-        const history = this.getBackupHistory();
-        const updatedHistory = history.filter(backup => backup.id !== backupId);
-        
-        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(updatedHistory));
-        console.log('已刪除備份記錄，ID:', backupId);
-        
-        return updatedHistory;
+        try {
+            const history = this.getBackupHistory();
+            const backupToDelete = history.find(backup => backup.id === backupId);
+            
+            // 刪除備份數據
+            if (backupToDelete && backupToDelete.dataKey) {
+                this.deleteChunkedData(backupToDelete.dataKey);
+            }
+            
+            // 更新歷史記錄
+            const updatedHistory = history.filter(backup => backup.id !== backupId);
+            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(updatedHistory));
+            
+            console.log('已刪除備份記錄，ID:', backupId);
+            return updatedHistory;
+        } catch (error) {
+            console.error('刪除備份歷史記錄時發生錯誤:', error);
+            throw error;
+        }
     },
     
     // 清空所有備份歷史記錄
     clearBackupHistory: function() {
-        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify([]));
-        console.log('已清空所有備份歷史記錄');
-        
-        return [];
+        try {
+            // 獲取所有備份歷史
+            const history = this.getBackupHistory();
+            
+            // 刪除所有備份數據
+            history.forEach(backup => {
+                if (backup.dataKey) {
+                    this.deleteChunkedData(backup.dataKey);
+                }
+            });
+            
+            // 清空歷史記錄
+            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify([]));
+            console.log('已清空所有備份歷史記錄');
+            
+            return [];
+        } catch (error) {
+            console.error('清空備份歷史記錄時發生錯誤:', error);
+            throw error;
+        }
     },
     
     // 創建備份
@@ -172,11 +375,37 @@ const BackupManager = {
                     data: books
                 };
                 
-                // 添加到備份歷史記錄
-                this.addBackupHistory(backup);
-                
-                // 更新最後備份時間
-                localStorage.setItem(this.LAST_BACKUP_KEY, backup.timestamp);
+                try {
+                    // 添加到備份歷史記錄
+                    this.addBackupHistory(backup);
+                    
+                    // 更新最後備份時間
+                    localStorage.setItem(this.LAST_BACKUP_KEY, backup.timestamp);
+                } catch (storageError) {
+                    // 處理存儲錯誤
+                    console.error('存儲備份數據時發生錯誤:', storageError);
+                    
+                    // 顯示詳細錯誤消息和解決方案
+                    const statusElement = document.getElementById('backupStatus');
+                    if (statusElement) {
+                        let errorMsg = `備份創建失敗: ${storageError.message || '未知錯誤'}`;
+                        
+                        // 如果是存儲配額錯誤，提供解決方案
+                        if (storageError.message && storageError.message.includes('quota')) {
+                            errorMsg += '\n\n解決方案:\n1. 刪除一些舊的備份\n2. 清理瀏覽器緩存\n3. 導出重要備份到文件';
+                        }
+                        
+                        statusElement.textContent = errorMsg;
+                        statusElement.style.color = '#e74c3c';
+                        statusElement.style.whiteSpace = 'pre-line';
+                        setTimeout(() => {
+                            statusElement.textContent = '';
+                            statusElement.style.whiteSpace = 'normal';
+                        }, 15000);
+                    }
+                    
+                    throw storageError;
+                }
                 
                 // 獲取備份設置
                 const settings = this.getBackupSettings();
@@ -188,7 +417,12 @@ const BackupManager = {
                     } catch (uploadError) {
                         console.error('上傳備份到GitHub時發生錯誤:', uploadError);
                         // 不中斷備份過程，但記錄錯誤
-                        backup.uploadError = uploadError.message || '上傳失敗';
+                        const history = this.getBackupHistory();
+                        const backupIndex = history.findIndex(b => b.id === backup.id);
+                        if (backupIndex !== -1) {
+                            history[backupIndex].uploadError = uploadError.message || '上傳失敗';
+                            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                        }
                     }
                 }
                 
@@ -199,7 +433,7 @@ const BackupManager = {
                 
                 // 顯示詳細錯誤消息
                 const statusElement = document.getElementById('backupStatus');
-                if (statusElement) {
+                if (statusElement && !statusElement.textContent) {
                     statusElement.textContent = `備份創建失敗: ${error.message || '未知錯誤'}`;
                     statusElement.style.color = '#e74c3c';
                     setTimeout(() => {
@@ -220,38 +454,44 @@ const BackupManager = {
             // 獲取備份歷史記錄
             const history = this.getBackupHistory();
             
-            // 查找指定ID的備份
-            const backup = history.find(b => b.id === backupId);
+            // 查找指定ID的備份元數據
+            const backupMeta = history.find(b => b.id === backupId);
             
-            if (!backup) {
+            if (!backupMeta) {
                 console.error('未找到指定ID的備份:', backupId);
                 return false;
             }
             
-            // 確保所有書籍ID都是字符串類型
-            if (backup.data && Array.isArray(backup.data)) {
-                backup.data.forEach(book => {
-                    if (book.id !== undefined) {
-                        book.id = String(book.id);
-                    }
-                });
+            // 從分片存儲中獲取完整備份數據
+            const backupData = this.loadDataFromChunks(backupMeta.dataKey);
+            
+            if (!backupData || !Array.isArray(backupData)) {
+                console.error('無法讀取備份數據或數據格式無效:', backupId);
+                return false;
             }
             
+            // 確保所有書籍ID都是字符串類型
+            backupData.forEach(book => {
+                if (book.id !== undefined) {
+                    book.id = String(book.id);
+                }
+            });
+            
             // 恢復書籍數據
-            localStorage.setItem('books', JSON.stringify(backup.data));
+            localStorage.setItem('books', JSON.stringify(backupData));
             
             // 更新最後恢復時間
             const now = new Date();
-            backup.lastRestored = now.toISOString();
+            backupMeta.lastRestored = now.toISOString();
             
             // 更新備份歷史記錄
             const backupIndex = history.findIndex(b => b.id === backupId);
             if (backupIndex !== -1) {
-                history[backupIndex] = backup;
+                history[backupIndex] = backupMeta;
                 localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
             }
             
-            console.log('備份恢復成功，書籍數量:', backup.data.length);
+            console.log('備份恢復成功，書籍數量:', backupData.length);
             return true;
         } catch (error) {
             console.error('恢復備份時發生錯誤:', error);
@@ -278,8 +518,23 @@ const BackupManager = {
                     throw new Error('未設置GitHub訪問令牌或倉庫信息，無法上傳');
                 }
                 
-                // 準備備份數據
-                const jsonContent = JSON.stringify(backup.data, null, 2);
+                // 準備備份數據 - 嘗試壓縮數據以減小文件大小
+                let jsonContent;
+                try {
+                    // 使用壓縮函數處理數據
+                    const compressedData = this.compressData(backup.data);
+                    // 如果壓縮成功且大小減小，則使用壓縮數據
+                    if (typeof compressedData === 'string' && compressedData.length < JSON.stringify(backup.data).length) {
+                        jsonContent = compressedData;
+                    } else {
+                        // 否則使用標準JSON
+                        jsonContent = JSON.stringify(backup.data, null, 2);
+                    }
+                } catch (e) {
+                    // 如果壓縮失敗，使用標準JSON
+                    jsonContent = JSON.stringify(backup.data, null, 2);
+                }
+                
                 const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
                 
                 // 顯示上傳中狀態
