@@ -25,24 +25,62 @@ const BackupManager = {
     init: function() {
         console.log('初始化備份管理器');
         
-        // 如果本地存儲中沒有備份設置，則初始化默認設置
-        if (!localStorage.getItem(this.BACKUP_SETTINGS_KEY)) {
-            const defaultSettings = {
-                enabled: false,
-                interval: 'daily',
-                autoUploadToGitHub: false,
-                maxBackupCount: 10
-            };
-            localStorage.setItem(this.BACKUP_SETTINGS_KEY, JSON.stringify(defaultSettings));
+        try {
+            // 如果本地存儲中沒有備份設置，則初始化默認設置
+            if (!localStorage.getItem(this.BACKUP_SETTINGS_KEY)) {
+                const defaultSettings = {
+                    enabled: false,
+                    interval: 'daily',
+                    autoUploadToGitHub: false,
+                    maxBackupCount: 10
+                };
+                localStorage.setItem(this.BACKUP_SETTINGS_KEY, JSON.stringify(defaultSettings));
+            } else {
+                // 驗證現有設置的有效性
+                try {
+                    const settings = JSON.parse(localStorage.getItem(this.BACKUP_SETTINGS_KEY));
+                    // 確保所有必要的屬性都存在
+                    if (!settings.hasOwnProperty('enabled') || 
+                        !settings.hasOwnProperty('interval') || 
+                        !settings.hasOwnProperty('autoUploadToGitHub') || 
+                        !settings.hasOwnProperty('maxBackupCount')) {
+                        throw new Error('備份設置格式無效');
+                    }
+                } catch (e) {
+                    console.error('備份設置解析失敗，重置為默認值:', e);
+                    const defaultSettings = {
+                        enabled: false,
+                        interval: 'daily',
+                        autoUploadToGitHub: false,
+                        maxBackupCount: 10
+                    };
+                    localStorage.setItem(this.BACKUP_SETTINGS_KEY, JSON.stringify(defaultSettings));
+                }
+            }
+            
+            // 如果本地存儲中沒有備份歷史記錄，則初始化
+            if (!localStorage.getItem(this.BACKUP_HISTORY_KEY)) {
+                localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify([]));
+            } else {
+                // 驗證備份歷史記錄的有效性
+                try {
+                    const history = JSON.parse(localStorage.getItem(this.BACKUP_HISTORY_KEY));
+                    if (!Array.isArray(history)) {
+                        throw new Error('備份歷史記錄格式無效');
+                    }
+                } catch (e) {
+                    console.error('備份歷史記錄解析失敗，重置為空數組:', e);
+                    localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify([]));
+                }
+            }
+            
+            // 啟動備份檢查器
+            this.startBackupChecker();
+            
+            console.log('備份管理器初始化成功');
+        } catch (error) {
+            console.error('初始化備份管理器時發生錯誤:', error);
         }
-        
-        // 如果本地存儲中沒有備份歷史記錄，則初始化
-        if (!localStorage.getItem(this.BACKUP_HISTORY_KEY)) {
-            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify([]));
-        }
-        
-        // 啟動備份檢查器
-        this.startBackupChecker();
     },
     
     // 獲取備份設置
@@ -109,56 +147,69 @@ const BackupManager = {
     
     // 創建備份
     createBackup: function() {
-        try {
-            console.log('開始創建備份...');
-            
-            // 獲取所有書籍數據
-            const books = BookData.getAllBooks();
-            
-            // 檢查書籍數據是否有效
-            if (!books || !Array.isArray(books)) {
-                throw new Error('無法獲取有效的書籍數據');
+        return new Promise(async (resolve, reject) => {
+            try {
+                console.log('開始創建備份...');
+                
+                // 獲取所有書籍數據
+                const books = BookData.getAllBooks();
+                
+                // 檢查書籍數據是否有效
+                if (!books || !Array.isArray(books)) {
+                    throw new Error('無法獲取有效的書籍數據');
+                }
+                
+                // 檢查書籍數據是否為空
+                if (books.length === 0) {
+                    throw new Error('書籍數據為空，無法創建備份');
+                }
+                
+                // 創建備份對象
+                const backup = {
+                    id: Date.now().toString(),
+                    timestamp: new Date().toISOString(),
+                    bookCount: books.length,
+                    data: books
+                };
+                
+                // 添加到備份歷史記錄
+                this.addBackupHistory(backup);
+                
+                // 更新最後備份時間
+                localStorage.setItem(this.LAST_BACKUP_KEY, backup.timestamp);
+                
+                // 獲取備份設置
+                const settings = this.getBackupSettings();
+                
+                // 如果啟用了自動上傳到GitHub，則上傳
+                if (settings.autoUploadToGitHub) {
+                    try {
+                        await this.uploadBackupToGitHub(backup);
+                    } catch (uploadError) {
+                        console.error('上傳備份到GitHub時發生錯誤:', uploadError);
+                        // 不中斷備份過程，但記錄錯誤
+                        backup.uploadError = uploadError.message || '上傳失敗';
+                    }
+                }
+                
+                console.log('備份創建成功，書籍數量:', books.length);
+                resolve(backup);
+            } catch (error) {
+                console.error('創建備份時發生錯誤:', error);
+                
+                // 顯示詳細錯誤消息
+                const statusElement = document.getElementById('backupStatus');
+                if (statusElement) {
+                    statusElement.textContent = `備份創建失敗: ${error.message || '未知錯誤'}`;
+                    statusElement.style.color = '#e74c3c';
+                    setTimeout(() => {
+                        statusElement.textContent = '';
+                    }, 8000);
+                }
+                
+                reject(error);
             }
-            
-            // 創建備份對象
-            const backup = {
-                id: Date.now().toString(),
-                timestamp: new Date().toISOString(),
-                bookCount: books.length,
-                data: books
-            };
-            
-            // 添加到備份歷史記錄
-            this.addBackupHistory(backup);
-            
-            // 更新最後備份時間
-            localStorage.setItem(this.LAST_BACKUP_KEY, backup.timestamp);
-            
-            // 獲取備份設置
-            const settings = this.getBackupSettings();
-            
-            // 如果啟用了自動上傳到GitHub，則上傳
-            if (settings.autoUploadToGitHub) {
-                this.uploadBackupToGitHub(backup);
-            }
-            
-            console.log('備份創建成功，書籍數量:', books.length);
-            return backup;
-        } catch (error) {
-            console.error('創建備份時發生錯誤:', error);
-            
-            // 顯示錯誤消息
-            const statusElement = document.getElementById('backupStatus');
-            if (statusElement) {
-                statusElement.textContent = `備份創建失敗: ${error.message}`;
-                statusElement.style.color = '#e74c3c';
-                setTimeout(() => {
-                    statusElement.textContent = '';
-                }, 8000);
-            }
-            
-            return null;
-        }
+        });
     },
     
     // 恢復備份
@@ -210,100 +261,100 @@ const BackupManager = {
     
     // 上傳備份到GitHub
     uploadBackupToGitHub: function(backup) {
-        try {
-            console.log('開始上傳備份到GitHub...');
-            
-            // 檢查備份對象是否有效
-            if (!backup || !backup.data) {
-                throw new Error('備份數據無效');
+        return new Promise((resolve, reject) => {
+            try {
+                console.log('開始上傳備份到GitHub...');
+                
+                // 檢查備份對象是否有效
+                if (!backup || !backup.data) {
+                    throw new Error('備份數據無效');
+                }
+                
+                // 檢查是否有GitHub設置
+                const token = localStorage.getItem('githubToken');
+                const repo = localStorage.getItem('githubRepo');
+                
+                if (!token || !repo) {
+                    throw new Error('未設置GitHub訪問令牌或倉庫信息，無法上傳');
+                }
+                
+                // 準備備份數據
+                const jsonContent = JSON.stringify(backup.data, null, 2);
+                const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
+                
+                // 顯示上傳中狀態
+                const statusElement = document.getElementById('backupStatus');
+                if (statusElement) {
+                    statusElement.textContent = '正在上傳備份到GitHub...';
+                    statusElement.style.color = '#3498db';
+                }
+                
+                // 使用現有的uploadToGitHub函數上傳
+                uploadToGitHub(jsonContent, fileName)
+                    .then((result) => {
+                        console.log('備份上傳到GitHub成功，文件名:', fileName);
+                        
+                        // 更新備份記錄，添加GitHub文件名和上傳狀態
+                        const history = this.getBackupHistory();
+                        const backupIndex = history.findIndex(b => b.id === backup.id);
+                        
+                        if (backupIndex !== -1) {
+                            history[backupIndex].githubFileName = fileName;
+                            history[backupIndex].uploadedToGitHub = true;
+                            history[backupIndex].uploadTime = new Date().toISOString();
+                            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                        }
+                        
+                        // 顯示成功消息
+                        if (statusElement) {
+                            statusElement.textContent = '備份已成功上傳到GitHub';
+                            statusElement.style.color = '#2ecc71';
+                            setTimeout(() => {
+                                statusElement.textContent = '';
+                            }, 5000);
+                        }
+                        
+                        resolve(result);
+                    })
+                    .catch(error => {
+                        console.error('備份上傳到GitHub失敗:', error);
+                        
+                        // 更新備份記錄，標記上傳失敗
+                        const history = this.getBackupHistory();
+                        const backupIndex = history.findIndex(b => b.id === backup.id);
+                        
+                        if (backupIndex !== -1) {
+                            history[backupIndex].uploadError = error.message || '上傳失敗';
+                            localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                        }
+                        
+                        // 顯示詳細錯誤消息
+                        if (statusElement) {
+                            statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
+                            statusElement.style.color = '#e74c3c';
+                            setTimeout(() => {
+                                statusElement.textContent = '';
+                            }, 8000);
+                        }
+                        
+                        reject(error); // 拋出錯誤，以便外部捕獲
+                    });
+            } catch (error) {
+                console.error('上傳備份到GitHub時發生錯誤:', error);
+                
+                // 顯示錯誤消息
+                const statusElement = document.getElementById('backupStatus');
+                if (statusElement) {
+                    statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
+                    statusElement.style.color = '#e74c3c';
+                    setTimeout(() => {
+                        statusElement.textContent = '';
+                    }, 8000);
+                }
+                
+                reject(error);
             }
-            
-            // 檢查是否有GitHub設置
-            const token = localStorage.getItem('githubToken');
-            const repo = localStorage.getItem('githubRepo');
-            
-            if (!token || !repo) {
-                throw new Error('未設置GitHub訪問令牌或倉庫信息，無法上傳');
-            }
-            
-            // 準備備份數據
-            const jsonContent = JSON.stringify(backup.data, null, 2);
-            const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
-            
-            // 顯示上傳中狀態
-            const statusElement = document.getElementById('backupStatus');
-            if (statusElement) {
-                statusElement.textContent = '正在上傳備份到GitHub...';
-                statusElement.style.color = '#3498db';
-            }
-            
-            // 使用現有的uploadToGitHub函數上傳
-            uploadToGitHub(jsonContent, fileName)
-                .then((result) => {
-                    console.log('備份上傳到GitHub成功，文件名:', fileName);
-                    
-                    // 更新備份記錄，添加GitHub文件名和上傳狀態
-                    const history = this.getBackupHistory();
-                    const backupIndex = history.findIndex(b => b.id === backup.id);
-                    
-                    if (backupIndex !== -1) {
-                        history[backupIndex].githubFileName = fileName;
-                        history[backupIndex].uploadedToGitHub = true;
-                        history[backupIndex].uploadTime = new Date().toISOString();
-                        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
-                    }
-                    
-                    // 顯示成功消息
-                    if (statusElement) {
-                        statusElement.textContent = '備份已成功上傳到GitHub';
-                        statusElement.style.color = '#2ecc71';
-                        setTimeout(() => {
-                            statusElement.textContent = '';
-                        }, 5000);
-                    }
-                    
-                    return result;
-                })
-                .catch(error => {
-                    console.error('備份上傳到GitHub失敗:', error);
-                    
-                    // 更新備份記錄，標記上傳失敗
-                    const history = this.getBackupHistory();
-                    const backupIndex = history.findIndex(b => b.id === backup.id);
-                    
-                    if (backupIndex !== -1) {
-                        history[backupIndex].uploadError = error.message || '上傳失敗';
-                        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
-                    }
-                    
-                    // 顯示詳細錯誤消息
-                    if (statusElement) {
-                        statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
-                        statusElement.style.color = '#e74c3c';
-                        setTimeout(() => {
-                            statusElement.textContent = '';
-                        }, 8000);
-                    }
-                    
-                    throw error; // 重新拋出錯誤，以便外部捕獲
-                });
-            
-            return true;
-        } catch (error) {
-            console.error('上傳備份到GitHub時發生錯誤:', error);
-            
-            // 顯示錯誤消息
-            const statusElement = document.getElementById('backupStatus');
-            if (statusElement) {
-                statusElement.textContent = `備份上傳失敗: ${error.message || '未知錯誤'}`;
-                statusElement.style.color = '#e74c3c';
-                setTimeout(() => {
-                    statusElement.textContent = '';
-                }, 8000);
-            }
-            
-            return false;
-        }
+        });
     },
     
     // 獲取最後一次備份時間
@@ -343,26 +394,68 @@ const BackupManager = {
         // 清除現有的定時器
         if (this.backupCheckerId) {
             clearInterval(this.backupCheckerId);
+            console.log('已清除現有的備份檢查器定時器');
         }
         
-        // 獲取備份設置
-        const settings = this.getBackupSettings();
-        
-        // 如果備份功能未啟用，則不啟動定時器
-        if (!settings.enabled) {
-            console.log('備份功能未啟用，不啟動定時器');
-            return;
-        }
-        
-        // 設置定時器，每分鐘檢查一次是否需要備份
-        this.backupCheckerId = setInterval(() => {
-            if (this.checkIfBackupNeeded()) {
-                console.log('需要進行自動備份');
-                this.createBackup();
+        try {
+            // 獲取備份設置
+            const settings = this.getBackupSettings();
+            
+            // 檢查設置是否有效
+            if (!settings) {
+                console.error('無法獲取有效的備份設置');
+                return;
             }
-        }, 60 * 1000); // 每分鐘檢查一次
-        
-        console.log('備份檢查器已啟動，間隔:', settings.interval);
+            
+            // 如果備份功能未啟用，則不啟動定時器
+            if (!settings.enabled) {
+                console.log('備份功能未啟用，不啟動定時器');
+                return;
+            }
+            
+            // 檢查備份間隔設置是否有效
+            if (!this.BACKUP_INTERVALS[settings.interval] && settings.interval !== 'manual') {
+                console.warn('無效的備份間隔設置:', settings.interval, '，使用默認值「每天」');
+                settings.interval = 'daily';
+                this.saveBackupSettings(settings);
+            }
+            
+            // 設置定時器，每分鐘檢查一次是否需要備份
+            this.backupCheckerId = setInterval(() => {
+                try {
+                    if (this.checkIfBackupNeeded()) {
+                        console.log('需要進行自動備份');
+                        this.createBackup()
+                            .then(backup => {
+                                console.log('自動備份創建成功，書籍數量:', backup.bookCount);
+                            })
+                            .catch(error => {
+                                console.error('自動備份創建失敗:', error.message);
+                                
+                                // 記錄備份失敗信息
+                                const failedBackups = JSON.parse(localStorage.getItem('failed_backups') || '[]');
+                                failedBackups.push({
+                                    timestamp: new Date().toISOString(),
+                                    error: error.message || '未知錯誤'
+                                });
+                                
+                                // 只保留最近10條失敗記錄
+                                if (failedBackups.length > 10) {
+                                    failedBackups.splice(0, failedBackups.length - 10);
+                                }
+                                
+                                localStorage.setItem('failed_backups', JSON.stringify(failedBackups));
+                            });
+                    }
+                } catch (error) {
+                    console.error('備份檢查過程中發生錯誤:', error);
+                }
+            }, 60 * 1000); // 每分鐘檢查一次
+            
+            console.log('備份檢查器已啟動，間隔:', settings.interval);
+        } catch (error) {
+            console.error('啟動備份檢查器時發生錯誤:', error);
+        }
     },
     
     // 停止備份檢查器

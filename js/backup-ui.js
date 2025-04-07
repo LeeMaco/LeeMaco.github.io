@@ -68,18 +68,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定創建備份按鈕點擊事件
     createBackupBtn.addEventListener('click', function() {
-        try {
-            // 創建備份前清空狀態消息
-            const statusElement = document.getElementById('backupStatus');
-            if (statusElement) {
-                statusElement.textContent = '正在創建備份...';
-                statusElement.style.color = '#3498db';
-            }
-            
-            // 創建備份
-            const backup = BackupManager.createBackup();
-            
-            if (backup) {
+        // 創建備份前清空狀態消息
+        const statusElement = document.getElementById('backupStatus');
+        if (statusElement) {
+            statusElement.textContent = '正在創建備份...';
+            statusElement.style.color = '#3498db';
+        }
+        
+        // 禁用按鈕，防止重複點擊
+        createBackupBtn.disabled = true;
+        createBackupBtn.style.opacity = '0.7';
+        createBackupBtn.style.cursor = 'not-allowed';
+        
+        // 創建備份
+        BackupManager.createBackup()
+            .then(backup => {
                 // 重新加載備份歷史記錄
                 loadBackupHistory();
                 
@@ -88,34 +91,49 @@ document.addEventListener('DOMContentLoaded', function() {
                 
                 // 顯示成功消息
                 if (statusElement) {
-                    statusElement.textContent = '備份創建成功';
-                    statusElement.style.color = '#2ecc71';
+                    // 檢查是否有上傳錯誤
+                    if (backup.uploadError) {
+                        statusElement.textContent = `備份創建成功，但上傳失敗: ${backup.uploadError}`;
+                        statusElement.style.color = '#f39c12'; // 警告顏色
+                    } else {
+                        statusElement.textContent = '備份創建成功';
+                        statusElement.style.color = '#2ecc71';
+                    }
+                    
                     setTimeout(() => {
                         statusElement.textContent = '';
                     }, 5000);
                 }
                 
-                alert('備份創建成功');
-            } else {
+                // 根據上傳結果顯示不同的成功消息
+                if (backup.uploadError) {
+                    alert(`備份創建成功，但上傳到GitHub失敗: ${backup.uploadError}`);
+                } else {
+                    alert('備份創建成功');
+                }
+            })
+            .catch(error => {
+                console.error('創建備份時發生錯誤:', error);
+                
                 // 如果backupStatus元素已經有錯誤消息，則使用該消息
                 const errorMsg = statusElement && statusElement.textContent.includes('失敗') 
                     ? statusElement.textContent 
-                    : '備份創建失敗，請重試';
+                    : `備份創建失敗: ${error.message || '未知錯誤，請重試'}`;
+                
+                // 確保錯誤消息顯示在狀態元素中
+                if (statusElement && !statusElement.textContent.includes('失敗')) {
+                    statusElement.textContent = errorMsg;
+                    statusElement.style.color = '#e74c3c';
+                }
                 
                 alert(errorMsg);
-            }
-        } catch (error) {
-            console.error('創建備份按鈕處理時發生錯誤:', error);
-            
-            // 顯示錯誤消息
-            const statusElement = document.getElementById('backupStatus');
-            if (statusElement) {
-                statusElement.textContent = `備份創建失敗: ${error.message || '未知錯誤'}`;
-                statusElement.style.color = '#e74c3c';
-            }
-            
-            alert(`備份創建失敗: ${error.message || '未知錯誤'}`);
-        }
+            })
+            .finally(() => {
+                // 恢復按鈕狀態
+                createBackupBtn.disabled = false;
+                createBackupBtn.style.opacity = '1';
+                createBackupBtn.style.cursor = 'pointer';
+            });
     });
     
     // 綁定清空備份歷史按鈕點擊事件
