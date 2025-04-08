@@ -567,14 +567,27 @@ const BookData = {
             const normalizeSeries = (series) => {
                 if (!series) return '';
                 // 處理集數，移除「第」「集」等字符，統一數字格式
-                return String(series)
+                let normalized = String(series)
                     .toLowerCase()
                     .replace(/[第卷冊集部]/g, '')
+                    // 處理大寫中文數字
+                    .replace(/[壹貳參肆伍陸柒捌玖拾佰仟萬]/g, match => {
+                        const traditionalNums = {'壹':'一','貳':'二','參':'三','肆':'四','伍':'五','陸':'六','柒':'七','捌':'八','玖':'九','拾':'十','佰':'百','仟':'千'};
+                        return traditionalNums[match] || match;
+                    })
+                    // 處理小寫中文數字
                     .replace(/[零一二三四五六七八九十百千萬]/g, match => {
                         const chineseNums = {'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000,'萬':10000};
                         return chineseNums[match] !== undefined ? chineseNums[match] : match;
                     })
                     .trim();
+                
+                // 處理阿拉伯數字，確保格式統一
+                if (/^\d+$/.test(normalized)) {
+                    normalized = parseInt(normalized, 10).toString();
+                }
+                
+                return normalized;
             };
             
             // 遍歷所有書籍，根據指定的標準生成唯一鍵

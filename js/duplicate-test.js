@@ -37,11 +37,27 @@
             },
             {
                 id: '4',
+                title: '測試書籍',
+                author: '測試作者',
+                series: '壹',  // 大寫中文數字
+                publisher: '測試出版社',
+                createdAt: new Date('2023-01-04').toISOString()
+            },
+            {
+                id: '5',
+                title: '測試書籍',
+                author: '測試作者',
+                series: '第1集',  // 混合格式
+                publisher: '測試出版社',
+                createdAt: new Date('2023-01-05').toISOString()
+            },
+            {
+                id: '6',
                 title: '不同的書',
                 author: '測試作者',
                 series: '第二集',
                 publisher: '測試出版社',
-                createdAt: new Date('2023-01-04').toISOString()
+                createdAt: new Date('2023-01-06').toISOString()
             }
         ];
         
