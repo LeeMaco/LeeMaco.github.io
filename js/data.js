@@ -687,15 +687,19 @@ const BookData = {
                         return book;
                     });
                     
-                    // 檢查垃圾桶中是否已存在相同ID的書籍
+                    // 檢查垃圾桶中是否已存在相同書籍（基於標題、作者和集數）
                     const updatedTrashBooks = [...trashBooks];
                     processedRemovedBooks.forEach(book => {
-                        const existingIndex = updatedTrashBooks.findIndex(b => String(b.id) === String(book.id));
-                        if (existingIndex !== -1) {
-                            // 如果已存在，則更新該書籍
-                            updatedTrashBooks[existingIndex] = book;
-                        } else {
-                            // 否則添加到垃圾桶
+                        // 使用相同的標準化函數檢查重複
+                        const isDuplicate = updatedTrashBooks.some(trashBook => {
+                            const isSameTitle = normalizeString(trashBook.title) === normalizeString(book.title);
+                            const isSameAuthor = normalizeString(trashBook.author) === normalizeString(book.author);
+                            const isSameSeries = normalizeSeries(trashBook.series) === normalizeSeries(book.series);
+                            return isSameTitle && isSameAuthor && isSameSeries;
+                        });
+                        
+                        if (!isDuplicate) {
+                            // 只有在垃圾桶中不存在相同書籍時才添加
                             updatedTrashBooks.push(book);
                         }
                     });
