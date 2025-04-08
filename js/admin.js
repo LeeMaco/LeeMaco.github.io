@@ -301,10 +301,6 @@ document.addEventListener('DOMContentLoaded', function() {
         e.preventDefault();
         
         try {
-            // 顯示處理中狀態
-            duplicateStatus.textContent = '正在處理中...';
-            duplicateStatus.style.color = 'blue';
-            
             // 獲取選中的判斷標準
             const criteria = [];
             if (document.getElementById('criteriaTitle').checked) criteria.push('title');
@@ -315,9 +311,21 @@ document.addEventListener('DOMContentLoaded', function() {
             
             // 確保至少選擇了一個標準
             if (criteria.length === 0) {
-                duplicateStatus.textContent = '請至少選擇一個判斷標準';
-                duplicateStatus.style.color = 'red';
+                if (hasFeedback) {
+                    UIFeedback.showWarning('請至少選擇一個判斷標準');
+                } else {
+                    duplicateStatus.textContent = '請至少選擇一個判斷標準';
+                    duplicateStatus.style.color = 'red';
+                }
                 return;
+            }
+            
+            // 顯示處理中狀態
+            if (hasFeedback) {
+                UIFeedback.showLoading('正在執行去重操作...');
+            } else {
+                duplicateStatus.textContent = '正在處理中...';
+                duplicateStatus.style.color = 'blue';
             }
             
             console.log('開始去重，使用標準:', criteria);
@@ -333,8 +341,14 @@ document.addEventListener('DOMContentLoaded', function() {
             console.log('去重結果:', result);
             
             // 顯示去重結果
-            duplicateStatus.textContent = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
-            duplicateStatus.style.color = 'green';
+            const successMessage = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
+            if (hasFeedback) {
+                UIFeedback.hideLoading();
+                UIFeedback.showSuccess(successMessage);
+            } else {
+                duplicateStatus.textContent = successMessage;
+                duplicateStatus.style.color = 'green';
+            }
             
             // 重新加載書籍列表
             loadBooks();
