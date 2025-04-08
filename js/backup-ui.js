@@ -9,6 +9,14 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    // 確保BackupManager已初始化
+    if (typeof BackupManager !== 'undefined' && typeof BackupManager.init === 'function') {
+        BackupManager.init();
+    } else {
+        console.error('BackupManager未定義或初始化方法不存在');
+        return;
+    }
+    
     // 獲取DOM元素
     const backupSettingsBtn = document.getElementById('backupSettingsBtn');
     const backupHistoryBtn = document.getElementById('backupHistoryBtn');
@@ -223,7 +231,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     });
             }
         }
-    });}
+    });
     
     // 綁定彈窗關閉按鈕點擊事件
     document.querySelectorAll('.modal .close').forEach(closeBtn => {

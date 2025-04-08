@@ -553,6 +553,30 @@ const BookData = {
             // 用於存儲被移除的書籍
             const removedBooks = [];
             
+            // 標準化字符串的輔助函數
+            const normalizeString = (str) => {
+                if (!str) return '';
+                // 轉為小寫，去除所有空白字符，移除標點符號
+                return String(str)
+                    .toLowerCase()
+                    .replace(/\s+/g, '')
+                    .replace(/[\.,，。、；：！？「」『』（）\[\]\-]/g, '');
+            };
+            
+            // 標準化集數的輔助函數
+            const normalizeSeries = (series) => {
+                if (!series) return '';
+                // 處理集數，移除「第」「集」等字符，統一數字格式
+                return String(series)
+                    .toLowerCase()
+                    .replace(/[第卷冊集部]/g, '')
+                    .replace(/[零一二三四五六七八九十百千萬]/g, match => {
+                        const chineseNums = {'零':0,'一':1,'二':2,'三':3,'四':4,'五':5,'六':6,'七':7,'八':8,'九':9,'十':10,'百':100,'千':1000,'萬':10000};
+                        return chineseNums[match] !== undefined ? chineseNums[match] : match;
+                    })
+                    .trim();
+            };
+            
             // 遍歷所有書籍，根據指定的標準生成唯一鍵
             allBooks.forEach((book, index) => {
                 // 確保book是有效對象
@@ -566,17 +590,40 @@ const BookData = {
                     book.id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 }
                 
-                // 生成唯一鍵，基於指定的標準欄位
-                let key = criteria.map(field => {
-                    // 確保欄位存在且轉換為小寫字符串
-                    return book[field] ? String(book[field]).toLowerCase().trim() : '';
-                }).join('|');
+                // 生成唯一鍵，基於指定的標準欄位，使用更嚴格的字符串處理
+                const keyParts = [];
+                
+                for (const field of criteria) {
+                    let fieldValue = '';
+                    
+                    if (field === 'series') {
+                        // 特殊處理集數
+                        fieldValue = normalizeSeries(book[field]);
+                    } else if (field === 'isbn') {
+                        // 特殊處理ISBN，只保留數字
+                        fieldValue = book[field] ? String(book[field]).replace(/[^0-9]/g, '') : '';
+                    } else {
+                        // 其他字段標準化處理
+                        fieldValue = normalizeString(book[field]);
+                    }
+                    
+                    // 使用安全的分隔符，避免字段值中可能包含分隔符
+                    keyParts.push(fieldValue);
+                    
+                    // 記錄詳細的標準化過程，幫助診斷
+                    console.log(`書籍 "${book.title || '未知'}" (ID: ${book.id}) 的 ${field} 欄位，原值: "${book[field] || ''}"，標準化後: "${fieldValue}"`);
+                }
+                
+                // 使用不太可能出現在實際數據中的分隔符
+                let key = keyParts.join('||##||');
                 
                 // 如果是空鍵（所有標準欄位都為空），則使用ID作為鍵
-                if (key === '' || key.split('|').every(part => part === '')) {
+                if (key === '' || keyParts.every(part => part === '')) {
                     console.warn(`書籍 "${book.title || '未知'}" (ID: ${book.id}) 的所有標準欄位都為空，使用ID作為唯一鍵`);
                     key = String(book.id);
                 }
+                
+                console.log(`書籍 "${book.title || '未知'}" (ID: ${book.id}) 的唯一鍵: "${key}"`);
                 
                 // 如果該鍵已存在，表示找到重複書籍
                 if (uniqueBooks.has(key)) {
@@ -586,6 +633,7 @@ const BookData = {
                     const currentTime = book.createdAt ? new Date(book.createdAt).getTime() : 0;
                     
                     console.log(`發現重複書籍: "${book.title || '未知'}" (ID: ${book.id})，與 "${existingBook.title || '未知'}" (ID: ${existingBook.id}) 重複`);
+                    console.log(`重複判斷標準: ${criteria.join(', ')}`);
                     
                     // 如果當前書籍比已存在的書籍更新，則替換
                     if (currentTime > existingTime) {
