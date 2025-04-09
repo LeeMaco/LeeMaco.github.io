@@ -297,45 +297,32 @@
         <div class="modal-content">
             <span class="close">&times;</span>
             <h2>備份設置</h2>
-            <p>配置自動備份和GitHub上傳設置。</p>
+            <p>請設置自動備份相關信息。</p>
             <form id="backupSettingsForm">
-                <div class="form-group">
-                    <label for="autoBackupEnabled">啟用自動備份</label>
-                    <input type="checkbox" id="autoBackupEnabled" name="autoBackupEnabled">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="backupEnabled" style="margin-right: 8px;">
+                    <label for="backupEnabled">啟用自動備份</label>
                 </div>
                 <div class="form-group">
-                    <label for="backupInterval">備份間隔</label>
-                    <select id="backupInterval" name="backupInterval">
+                    <label for="backupInterval">備份頻率：</label>
+                    <select id="backupInterval">
                         <option value="hourly">每小時</option>
-                        <option value="daily">每天</option>
+                        <option value="daily" selected>每天</option>
                         <option value="weekly">每週</option>
-                        <option value="manual">手動</option>
+                        <option value="manual">手動備份</option>
                     </select>
                 </div>
-                <div class="form-group">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="autoUploadToGitHub" style="margin-right: 8px;">
                     <label for="autoUploadToGitHub">自動上傳到GitHub</label>
-                    <input type="checkbox" id="autoUploadToGitHub" name="autoUploadToGitHub">
                 </div>
                 <div class="form-group">
-                    <label for="maxBackupCount">最大備份數量</label>
-                    <input type="number" id="maxBackupCount" name="maxBackupCount" min="1" max="100" value="10">
+                    <label for="maxBackupCount">保留備份數量：</label>
+                    <input type="number" id="maxBackupCount" min="1" max="50" value="10">
                 </div>
                 <div class="form-group">
-                    <label>上次備份時間</label>
+                    <label>最後備份時間：</label>
                     <span id="lastBackupTime">從未備份</span>
-                </div>
-                <div class="form-group">
-                    <label>備份狀態</label>
-                    <div id="backupStatus" class="backup-status">
-                        <div class="status-item">
-                            <span class="status-label">自動備份：</span>
-                            <span id="autoBackupStatus">未啟用</span>
-                        </div>
-                        <div class="status-item">
-                            <span class="status-label">完整性驗證：</span>
-                            <span id="integrityStatus">未驗證</span>
-                        </div>
-                    </div>
                 </div>
                 <button type="submit">保存設置</button>
             </form>
@@ -359,8 +346,6 @@
                             <th>備份時間</th>
                             <th>書籍數量</th>
                             <th>已上傳GitHub</th>
-                            <th>數據完整性</th>
-                            <th>變更統計</th>
                             <th>操作</th>
                         </tr>
                     </thead>
@@ -379,6 +364,7 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/polyfill.js"></script>
     <script src="js/data.js"></script>
     <script src="js/user-manager.js"></script>
     <script src="js/permissions.js"></script>
