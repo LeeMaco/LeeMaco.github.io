@@ -17,9 +17,14 @@ const BookData = {
     TRASH_KEY: 'books_trash',
     
     // 初始化數據
-    init: function() {
-        // 如果本地存儲中沒有書籍數據，則初始化一些示例數據
-        if (!localStorage.getItem('books')) {
+    init: async function() {
+        // 初始化存儲管理器
+        StorageManager.init();
+        // 嘗試從分片存儲中讀取數據
+        const storedData = StorageManager.loadData();
+        
+        // 如果分片存儲中沒有數據，則初始化示例數據
+        if (!storedData) {
             const sampleBooks = [
                 {
                     id: '1',
@@ -58,7 +63,8 @@ const BookData = {
                     notes: '科幻小說'
                 }
             ];
-            localStorage.setItem('books', JSON.stringify(sampleBooks));
+            // 使用分片存儲保存示例數據
+            StorageManager.saveData(sampleBooks);
         }
         
         // 如果本地存儲中沒有管理員信息，則初始化
@@ -92,6 +98,23 @@ const BookData = {
             basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
         }
         strategies.push(basePath + 'data/books.json');
+        
+        // 添加loadBooks和saveBooks方法
+        this.loadBooks = function() {
+            const books = StorageManager.loadData();
+            return books || [];
+        };
+        
+        this.saveBooks = function(books) {
+            try {
+                const chunkInfo = StorageManager.saveData(books);
+                console.log('數據已分片存儲，總大小:', chunkInfo.totalSize, '字節');
+                return true;
+            } catch (error) {
+                console.error('數據存儲失敗:', error);
+                return false;
+            }
+        };
         
         // 策略3: GitHub Pages特定路徑 (如果檢測到GitHub Pages環境)
         if (window.location.href.includes('github.io')) {

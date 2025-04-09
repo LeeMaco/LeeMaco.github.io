@@ -9,6 +9,9 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
+    // 初始化備份管理器
+    BackupManager.init();
+    
     // 獲取DOM元素
     const backupSettingsBtn = document.getElementById('backupSettingsBtn');
     const backupHistoryBtn = document.getElementById('backupHistoryBtn');
@@ -53,7 +56,8 @@ document.addEventListener('DOMContentLoaded', function() {
             enabled: document.getElementById('backupEnabled').checked,
             interval: document.getElementById('backupInterval').value,
             autoUploadToGitHub: document.getElementById('autoUploadToGitHub').checked,
-            maxBackupCount: parseInt(document.getElementById('maxBackupCount').value, 10)
+            maxBackupCount: parseInt(document.getElementById('maxBackupCount').value, 10),
+            autoBackupEnabled: document.getElementById('autoBackupEnabled').checked
         };
         
         // 保存設置
@@ -101,6 +105,27 @@ document.addEventListener('DOMContentLoaded', function() {
         
         const backupId = row.getAttribute('data-id');
         if (!backupId) return;
+        
+        // 處理差異比較按鈕點擊
+        if (e.target.classList.contains('compare-btn') || e.target.parentElement.classList.contains('compare-btn')) {
+            const selectedRows = document.querySelectorAll('.backup-selected');
+            
+            if (selectedRows.length === 0) {
+                // 第一次選擇
+                row.classList.add('backup-selected');
+            } else if (selectedRows.length === 1) {
+                // 第二次選擇，執行比較
+                const firstBackupId = selectedRows[0].getAttribute('data-id');
+                const changes = BackupManager.compareBackups(firstBackupId, backupId);
+                
+                if (changes) {
+                    displayBackupChanges(changes);
+                }
+                
+                // 清除選擇
+                selectedRows[0].classList.remove('backup-selected');
+            }
+        }
         
         // 處理恢復按鈕點擊
         if (e.target.classList.contains('restore-btn') || e.target.parentElement.classList.contains('restore-btn')) {
@@ -155,13 +180,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 // 格式化日期
                 const backupDate = new Date(backup.timestamp).toLocaleString();
                 
+                // 驗證備份完整性
+                const isValid = BackupManager.verifyBackupIntegrity(backup);
+                
                 html += `
-                    <tr data-id="${backup.id}">
+                    <tr data-id="${backup.id}" class="${isValid ? '' : 'backup-invalid'}">
                         <td>${backupDate}</td>
                         <td>${backup.bookCount} 本</td>
                         <td>${backup.githubFileName ? '是' : '否'}</td>
                         <td>
-                            <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
+                            <button class="restore-btn" title="恢復此備份" ${isValid ? '' : 'disabled'}><i class="fas fa-undo"></i></button>
+                            <button class="compare-btn" title="比較備份"><i class="fas fa-exchange-alt"></i></button>
                             <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
                         </td>
                     </tr>
@@ -184,5 +213,73 @@ document.addEventListener('DOMContentLoaded', function() {
         } else {
             lastBackupTimeElement.textContent = '從未備份';
         }
+    }
+    
+    // 顯示備份差異
+    function displayBackupChanges(changes) {
+        const modal = document.createElement('div');
+        modal.className = 'modal';
+        modal.id = 'backupCompareModal';
+        
+        let html = `
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>備份差異比較</h2>
+                <div class="backup-changes">
+        `;
+        
+        if (changes.added.length > 0) {
+            html += `
+                <h3>新增的書籍 (${changes.added.length}本)</h3>
+                <ul>
+                    ${changes.added.map(book => `<li>${book.title} - ${book.author}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        if (changes.removed.length > 0) {
+            html += `
+                <h3>刪除的書籍 (${changes.removed.length}本)</h3>
+                <ul>
+                    ${changes.removed.map(book => `<li>${book.title} - ${book.author}</li>`).join('')}
+                </ul>
+            `;
+        }
+        
+        if (changes.modified.length > 0) {
+            html += `
+                <h3>修改的書籍 (${changes.modified.length}本)</h3>
+                <ul>
+                    ${changes.modified.map(change => `
+                        <li>
+                            ${change.before.title} - ${change.before.author}<br>
+                            <small>修改前：${JSON.stringify(change.before)}</small><br>
+                            <small>修改後：${JSON.stringify(change.after)}</small>
+                        </li>
+                    `).join('')}
+                </ul>
+            `;
+        }
+        
+        html += `
+                </div>
+            </div>
+        `;
+        
+        modal.innerHTML = html;
+        document.body.appendChild(modal);
+        
+        // 綁定關閉按鈕事件
+        const closeBtn = modal.querySelector('.close');
+        closeBtn.addEventListener('click', function() {
+            modal.remove();
+        });
+        
+        // 點擊彈窗外部關閉
+        modal.addEventListener('click', function(e) {
+            if (e.target === modal) {
+                modal.remove();
+            }
+        });
     }
 });

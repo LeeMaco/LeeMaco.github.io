@@ -818,6 +818,20 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // 檢查文件大小（限制為10MB）
+        const MAX_FILE_SIZE = 10 * 1024 * 1024;
+        if (file.size > MAX_FILE_SIZE) {
+            alert('文件過大，請確保文件大小不超過10MB');
+            return;
+        }
+        
+        // 檢查文件類型
+        const validTypes = ['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/vnd.ms-excel'];
+        if (!validTypes.includes(file.type)) {
+            alert('請選擇有效的Excel文件（.xlsx或.xls格式）');
+            return;
+        }
+        
         console.log('選擇的文件:', file.name, '大小:', file.size, '類型:', file.type);
         
         const reader = new FileReader();
@@ -858,40 +872,72 @@ document.addEventListener('DOMContentLoaded', function() {
                     return;
                 }
                 
-                // 檢查數據格式
+                // 檢查數據格式和必要欄位
+                const requiredFields = ['書名', '作者'];
+                const recommendedFields = ['集數', '出版社', '描述', '櫃號', '行號', 'ISBN號', '備註'];
+                
                 const firstRow = jsonData[0];
                 console.log('第一行數據:', JSON.stringify(firstRow));
                 
-                if (!firstRow['書名'] || !firstRow['作者']) {
-                    alert('Excel文件格式不正確，請確保包含「書名」和「作者」欄位');
+                // 檢查必要欄位
+                const missingFields = requiredFields.filter(field => !firstRow[field]);
+                if (missingFields.length > 0) {
+                    alert(`Excel文件缺少必要欄位：${missingFields.join('、')}\n請確保文件包含所有必要欄位。`);
                     return;
+                }
+                
+                // 檢查建議欄位
+                const missingRecommended = recommendedFields.filter(field => !firstRow[field]);
+                if (missingRecommended.length > 0) {
+                    if (!confirm(`注意：文件缺少以下建議欄位：\n${missingRecommended.join('、')}\n\n是否仍要繼續導入？`)) {
+                        return;
+                    }
                 }
                 
                 // 處理匯入的數據
                 let importCount = 0;
+                let errorCount = 0;
                 const books = [];
+                const errors = [];
+                
                 jsonData.forEach((row, index) => {
-                    // 檢查必要欄位
-                    if (row['書名'] && row['作者']) {
+                    try {
+                        // 檢查並清理數據
+                        const cleanedData = {
+                            title: row['書名']?.trim(),
+                            author: row['作者']?.trim(),
+                            series: row['集數']?.trim() || '',
+                            publisher: row['出版社']?.trim() || '',
+                            description: row['描述']?.trim() || '',
+                            cabinet: row['櫃號']?.trim() || '',
+                            row: row['行號']?.trim() || '',
+                            isbn: row['ISBN號']?.trim() || '',
+                            notes: row['備註']?.trim() || ''
+                        };
+                        
+                        // 驗證必要欄位
+                        if (!cleanedData.title || !cleanedData.author) {
+                            throw new Error('缺少必要欄位');
+                        }
+                        
+                        // 驗證ISBN格式（如果有提供）
+                        if (cleanedData.isbn && !/^\d{10}(\d{3})?$/.test(cleanedData.isbn.replace(/-/g, ''))) {
+                            throw new Error('ISBN格式不正確');
+                        }
+                        
                         const bookData = {
                             id: Date.now().toString() + index, // 確保ID唯一
-                            title: row['書名'],
-                            author: row['作者'],
-                            series: row['集數'] || '',
-                            publisher: row['出版社'] || '',
-                            description: row['描述'] || '',
-                            cabinet: row['櫃號'] || '',
-                            row: row['行號'] || '',
-                            isbn: row['ISBN號'] || '',
-                            notes: row['備註'] || ''
+                            ...cleanedData
                         };
                         
                         // 添加書籍
                         BookData.addBook(bookData);
                         books.push(bookData);
                         importCount++;
-                    } else {
-                        console.warn(`第${index+1}行數據缺少必要欄位:`, JSON.stringify(row));
+                    } catch (error) {
+                        errorCount++;
+                        errors.push(`第${index + 1}行: ${error.message}`);
+                        console.warn(`第${index + 1}行數據錯誤:`, error.message, JSON.stringify(row));
                     }
                 });
                 
