@@ -545,8 +545,8 @@ const BookData = {
     },
     
     // 移除重複書籍並將其移至垃圾桶
-    removeDuplicateBooks: function(criteria = ['title', 'author', 'isbn']) {
-        console.log('開始移除重複書籍，判斷標準:', criteria);
+    removeDuplicateBooks: function(criteria = ['title', 'author', 'isbn'], similarityThreshold = 0.8) {
+        console.log('開始移除重複書籍，判斷標準:', criteria, '相似度閾值:', similarityThreshold);
         
         // 獲取所有書籍
         const allBooks = this.getAllBooks();
@@ -575,10 +575,50 @@ const BookData = {
                 key = String(book.id);
             }
             
-            // 如果該鍵已存在，表示找到重複書籍
+            // 檢查是否已有相似書籍
+            let isDuplicate = false;
+            let existingBook = null;
+            
+            // 首先檢查精確匹配
             if (uniqueBooks.has(key)) {
+                isDuplicate = true;
+                existingBook = uniqueBooks.get(key);
+            } else {
+                // 如果沒有精確匹配，則檢查模糊匹配
+                for (const [existingKey, existing] of uniqueBooks) {
+                    let similarityScore = 0;
+                    let matchedFields = 0;
+                    
+                    // 計算相似度
+                    criteria.forEach(field => {
+                        const existingValue = existing[field] ? String(existing[field]).toLowerCase() : '';
+                        const currentValue = book[field] ? String(book[field]).toLowerCase() : '';
+                        
+                        if (existingValue && currentValue) {
+                            // 使用Levenshtein距離計算相似度
+                            const distance = Utils.levenshteinDistance(existingValue, currentValue);
+                            const maxLength = Math.max(existingValue.length, currentValue.length);
+                            const similarity = 1 - (distance / maxLength);
+                            
+                            if (similarity >= similarityThreshold) {
+                                similarityScore += similarity;
+                                matchedFields++;
+                            }
+                        }
+                    });
+                    
+                    // 如果有足夠的相似度，則視為重複
+                    if (matchedFields > 0 && (similarityScore / matchedFields) >= similarityThreshold) {
+                        isDuplicate = true;
+                        existingBook = existing;
+                        key = existingKey; // 使用已存在的鍵
+                        break;
+                    }
+                }
+            }
+            
+            if (isDuplicate && existingBook) {
                 // 比較創建時間，保留最新的記錄
-                const existingBook = uniqueBooks.get(key);
                 const existingTime = existingBook.createdAt ? new Date(existingBook.createdAt).getTime() : 0;
                 const currentTime = book.createdAt ? new Date(book.createdAt).getTime() : 0;
                 

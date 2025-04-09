@@ -53,6 +53,32 @@ document.addEventListener('DOMContentLoaded', function() {
         performSearch();
     });
     
+    // 綁定去重按鈕點擊事件
+    const removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
+    if (removeDuplicatesBtn) {
+        removeDuplicatesBtn.addEventListener('click', function() {
+            const progressContainer = document.createElement('div');
+            progressContainer.className = 'progress-container';
+            progressContainer.innerHTML = '<div class="progress-bar"><div class="progress"></div></div><p>正在移除重複書籍...</p>';
+            document.body.appendChild(progressContainer);
+            
+            // 執行去重操作
+            const result = BookData.removeDuplicateBooks();
+            
+            // 更新進度顯示
+            progressContainer.innerHTML = `<p>已完成去重！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本唯一書籍。</p>`;
+            
+            // 觸發數據更新事件
+            const event = new Event('booksUpdated');
+            window.dispatchEvent(event);
+            
+            // 3秒後自動關閉提示
+            setTimeout(() => {
+                progressContainer.remove();
+            }, 3000);
+        });
+    }
+    
     // 綁定搜索輸入框回車事件
     searchInput.addEventListener('keypress', function(e) {
         if (e.key === 'Enter') {
@@ -198,30 +224,42 @@ document.addEventListener('DOMContentLoaded', function() {
             // 構建搜索條件
             let results = BookData.getAllBooks();
             
-            // 應用標題篩選
-            if (title) {
-                results = results.filter(book => book.title && book.title.toLowerCase().includes(title.toLowerCase()));
-            }
-            
-            // 應用作者篩選
-            if (author) {
-                results = results.filter(book => book.author && book.author.toLowerCase().includes(author.toLowerCase()));
-            }
-            
-            // 應用出版社篩選
-            if (publisher) {
-                results = results.filter(book => book.publisher && book.publisher.toLowerCase().includes(publisher.toLowerCase()));
-            }
-            
-            // 應用櫃號篩選
-            if (cabinet) {
-                results = results.filter(book => book.cabinet && book.cabinet.toLowerCase() === cabinet.toLowerCase());
-            }
-            
-            // 應用行號篩選
-            if (row) {
-                results = results.filter(book => book.row && book.row.toLowerCase() === row.toLowerCase());
-            }
+            // 應用多條件組合篩選
+            results = results.filter(book => {
+                let match = true;
+                
+                // 模糊搜索標題
+                if (title) {
+                    match = match && book.title && 
+                        Utils.fuzzyMatch(book.title.toLowerCase(), title.toLowerCase());
+                }
+                
+                // 模糊搜索作者
+                if (author) {
+                    match = match && book.author && 
+                        Utils.fuzzyMatch(book.author.toLowerCase(), author.toLowerCase());
+                }
+                
+                // 模糊搜索出版社
+                if (publisher) {
+                    match = match && book.publisher && 
+                        Utils.fuzzyMatch(book.publisher.toLowerCase(), publisher.toLowerCase());
+                }
+                
+                // 精確匹配櫃號
+                if (cabinet) {
+                    match = match && book.cabinet && 
+                        book.cabinet.toLowerCase() === cabinet.toLowerCase();
+                }
+                
+                // 精確匹配行號
+                if (row) {
+                    match = match && book.row && 
+                        book.row.toLowerCase() === row.toLowerCase();
+                }
+                
+                return match;
+            });
             
             console.log('高級搜索結果數量:', results.length);
             displaySearchResults(results);
@@ -261,6 +299,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     return BookData.searchBooks(query, type);
                   })
                 : Promise.resolve(BookData.searchBooks(query, type));
+            
+            // 添加搜索狀態提示
+            const statusElement = document.createElement('div');
+            statusElement.className = 'search-status';
+            statusElement.innerHTML = '<i class="fas fa-info-circle"></i> 正在搜索: ' + query;
+            searchResults.appendChild(statusElement);
             
             searchPromise.then(results => {
                 console.log('搜索結果數量:', results.length);
@@ -304,8 +348,24 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
-        let html = '';
+        // 增強去重邏輯 - 基於書籍ID和ISBN
+        const uniqueBooks = [];
+        const seenIds = new Set();
+        const seenIsbns = new Set();
+        
         books.forEach(book => {
+            // 優先使用ISBN去重，如果沒有ISBN則使用ID
+            const uniqueKey = book.isbn ? book.isbn : book.id;
+            const seenSet = book.isbn ? seenIsbns : seenIds;
+            
+            if (!seenSet.has(uniqueKey)) {
+                seenSet.add(uniqueKey);
+                uniqueBooks.push(book);
+            }
+        });
+        
+        let html = '';
+        uniqueBooks.forEach(book => {
             html += `
                 <div class="book-card" data-id="${book.id}">
                     <h3>${book.title}</h3>
