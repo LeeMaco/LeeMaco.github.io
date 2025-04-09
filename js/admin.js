@@ -4,9 +4,6 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // 檢查是否支持UI反饋模塊
-    const hasFeedback = typeof UIFeedback !== 'undefined';
-    
     // 檢查是否已登入
     if (!localStorage.getItem('isLoggedIn')) {
         // 未登入則跳轉到首頁
@@ -212,200 +209,88 @@ document.addEventListener('DOMContentLoaded', function() {
             notes: document.getElementById('notes').value
         };
         
-        // 表單驗證
-        if (hasFeedback) {
-            const submitBtn = this.querySelector('button[type="submit"]');
-            
-            // 設置驗證規則
-            const rules = {
-                'title': {
-                    required: true,
-                    requiredMessage: '請輸入書名'
-                },
-                'author': {
-                    required: true,
-                    requiredMessage: '請輸入作者'
-                },
-                'isbn': {
-                    pattern: /^[\d-]*$/,
-                    message: 'ISBN只能包含數字和連字符'
-                }
-            };
-            
-            // 驗證表單
-            if (!UIFeedback.validateForm(this, rules)) {
-                return;
-            }
-            
-            // 顯示按鈕加載狀態
-            UIFeedback.setButtonLoading(submitBtn, '儲存中...');
-            UIFeedback.showLoading('正在儲存書籍資料...');
+        let savedBook;
+        // 保存數據
+        if (bookId) {
+            // 確保bookId是字符串類型
+            const stringBookId = String(bookId);
+            console.log('保存書籍ID:', stringBookId, '(原始ID:', bookId, ')');
+            // 更新現有書籍
+            savedBook = BookData.updateBook(stringBookId, bookData);
+        } else {
+            // 添加新書籍
+            savedBook = BookData.addBook(bookData);
         }
         
-        try {
-            let savedBook;
-            // 保存數據
-            if (bookId) {
-                // 確保bookId是字符串類型
-                const stringBookId = String(bookId);
-                console.log('保存書籍ID:', stringBookId, '(原始ID:', bookId, ')');
-                // 更新現有書籍
-                savedBook = BookData.updateBook(stringBookId, bookData);
-                if (!savedBook) {
-                    throw new Error('更新書籍失敗');
-                }
-            } else {
-                // 添加新書籍
-                savedBook = BookData.addBook(bookData);
-                if (!savedBook) {
-                    throw new Error('添加書籍失敗');
-                }
-            }
-            console.log('書籍保存成功:', savedBook);
-            
-            // 顯示成功消息
-            if (hasFeedback) {
-                UIFeedback.hideLoading();
-                UIFeedback.showSuccess(bookId ? '書籍更新成功' : '書籍添加成功');
-                
-                // 恢復按鈕狀態
-                const submitBtn = this.querySelector('button[type="submit"]');
-                UIFeedback.resetButton(submitBtn);
-            }
-            
-            // 重新加載書籍列表
-            loadBooks();
-            
-            // 關閉彈窗
-            bookFormModal.style.display = 'none';
-            
-        } catch (error) {
-            console.error('保存書籍時發生錯誤:', error);
-            
-            if (hasFeedback) {
-                UIFeedback.hideLoading();
-                UIFeedback.showError('保存書籍時發生錯誤: ' + error.message);
-                
-                // 恢復按鈕狀態
-                const submitBtn = this.querySelector('button[type="submit"]');
-                UIFeedback.resetButton(submitBtn);
-            } else {
-                alert('保存書籍時發生錯誤: ' + error.message);
-            }
-            return; // 中止後續操作
-        }
+        // 重新加載書籍列表
+        loadBooks();
+        
+        // 關閉彈窗
+        bookFormModal.style.display = 'none';
     });
     
     // 綁定去重表單提交事件
     removeDuplicatesForm.addEventListener('submit', function(e) {
         e.preventDefault();
         
-        try {
-            // 獲取選中的判斷標準
-            const criteria = [];
-            if (document.getElementById('criteriaTitle').checked) criteria.push('title');
-            if (document.getElementById('criteriaAuthor').checked) criteria.push('author');
-            if (document.getElementById('criteriaISBN').checked) criteria.push('isbn');
-            if (document.getElementById('criteriaPublisher').checked) criteria.push('publisher');
-            if (document.getElementById('criteriaSeries').checked) criteria.push('series');
-            
-            // 確保至少選擇了一個標準
-            if (criteria.length === 0) {
-                if (hasFeedback) {
-                    UIFeedback.showWarning('請至少選擇一個判斷標準');
-                } else {
-                    duplicateStatus.textContent = '請至少選擇一個判斷標準';
-                    duplicateStatus.style.color = 'red';
-                }
-                return;
-            }
-            
-            // 顯示處理中狀態
-            if (hasFeedback) {
-                UIFeedback.showLoading('正在執行去重操作...');
-            } else {
-                duplicateStatus.textContent = '正在處理中...';
-                duplicateStatus.style.color = 'blue';
-            }
-            
-            console.log('開始去重，使用標準:', criteria);
-            
-            // 執行去重操作
-            const result = BookData.removeDuplicateBooks(criteria);
-            
-            // 檢查結果是否包含錯誤
-            if (result.error) {
-                throw new Error(result.error);
-            }
-            
-            console.log('去重結果:', result);
-            
-            // 顯示去重結果
-            const successMessage = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
-            if (hasFeedback) {
-                UIFeedback.hideLoading();
-                UIFeedback.showSuccess(successMessage);
-            } else {
-                duplicateStatus.textContent = successMessage;
-                duplicateStatus.style.color = 'green';
-            }
-            
-            // 重新加載書籍列表
-            loadBooks();
-            
-            // 檢查是否需要上傳到GitHub
-            const token = localStorage.getItem('githubToken');
-            const repo = localStorage.getItem('githubRepo');
-            
-            if (token && repo) {
-                // 自動上傳到GitHub
-                const books = BookData.getAllBooks();
-                const jsonContent = JSON.stringify(books, null, 2);
-                
-                // 創建上傳狀態元素
-                let statusElement = document.getElementById('uploadStatus');
-                if (!statusElement) {
-                    statusElement = document.createElement('div');
-                    statusElement.id = 'uploadStatus';
-                    statusElement.style.position = 'fixed';
-                    statusElement.style.bottom = '20px';
-                    statusElement.style.right = '20px';
-                    statusElement.style.padding = '10px 15px';
-                    statusElement.style.backgroundColor = '#f8f9fa';
-                    statusElement.style.border = '1px solid #ddd';
-                    statusElement.style.borderRadius = '4px';
-                    statusElement.style.zIndex = '1000';
-                    statusElement.style.fontWeight = 'bold';
-                    document.body.appendChild(statusElement);
-                }
-                
-                statusElement.textContent = '正在上傳到GitHub...';
-                statusElement.style.backgroundColor = '#f8f9fa';
-                
-                // 上傳到GitHub
-                uploadToGitHub(jsonContent)
-                    .then(() => {
-                        console.log('去重後的書籍數據上傳成功');
-                        statusElement.textContent = '上傳成功！';
-                        statusElement.style.backgroundColor = '#d4edda';
-                        setTimeout(() => {
-                            statusElement.style.display = 'none';
-                        }, 3000);
-                    })
-                    .catch(error => {
-                        console.error('去重後的書籍數據上傳失敗:', error);
-                        statusElement.textContent = `上傳失敗: ${error.message}`;
-                        statusElement.style.backgroundColor = '#f8d7da';
-                    });
-            }
-            
-            // 關閉彈窗
-            removeDuplicatesModal.style.display = 'none';
-        } catch (error) {
-            console.error('去重過程中發生錯誤:', error);
-            duplicateStatus.textContent = `去重失敗: ${error.message}`;
+        // 獲取選中的判斷標準
+        const criteria = [];
+        if (document.getElementById('criteriaTitle').checked) criteria.push('title');
+        if (document.getElementById('criteriaAuthor').checked) criteria.push('author');
+        if (document.getElementById('criteriaISBN').checked) criteria.push('isbn');
+        if (document.getElementById('criteriaPublisher').checked) criteria.push('publisher');
+        if (document.getElementById('criteriaSeries').checked) criteria.push('series');
+        
+        // 確保至少選擇了一個標準
+        if (criteria.length === 0) {
+            duplicateStatus.textContent = '請至少選擇一個判斷標準';
             duplicateStatus.style.color = 'red';
+            return;
         }
+        
+        // 執行去重操作
+        const result = BookData.removeDuplicateBooks(criteria);
+        
+        // 顯示去重結果
+        duplicateStatus.textContent = `去重完成！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本書籍。`;
+        duplicateStatus.style.color = 'green';
+        
+        // 重新加載書籍列表
+        loadBooks();
+        
+        // 自動上傳到GitHub（如果有設置）
+        const books = BookData.getAllBooks();
+        const jsonContent = JSON.stringify(books, null, 2);
+        
+        // 創建上傳狀態元素
+        let statusElement = document.getElementById('uploadStatus');
+        if (!statusElement) {
+            statusElement = document.createElement('div');
+            statusElement.id = 'uploadStatus';
+            statusElement.style.position = 'fixed';
+            statusElement.style.bottom = '20px';
+            statusElement.style.right = '20px';
+            statusElement.style.padding = '10px 15px';
+            statusElement.style.backgroundColor = '#f8f9fa';
+            statusElement.style.border = '1px solid #ddd';
+            statusElement.style.borderRadius = '4px';
+            statusElement.style.zIndex = '1000';
+            statusElement.style.fontWeight = 'bold';
+            document.body.appendChild(statusElement);
+        }
+        
+        // 上傳到GitHub
+        uploadToGitHub(jsonContent)
+            .then(() => {
+                console.log('去重後的書籍數據上傳成功');
+            })
+            .catch(error => {
+                console.error('去重後的書籍數據上傳失敗:', error);
+                alert(`上傳失敗: ${error.message}`);
+            });
+        
+        // 關閉彈窗
+        removeDuplicatesModal.style.display = 'none';
     });
     
     
@@ -432,30 +317,9 @@ document.addEventListener('DOMContentLoaded', function() {
     confirmDeleteBtn.addEventListener('click', function() {
         const bookId = confirmDeleteBtn.getAttribute('data-id');
         if (bookId) {
-            if (hasFeedback) {
-                UIFeedback.setButtonLoading(this, '刪除中...');
-                UIFeedback.showLoading('正在刪除書籍...');
-            }
-            
-            const result = BookData.deleteBook(bookId);
-            
-            if (result) {
-                if (hasFeedback) {
-                    UIFeedback.hideLoading();
-                    UIFeedback.showSuccess('書籍已成功移至垃圾桶');
-                    UIFeedback.resetButton(this);
-                }
-                loadBooks();
-                deleteConfirmModal.style.display = 'none';
-            } else {
-                if (hasFeedback) {
-                    UIFeedback.hideLoading();
-                    UIFeedback.showError('刪除書籍失敗');
-                    UIFeedback.resetButton(this);
-                } else {
-                    alert('刪除書籍失敗');
-                }
-            }
+            BookData.deleteBook(bookId);
+            loadBooks();
+            deleteConfirmModal.style.display = 'none';
         }
     });
     
@@ -656,14 +520,10 @@ document.addEventListener('DOMContentLoaded', function() {
             const bookId = row.dataset.id;
             if (!bookId) return;
             
-            // 確保bookId是字符串類型
-            const stringBookId = String(bookId);
-            console.log('垃圾桶操作，書籍ID:', stringBookId);
-            
             // 處理恢復按鈕點擊
             if (e.target.classList.contains('restore-btn') || e.target.parentElement.classList.contains('restore-btn')) {
                 if (confirm('確定要恢復這本書嗎？')) {
-                    if (BookData.restoreFromTrash(stringBookId)) {
+                    if (BookData.restoreFromTrash(bookId)) {
                         // 重新加載垃圾桶和書籍列表
                         loadTrashBooks();
                         loadBooks();
@@ -677,7 +537,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // 處理永久刪除按鈕點擊
             if (e.target.classList.contains('permanent-delete-btn') || e.target.parentElement.classList.contains('permanent-delete-btn')) {
                 if (confirm('確定要永久刪除這本書嗎？此操作無法撤銷！')) {
-                    if (BookData.deleteFromTrash(stringBookId)) {
+                    if (BookData.deleteFromTrash(bookId)) {
                         // 重新加載垃圾桶
                         loadTrashBooks();
                         alert('書籍已永久刪除');
@@ -775,21 +635,42 @@ document.addEventListener('DOMContentLoaded', function() {
         // 確保bookId是字符串類型
         const stringBookId = String(bookId);
         console.log('確認刪除書籍ID:', stringBookId, '(原始ID:', bookId, ')');
+        
+        // 先檢查書籍是否存在
+        const book = BookData.getBookById(stringBookId);
+        if (!book) {
+            console.error('未找到ID為', stringBookId, '的書籍');
+            alert('找不到指定的書籍，可能已被刪除');
+            return;
+        }
+        
+        // 設置確認對話框內容，顯示書籍標題，提升用戶體驗
+        const confirmMessage = document.getElementById('deleteConfirmMessage');
+        if (confirmMessage) {
+            confirmMessage.textContent = `確定要將「${book.title}」移至垃圾桶嗎？`;
+        }
+        
         confirmDeleteBtn.setAttribute('data-id', stringBookId);
         deleteConfirmModal.style.display = 'block';
         
         // 綁定確認刪除按鈕點擊事件
         confirmDeleteBtn.onclick = function() {
-            // 移至垃圾桶（現在deleteBook內部調用moveToTrash）
-            if (BookData.deleteBook(stringBookId)) { // 使用字符串ID
-                // 重新加載書籍列表
-                loadBooks();
-                // 關閉彈窗
-                deleteConfirmModal.style.display = 'none';
-                // 顯示提示
-                alert('書籍已移至垃圾桶');
-            } else {
-                alert('刪除失敗，請重試');
+            try {
+                // 移至垃圾桶（現在deleteBook內部調用moveToTrash）
+                if (BookData.deleteBook(stringBookId)) { // 使用字符串ID
+                    // 重新加載書籍列表
+                    loadBooks();
+                    // 關閉彈窗
+                    deleteConfirmModal.style.display = 'none';
+                    // 顯示提示
+                    alert(`「${book.title}」已移至垃圾桶`);
+                } else {
+                    console.error('刪除書籍失敗，ID:', stringBookId);
+                    alert('刪除失敗，請重試');
+                }
+            } catch (error) {
+                console.error('刪除書籍時發生錯誤:', error);
+                alert(`刪除時發生錯誤: ${error.message}`);
             }
         };
         
@@ -875,33 +756,22 @@ document.addEventListener('DOMContentLoaded', function() {
             // 獲取分支名稱
             const branch = localStorage.getItem('githubBranch') || 'main';
             
-            // 檢查文件是否已存在，獲取最新的SHA
+            // 檢查文件是否已存在，獲取SHA
             let fileSha = '';
-            let fileExists = false;
             try {
                 const checkResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
                     headers: {
                         'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json',
-                        'If-None-Match': ''
+                        'Accept': 'application/vnd.github.v3+json'
                     }
                 });
                 
                 if (checkResponse.status === 200) {
                     const fileData = await checkResponse.json();
                     fileSha = fileData.sha;
-                    fileExists = true;
-                    console.log(`文件已存在，獲取到SHA: ${fileSha}`);
-                } else if (checkResponse.status === 404) {
-                    console.log('文件不存在，將創建新文件');
-                } else {
-                    console.warn(`檢查文件時收到非預期狀態碼: ${checkResponse.status}`);
-                    const errorData = await checkResponse.json();
-                    console.warn('API響應:', errorData);
                 }
             } catch (error) {
-                console.warn('檢查文件是否存在時發生錯誤:', error);
-                // 繼續執行，嘗試創建文件
+                console.log('文件不存在，將創建新文件');
             }
             
             // 準備上傳數據
@@ -912,13 +782,11 @@ document.addEventListener('DOMContentLoaded', function() {
             };
             
             // 如果文件已存在，添加SHA
-            if (fileExists && fileSha) {
+            if (fileSha) {
                 uploadData.sha = fileSha;
-                console.log('添加SHA到上傳數據');
             }
             
             // 上傳到GitHub
-            console.log(`正在上傳到 data/${fileName}，文件${fileExists ? '更新' : '創建'}`);
             const response = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
                 method: 'PUT',
                 headers: {
@@ -931,60 +799,7 @@ document.addEventListener('DOMContentLoaded', function() {
             
             if (!response.ok) {
                 const errorData = await response.json();
-                console.error('GitHub API錯誤詳情:', errorData);
-                
-                // 處理409衝突錯誤 - 嘗試重新獲取SHA並再次上傳
-                if (response.status === 409) {
-                    console.log('檢測到文件衝突(409)，嘗試重新獲取SHA並再次上傳...');
-                    
-                    // 重新獲取最新的SHA
-                    const refreshResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
-                        headers: {
-                            'Authorization': `token ${token}`,
-                            'Accept': 'application/vnd.github.v3+json',
-                            'Cache-Control': 'no-cache'
-                        }
-                    });
-                    
-                    if (refreshResponse.ok) {
-                        const refreshData = await refreshResponse.json();
-                        uploadData.sha = refreshData.sha;
-                        console.log(`已更新SHA: ${refreshData.sha}，重新嘗試上傳`);
-                        
-                        // 使用更新的SHA再次嘗試上傳
-                        const retryResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
-                            method: 'PUT',
-                            headers: {
-                                'Authorization': `token ${token}`,
-                                'Content-Type': 'application/json',
-                                'Accept': 'application/vnd.github.v3+json'
-                            },
-                            body: JSON.stringify(uploadData)
-                        });
-                        
-                        if (!retryResponse.ok) {
-                            const retryErrorData = await retryResponse.json();
-                            throw new Error(`重試上傳失敗: ${retryResponse.status} - ${retryErrorData.message}`);
-                        }
-                        
-                        const retryResult = await retryResponse.json();
-                        console.log('重試上傳成功:', retryResult);
-                        
-                        if (statusElement) {
-                            statusElement.textContent = '上傳成功！';
-                            statusElement.style.color = '#2ecc71';
-                            setTimeout(() => {
-                                statusElement.textContent = '';
-                            }, 5000);
-                        }
-                        
-                        return retryResult;
-                    } else {
-                        throw new Error(`重新獲取SHA失敗: ${refreshResponse.status}`);
-                    }
-                } else {
-                    throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
-                }
+                throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
             }
             
             const result = await response.json();
@@ -1024,118 +839,235 @@ document.addEventListener('DOMContentLoaded', function() {
             return;
         }
         
+        // 檢查文件類型
+        const validTypes = ['application/vnd.ms-excel', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'];
+        if (!validTypes.includes(file.type) && !file.name.endsWith('.xlsx') && !file.name.endsWith('.xls')) {
+            alert('請選擇有效的Excel文件 (.xlsx 或 .xls)');
+            return;
+        }
+        
         console.log('選擇的文件:', file.name, '大小:', file.size, '類型:', file.type);
         
-        const reader = new FileReader();
+        // 顯示進度指示器
+        const statusElement = document.createElement('div');
+        statusElement.id = 'importStatus';
+        statusElement.style.margin = '10px 0';
+        statusElement.style.padding = '5px';
+        statusElement.style.backgroundColor = '#f8f9fa';
+        statusElement.style.borderRadius = '4px';
+        statusElement.textContent = '準備讀取文件...';
         
-        // 添加錯誤處理
-        reader.onerror = function(event) {
-            console.error('FileReader錯誤:', event.target.error);
-            alert('讀取文件時發生錯誤: ' + event.target.error);
-        };
+        const formElement = document.getElementById('importExcelForm');
+        if (formElement) {
+            formElement.appendChild(statusElement);
+        }
         
-        // 添加進度監控
-        reader.onprogress = function(event) {
-            if (event.lengthComputable) {
-                const percentLoaded = Math.round((event.loaded / event.total) * 100);
-                console.log('文件讀取進度: ' + percentLoaded + '%');
-            }
-        };
+        // 設置最大重試次數
+        const maxRetries = 3;
+        let retryCount = 0;
         
-        reader.onload = function(e) {
-            console.log('文件讀取完成，開始處理數據');
-            try {
-                const data = new Uint8Array(e.target.result);
-                console.log('文件數據大小:', data.length, '字節');
+        // 創建讀取函數，支持重試
+        function readFile(retry = 0) {
+            const reader = new FileReader();
+            
+            // 添加錯誤處理
+            reader.onerror = function(event) {
+                console.error(`FileReader錯誤 (嘗試 ${retry+1}/${maxRetries}):`, event.target.error);
                 
-                const workbook = XLSX.read(data, { type: 'array' });
-                console.log('工作簿讀取成功，工作表數量:', workbook.SheetNames.length);
-                
-                // 獲取第一個工作表
-                const worksheet = workbook.Sheets[workbook.SheetNames[0]];
-                console.log('工作表名稱:', workbook.SheetNames[0]);
-                
-                // 將工作表轉換為JSON
-                const jsonData = XLSX.utils.sheet_to_json(worksheet);
-                console.log('轉換為JSON成功，數據行數:', jsonData.length);
-                
-                if (jsonData.length === 0) {
-                    alert('Excel文件中沒有數據或格式不正確');
-                    return;
+                if (retry < maxRetries - 1) {
+                    // 更新狀態並重試
+                    statusElement.textContent = `讀取失敗，正在重試... (${retry+2}/${maxRetries})`;
+                    statusElement.style.color = '#e67e22';
+                    
+                    // 延遲後重試
+                    setTimeout(() => readFile(retry + 1), 1000);
+                } else {
+                    // 重試失敗
+                    statusElement.textContent = `讀取文件失敗: ${event.target.error}`;
+                    statusElement.style.color = '#e74c3c';
+                    alert(`讀取文件失敗 (已重試 ${maxRetries} 次): ${event.target.error}`);
                 }
-                
-                // 檢查數據格式
-                const firstRow = jsonData[0];
-                console.log('第一行數據:', JSON.stringify(firstRow));
-                
-                if (!firstRow['書名'] || !firstRow['作者']) {
-                    alert('Excel文件格式不正確，請確保包含「書名」和「作者」欄位');
-                    return;
+            };
+            
+            // 添加進度監控
+            reader.onprogress = function(event) {
+                if (event.lengthComputable) {
+                    const percentLoaded = Math.round((event.loaded / event.total) * 100);
+                    statusElement.textContent = `文件讀取進度: ${percentLoaded}%`;
+                    console.log('文件讀取進度: ' + percentLoaded + '%');
                 }
+            };
+
+        
+                    reader.onload = function(e) {
+                console.log('文件讀取完成，開始處理數據');
+                statusElement.textContent = '文件讀取完成，正在處理數據...';
+                statusElement.style.color = '#3498db';
                 
-                // 處理匯入的數據
-                let importCount = 0;
-                const books = [];
-                jsonData.forEach((row, index) => {
-                    // 檢查必要欄位
-                    if (row['書名'] && row['作者']) {
-                        const bookData = {
-                            id: Date.now().toString() + index, // 確保ID唯一
-                            title: row['書名'],
-                            author: row['作者'],
-                            series: row['集數'] || '',
-                            publisher: row['出版社'] || '',
-                            description: row['描述'] || '',
-                            cabinet: row['櫃號'] || '',
-                            row: row['行號'] || '',
-                            isbn: row['ISBN號'] || '',
-                            notes: row['備註'] || ''
-                        };
-                        
-                        // 添加書籍
-                        BookData.addBook(bookData);
-                        books.push(bookData);
-                        importCount++;
-                    } else {
-                        console.warn(`第${index+1}行數據缺少必要欄位:`, JSON.stringify(row));
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    console.log('文件數據大小:', data.length, '字節');
+                    
+                    // 檢查文件大小
+                    if (data.length === 0) {
+                        throw new Error('文件為空');
                     }
-                });
-                
-                console.log(`成功匯入 ${importCount} 本書籍`);
-                
-                // 重新加載書籍列表
-                loadBooks();
-                
-                // 如果啟用了自動上傳，則上傳到GitHub
-                if (autoUpload) {
-                    // 獲取所有書籍數據，確保上傳的是完整數據
-                    const allBooks = BookData.getAllBooks();
-                    const jsonContent = JSON.stringify(allBooks, null, 2);
-                    uploadToGitHub(jsonContent)
-                        .then(() => {
-                            console.log('自動上傳成功');
-                        })
-                        .catch(error => {
-                            console.error('自動上傳失敗:', error);
-                            alert(`自動上傳失敗: ${error.message}`);
-                        });
+                    
+                    statusElement.textContent = '正在解析Excel文件...';
+                    
+                    // 使用try-catch包裝XLSX操作，以捕獲可能的解析錯誤
+                    let workbook;
+                    try {
+                        workbook = XLSX.read(data, { type: 'array' });
+                    } catch (xlsxError) {
+                        console.error('Excel解析錯誤:', xlsxError);
+                        throw new Error(`Excel文件格式錯誤: ${xlsxError.message}`);
+                    }
+                    
+                    console.log('工作簿讀取成功，工作表數量:', workbook.SheetNames.length);
+                    
+                    // 檢查工作表是否存在
+                    if (!workbook.SheetNames || workbook.SheetNames.length === 0) {
+                        throw new Error('Excel文件中沒有工作表');
+                    }
+                    
+                    // 獲取第一個工作表
+                    const worksheet = workbook.Sheets[workbook.SheetNames[0]];
+                    console.log('工作表名稱:', workbook.SheetNames[0]);
+                    
+                    statusElement.textContent = '正在轉換數據...';
+                    
+                    // 將工作表轉換為JSON
+                    const jsonData = XLSX.utils.sheet_to_json(worksheet);
+                    console.log('轉換為JSON成功，數據行數:', jsonData.length);
+                    
+                    if (jsonData.length === 0) {
+                        statusElement.textContent = '文件中沒有數據';
+                        statusElement.style.color = '#e74c3c';
+                        throw new Error('Excel文件中沒有數據或格式不正確');
+                    }
+                    
+                    // 檢查數據格式
+                    const firstRow = jsonData[0];
+                    console.log('第一行數據:', JSON.stringify(firstRow));
+                    
+                    if (!firstRow['書名'] || !firstRow['作者']) {
+                        statusElement.textContent = '文件格式不正確';
+                        statusElement.style.color = '#e74c3c';
+                        throw new Error('Excel文件格式不正確，請確保包含「書名」和「作者」欄位');
+                    }
+                    
+                    statusElement.textContent = '正在匯入數據...';
+                    
+                    // 處理匯入的數據
+                    let importCount = 0;
+                    let errorCount = 0;
+                    const books = [];
+                    const errors = [];
+                    
+                    jsonData.forEach((row, index) => {
+                        // 檢查必要欄位
+                        if (row['書名'] && row['作者']) {
+                            try {
+                                const bookData = {
+                                    id: Date.now().toString() + index, // 確保ID唯一
+                                    title: row['書名'],
+                                    author: row['作者'],
+                                    series: row['集數'] || '',
+                                    publisher: row['出版社'] || '',
+                                    description: row['描述'] || '',
+                                    cabinet: row['櫃號'] || '',
+                                    row: row['行號'] || '',
+                                    isbn: row['ISBN號'] || '',
+                                    notes: row['備註'] || ''
+                                };
+                                
+                                // 添加書籍
+                                BookData.addBook(bookData);
+                                books.push(bookData);
+                                importCount++;
+                            } catch (rowError) {
+                                console.error(`處理第${index+1}行數據時發生錯誤:`, rowError);
+                                errors.push(`第${index+1}行: ${rowError.message}`);
+                                errorCount++;
+                            }
+                        } else {
+                            console.warn(`第${index+1}行數據缺少必要欄位:`, JSON.stringify(row));
+                            errors.push(`第${index+1}行: 缺少必要欄位「書名」或「作者」`);
+                            errorCount++;
+                        }
+                    });
+                    
+                    console.log(`成功匯入 ${importCount} 本書籍，失敗 ${errorCount} 項`);
+                    
+                    // 更新狀態
+                    if (importCount > 0) {
+                        statusElement.textContent = `成功匯入 ${importCount} 本書籍${errorCount > 0 ? `，${errorCount} 項失敗` : ''}`;
+                        statusElement.style.color = errorCount > 0 ? '#f39c12' : '#2ecc71';
+                    } else {
+                        statusElement.textContent = '匯入失敗，沒有有效數據';
+                        statusElement.style.color = '#e74c3c';
+                        throw new Error('匯入失敗，沒有有效數據');
+                    }
+                    
+                    // 重新加載書籍列表
+                    loadBooks();
+                    
+                    // 如果啟用了自動上傳，則上傳到GitHub
+                    if (autoUpload) {
+                        statusElement.textContent = `匯入成功，正在上傳到GitHub...`;
+                        
+                        // 獲取所有書籍數據，確保上傳的是完整數據
+                        const allBooks = BookData.getAllBooks();
+                        const jsonContent = JSON.stringify(allBooks, null, 2);
+                        uploadToGitHub(jsonContent)
+                            .then(() => {
+                                console.log('自動上傳成功');
+                                statusElement.textContent = `匯入 ${importCount} 本書籍並上傳成功`;
+                                statusElement.style.color = '#2ecc71';
+                            })
+                            .catch(error => {
+                                console.error('自動上傳失敗:', error);
+                                statusElement.textContent = `匯入成功但上傳失敗: ${error.message}`;
+                                statusElement.style.color = '#f39c12';
+                                alert(`匯入成功但上傳失敗: ${error.message}`);
+                            });
+                    }
+                    
+                    // 關閉彈窗（延遲關閉，讓用戶有時間看到狀態）
+                    setTimeout(() => {
+                        importExcelModal.style.display = 'none';
+                    }, 3000);
+                    
+                    // 顯示匯入結果
+                    let resultMessage = `成功匯入 ${importCount} 本書籍`;
+                    if (errorCount > 0) {
+                        resultMessage += `，${errorCount} 項失敗\n\n失敗項目:\n${errors.slice(0, 5).join('\n')}`;
+                        if (errors.length > 5) {
+                            resultMessage += `\n...以及其他 ${errors.length - 5} 項錯誤`;
+                        }
+                    }
+                    resultMessage += autoUpload ? '\n\n已開始上傳到GitHub' : '';
+                    
+                    alert(resultMessage);
+                    
+                    // 重置表單
+                    fileInput.value = '';
+                } catch (error) {
+                    console.error('處理Excel數據時發生錯誤:', error);
+                    statusElement.textContent = `匯入失敗: ${error.message}`;
+                    statusElement.style.color = '#e74c3c';
+                    alert('匯入失敗：' + error.message);
                 }
-                
-                // 關閉彈窗
-                importExcelModal.style.display = 'none';
-                
-                // 顯示匯入結果
-                alert(`成功匯入 ${importCount} 本書籍${autoUpload ? '，並已開始上傳到GitHub' : ''}`);
-                
-                // 重置表單
-                fileInput.value = '';
-            } catch (error) {
-                console.error('處理Excel數據時發生錯誤:', error);
-                alert('匯入失敗：' + error.message);
-            }
-        };
+            };
+            
+            // 開始讀取文件
+            statusElement.textContent = '開始讀取文件...';
+            reader.readAsArrayBuffer(file);
+        }
         
+        // 開始讀取過程
         console.log('開始讀取文件...');
-        reader.readAsArrayBuffer(file);
+        readFile(0);
     }
 });

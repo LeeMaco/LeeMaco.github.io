@@ -6,7 +6,6 @@
     <title>書籍管理系統 - 管理頁面</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/error.css">
-    <link rel="stylesheet" href="css/responsive.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
 </head>
 <body>
@@ -340,7 +339,6 @@
                 <button id="createBackupBtn" class="add-btn"><i class="fas fa-plus"></i> 立即備份</button>
                 <button id="clearBackupHistoryBtn" class="delete-btn"><i class="fas fa-trash"></i> 清空歷史</button>
             </div>
-            <div id="backupStatus" style="margin: 10px 0; font-weight: bold;"></div>
             <div class="admin-content">
                 <table class="admin-table">
                     <thead>
@@ -366,15 +364,13 @@
     </footer>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/logger.js"></script>
+    <script src="js/cache.js"></script>
     <script src="js/data.js"></script>
     <script src="js/user-manager.js"></script>
     <script src="js/permissions.js"></script>
-    <script src="js/ui-feedback.js"></script>
-    <script src="js/lz-string.min.js"></script>
     <script src="js/admin.js"></script>
-    <script src="js/github-upload.js"></script>
     <script src="js/backup.js"></script>
     <script src="js/backup-ui.js"></script>
-    <script src="js/duplicate-test.js"></script>
 </body>
 </html>

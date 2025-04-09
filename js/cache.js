@@ -214,24 +214,16 @@ const CacheManager = {
     clearExpired: function() {
         const now = Date.now();
         let count = 0;
-        const expiredKeys = [];
         
-        // 先收集所有過期的鍵，避免在迭代過程中修改對象
+        // 清理內存緩存
         for (const key in this.cache) {
             const item = this.cache[key];
             if (item.expiry && item.expiry < now) {
-                expiredKeys.push(key);
+                this.remove(key);
                 count++;
             }
         }
         
-        // 批量刪除過期項
-        expiredKeys.forEach(key => this.remove(key));
-        
-        // 記錄到日誌系統
-        if (count > 0 && window.Logger) {
-            Logger.info(`已清理 ${count} 個過期緩存項`);
-        }
         console.log(`已清理 ${count} 個過期緩存項`);
         return count;
     },

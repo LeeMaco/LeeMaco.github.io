@@ -9,14 +9,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // 確保BackupManager已初始化
-    if (typeof BackupManager !== 'undefined' && typeof BackupManager.init === 'function') {
-        BackupManager.init();
-    } else {
-        console.error('BackupManager未定義或初始化方法不存在');
-        return;
-    }
-    
     // 獲取DOM元素
     const backupSettingsBtn = document.getElementById('backupSettingsBtn');
     const backupHistoryBtn = document.getElementById('backupHistoryBtn');
@@ -76,72 +68,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定創建備份按鈕點擊事件
     createBackupBtn.addEventListener('click', function() {
-        // 創建備份前清空狀態消息
-        const statusElement = document.getElementById('backupStatus');
-        if (statusElement) {
-            statusElement.textContent = '正在創建備份...';
-            statusElement.style.color = '#3498db';
-        }
-        
-        // 禁用按鈕，防止重複點擊
-        createBackupBtn.disabled = true;
-        createBackupBtn.style.opacity = '0.7';
-        createBackupBtn.style.cursor = 'not-allowed';
-        
         // 創建備份
-        BackupManager.createBackup()
-            .then(backup => {
-                // 重新加載備份歷史記錄
-                loadBackupHistory();
-                
-                // 更新最後備份時間顯示
-                updateLastBackupTimeDisplay();
-                
-                // 顯示成功消息
-                if (statusElement) {
-                    // 檢查是否有上傳錯誤
-                    if (backup.uploadError) {
-                        statusElement.textContent = `備份創建成功，但上傳失敗: ${backup.uploadError}`;
-                        statusElement.style.color = '#f39c12'; // 警告顏色
-                    } else {
-                        statusElement.textContent = '備份創建成功';
-                        statusElement.style.color = '#2ecc71';
-                    }
-                    
-                    setTimeout(() => {
-                        statusElement.textContent = '';
-                    }, 5000);
-                }
-                
-                // 根據上傳結果顯示不同的成功消息
-                if (backup.uploadError) {
-                    alert(`備份創建成功，但上傳到GitHub失敗: ${backup.uploadError}`);
-                } else {
-                    alert('備份創建成功');
-                }
-            })
-            .catch(error => {
-                console.error('創建備份時發生錯誤:', error);
-                
-                // 如果backupStatus元素已經有錯誤消息，則使用該消息
-                const errorMsg = statusElement && statusElement.textContent.includes('失敗') 
-                    ? statusElement.textContent 
-                    : `備份創建失敗: ${error.message || '未知錯誤，請重試'}`;
-                
-                // 確保錯誤消息顯示在狀態元素中
-                if (statusElement && !statusElement.textContent.includes('失敗')) {
-                    statusElement.textContent = errorMsg;
-                    statusElement.style.color = '#e74c3c';
-                }
-                
-                alert(errorMsg);
-            })
-            .finally(() => {
-                // 恢復按鈕狀態
-                createBackupBtn.disabled = false;
-                createBackupBtn.style.opacity = '1';
-                createBackupBtn.style.cursor = 'pointer';
-            });
+        const backup = BackupManager.createBackup();
+        
+        if (backup) {
+            // 重新加載備份歷史記錄
+            loadBackupHistory();
+            
+            // 更新最後備份時間顯示
+            updateLastBackupTimeDisplay();
+            
+            // 顯示成功消息
+            alert('備份創建成功');
+        } else {
+            alert('備份創建失敗，請重試');
+        }
     });
     
     // 綁定清空備份歷史按鈕點擊事件
@@ -169,15 +110,7 @@ document.addEventListener('DOMContentLoaded', function() {
                     backupHistoryModal.style.display = 'none';
                     
                     // 重新加載書籍列表
-                    if (typeof loadBooks === 'function') {
-                        loadBooks();
-                    } else {
-                        // 如果在非管理頁面，則重新加載頁面以顯示最新數據
-                        window.location.reload();
-                    }
-                    
-                    // 更新最後備份時間顯示
-                    updateLastBackupTimeDisplay();
+                    loadBooks();
                     
                     alert('備份已恢復，書籍列表已更新');
                 } else {
@@ -192,43 +125,6 @@ document.addEventListener('DOMContentLoaded', function() {
                 BackupManager.deleteBackupHistory(backupId);
                 loadBackupHistory();
                 alert('備份已刪除');
-            }
-        }
-        
-        // 處理上傳按鈕點擊
-        if (e.target.classList.contains('upload-btn') || e.target.parentElement.classList.contains('upload-btn')) {
-            if (confirm('確定要上傳此備份到GitHub嗎？')) {
-                // 禁用按鈕，防止重複點擊
-                const uploadBtn = e.target.classList.contains('upload-btn') ? e.target : e.target.parentElement;
-                uploadBtn.disabled = true;
-                uploadBtn.style.opacity = '0.7';
-                uploadBtn.style.cursor = 'not-allowed';
-                uploadBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-                
-                // 顯示上傳狀態
-                const statusElement = document.getElementById('backupStatus');
-                if (statusElement) {
-                    statusElement.textContent = '正在準備上傳到GitHub...';
-                    statusElement.style.color = '#3498db';
-                }
-                
-                // 調用手動上傳函數
-                GitHubUploader.manualUploadBackup(backupId)
-                    .then(() => {
-                        // 重新加載備份歷史記錄
-                        loadBackupHistory();
-                        alert('備份已成功上傳到GitHub');
-                    })
-                    .catch(error => {
-                        console.error('手動上傳備份失敗:', error);
-                        alert(`上傳失敗: ${error.message || '未知錯誤，請重試'}`);
-                        
-                        // 恢復按鈕狀態
-                        uploadBtn.disabled = false;
-                        uploadBtn.style.opacity = '1';
-                        uploadBtn.style.cursor = 'pointer';
-                        uploadBtn.innerHTML = '<i class="fas fa-cloud-upload-alt"></i>';
-                    });
             }
         }
     });
@@ -263,11 +159,10 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${backup.id}">
                         <td>${backupDate}</td>
                         <td>${backup.bookCount} 本</td>
-                        <td>${backup.githubFileName ? '是' : (backup.uploadError ? `<span title="${backup.uploadError}" style="color: #e74c3c;">否</span>` : '否')}</td>
+                        <td>${backup.githubFileName ? '是' : '否'}</td>
                         <td>
                             <button class="restore-btn" title="恢復此備份"><i class="fas fa-undo"></i></button>
                             <button class="delete-btn" title="刪除此備份"><i class="fas fa-trash"></i></button>
-                            ${!backup.githubFileName ? `<button class="upload-btn" title="上傳到GitHub"><i class="fas fa-cloud-upload-alt"></i></button>` : ''}
                         </td>
                     </tr>
                 `;
