@@ -11,12 +11,6 @@ document.addEventListener('DOMContentLoaded', function() {
         return;
     }
     
-    // 檢查當前用戶
-    if (window.UserManager && !UserManager.getCurrentUser()) {
-        // 如果沒有當前用戶信息，則初始化
-        UserManager.init();
-    }
-    
     // 獲取DOM元素
     const bookTableBody = document.getElementById('bookTableBody');
     const addBookBtn = document.getElementById('addBookBtn');
@@ -73,11 +67,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const emptyTrashBtn = document.getElementById('emptyTrashBtn');
         if (emptyTrashBtn) {
             emptyTrashBtn.addEventListener('click', function() {
-                // 檢查權限
-                if (window.PermissionManager && !PermissionManager.isEnabled('emptyTrash')) {
-                    alert('此功能已被管理員禁用');
-                    return;
-                }
                 emptyTrash();
             });
         }
@@ -103,13 +92,8 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定登出按鈕點擊事件
     logoutBtn.addEventListener('click', function() {
-        // 使用UserManager進行登出
-        if (window.UserManager) {
-            UserManager.logout();
-        } else {
-            // 向下兼容：直接清除登入狀態
-            localStorage.removeItem('isLoggedIn');
-        }
+        // 清除登入狀態
+        localStorage.removeItem('isLoggedIn');
         // 跳轉到首頁
         window.location.href = 'index.html';
     });
