@@ -47,29 +47,8 @@ const BackupManager = {
     
     // 獲取備份設置
     getBackupSettings: function() {
-        try {
-            const settings = localStorage.getItem(this.BACKUP_SETTINGS_KEY);
-            if (!settings) {
-                // 如果沒有設置，返回默認設置
-                const defaultSettings = {
-                    enabled: false,
-                    interval: 'daily',
-                    autoUploadToGitHub: false,
-                    maxBackupCount: 10
-                };
-                return defaultSettings;
-            }
-            return JSON.parse(settings);
-        } catch (error) {
-            console.error('獲取備份設置時發生錯誤:', error);
-            // 返回默認設置
-            return {
-                enabled: false,
-                interval: 'daily',
-                autoUploadToGitHub: false,
-                maxBackupCount: 10
-            };
-        }
+        const settings = localStorage.getItem(this.BACKUP_SETTINGS_KEY);
+        return settings ? JSON.parse(settings) : null;
     },
     
     // 保存備份設置
@@ -129,7 +108,7 @@ const BackupManager = {
     },
     
     // 創建備份
-    createBackup: async function() {
+    createBackup: function() {
         try {
             console.log('開始創建備份...');
             
@@ -155,7 +134,7 @@ const BackupManager = {
             
             // 如果啟用了自動上傳到GitHub，則上傳
             if (settings.autoUploadToGitHub) {
-                await this.uploadBackupToGitHub(backup);
+                this.uploadBackupToGitHub(backup);
             }
             
             console.log('備份創建成功，書籍數量:', books.length);
@@ -194,7 +173,7 @@ const BackupManager = {
     },
     
     // 上傳備份到GitHub
-    uploadBackupToGitHub: async function(backup) {
+    uploadBackupToGitHub: function(backup) {
         try {
             console.log('開始上傳備份到GitHub...');
             
@@ -211,25 +190,25 @@ const BackupManager = {
             const jsonContent = JSON.stringify(backup.data, null, 2);
             const fileName = `backup_${new Date(backup.timestamp).toISOString().replace(/[:.]/g, '-')}.json`;
             
-            try {
-                // 使用現有的uploadToGitHub函數上傳，並等待上傳完成
-                await uploadToGitHub(jsonContent, fileName);
-                console.log('備份上傳到GitHub成功，文件名:', fileName);
-                
-                // 更新備份記錄，添加GitHub文件名
-                const history = this.getBackupHistory();
-                const backupIndex = history.findIndex(b => b.id === backup.id);
-                
-                if (backupIndex !== -1) {
-                    history[backupIndex].githubFileName = fileName;
-                    localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
-                }
-                
-                return true;
-            } catch (uploadError) {
-                console.error('備份上傳到GitHub失敗:', uploadError);
-                return false;
-            }
+            // 使用現有的uploadToGitHub函數上傳
+            uploadToGitHub(jsonContent, fileName)
+                .then(() => {
+                    console.log('備份上傳到GitHub成功，文件名:', fileName);
+                    
+                    // 更新備份記錄，添加GitHub文件名
+                    const history = this.getBackupHistory();
+                    const backupIndex = history.findIndex(b => b.id === backup.id);
+                    
+                    if (backupIndex !== -1) {
+                        history[backupIndex].githubFileName = fileName;
+                        localStorage.setItem(this.BACKUP_HISTORY_KEY, JSON.stringify(history));
+                    }
+                })
+                .catch(error => {
+                    console.error('備份上傳到GitHub失敗:', error);
+                });
+            
+            return true;
         } catch (error) {
             console.error('上傳備份到GitHub時發生錯誤:', error);
             return false;

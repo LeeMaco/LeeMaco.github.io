@@ -83,20 +83,15 @@ const BookData = {
         const currentUrl = window.location.href;
         let basePath = '';
         
-        try {
-            // 從當前URL中提取基礎路徑
-            if (currentUrl.includes('.html')) {
-                // 如果URL包含HTML文件名，則移除文件名部分
-                basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-            } else {
-                // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
-                basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
-            }
-            strategies.push(basePath + 'data/books.json');
-        } catch (error) {
-            console.error('URL解析錯誤:', error);
-            // 即使URL解析失敗，仍然保留策略1
+        // 從當前URL中提取基礎路徑
+        if (currentUrl.includes('.html')) {
+            // 如果URL包含HTML文件名，則移除文件名部分
+            basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
+        } else {
+            // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
+            basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
         }
+        strategies.push(basePath + 'data/books.json');
         
         // 策略3: GitHub Pages特定路徑 (如果檢測到GitHub Pages環境)
         if (window.location.href.includes('github.io')) {
@@ -195,23 +190,11 @@ const BookData = {
     getAllBooks: function() {
         // 從localStorage獲取書籍
         const localBooks = localStorage.getItem('books');
-        let parsedLocalBooks = [];
-        
-        try {
-            parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
-        } catch (error) {
-            console.error('解析localStorage書籍數據時發生錯誤:', error);
-            // 如果解析失敗，使用空數組並嘗試重置localStorage
-            try {
-                localStorage.setItem('books', JSON.stringify([]));
-            } catch (e) {
-                console.error('重置localStorage失敗:', e);
-            }
-        }
+        const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
         
         // 確保所有本地書籍的ID都是字符串類型
         parsedLocalBooks.forEach(book => {
-            if (book && book.id !== undefined) {
+            if (book.id !== undefined) {
                 book.id = String(book.id);
             }
         });

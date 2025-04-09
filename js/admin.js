@@ -482,17 +482,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const sortField = document.getElementById('sortField').value;
         const sortOrder = document.getElementById('sortOrder').value;
         
-        // 安全地處理文本，防止XSS攻擊
-        function escapeHtml(text) {
-            if (text === undefined || text === null) return '';
-            return String(text)
-                .replace(/&/g, '&amp;')
-                .replace(/</g, '&lt;')
-                .replace(/>/g, '&gt;')
-                .replace(/"/g, '&quot;')
-                .replace(/'/g, '&#039;');
-        }
-        
         // 應用關鍵字搜索
         if (searchKeyword) {
             books = books.filter(book => {
@@ -793,8 +782,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
     
     // GitHub API相關功能
-    // 將函數設置為全局可訪問，以便其他模塊可以調用
-    window.uploadToGitHub = async function(content, fileName = 'books.json') {
+    async function uploadToGitHub(content, fileName = 'books.json') {
         try {
             const statusElement = document.getElementById('uploadStatus');
             if (statusElement) {
