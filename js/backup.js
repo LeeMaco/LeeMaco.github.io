@@ -21,6 +21,18 @@ const BackupManager = {
         'manual': 0                       // 手動備份
     },
     
+    // 郵件備份設置的存儲鍵名
+    EMAIL_BACKUP_SETTINGS_KEY: 'email_backup_settings',
+    
+    // 默認郵件備份設置
+    DEFAULT_EMAIL_SETTINGS: {
+        enabled: false,
+        email: '',
+        password: '',
+        interval: 'daily',
+        lastSent: null
+    },
+    
     // 初始化備份管理器
     init: function() {
         console.log('初始化備份管理器');
@@ -34,6 +46,11 @@ const BackupManager = {
                 maxBackupCount: 10
             };
             localStorage.setItem(this.BACKUP_SETTINGS_KEY, JSON.stringify(defaultSettings));
+        }
+        
+        // 如果本地存儲中沒有郵件備份設置，則初始化默認設置
+        if (!localStorage.getItem(this.EMAIL_BACKUP_SETTINGS_KEY)) {
+            localStorage.setItem(this.EMAIL_BACKUP_SETTINGS_KEY, JSON.stringify(this.DEFAULT_EMAIL_SETTINGS));
         }
         
         // 如果本地存儲中沒有備份歷史記錄，則初始化
@@ -147,6 +164,12 @@ const BackupManager = {
                 this.uploadBackupToGitHub(backup);
             }
             
+            // 如果啟用了郵件備份，則發送郵件
+            const emailSettings = this.getEmailBackupSettings();
+            if (emailSettings.enabled) {
+                this.sendBackupToEmail(backup);
+            }
+            
             // 返回備份對象
             return backup;
             
@@ -187,6 +210,262 @@ const BackupManager = {
             console.error('恢復備份時發生錯誤:', error);
             return false;
         }
+    },
+    
+    // 獲取郵件備份設置
+    getEmailBackupSettings: function() {
+        return Utils.safeGetLocalStorage(this.EMAIL_BACKUP_SETTINGS_KEY) || this.DEFAULT_EMAIL_SETTINGS;
+    },
+    
+    // 保存郵件備份設置
+    saveEmailBackupSettings: function(settings) {
+        if (Utils.safeSetLocalStorage(this.EMAIL_BACKUP_SETTINGS_KEY, settings)) {
+            console.log('郵件備份設置已保存:', settings);
+            return settings;
+        }
+        return null;
+    },
+    
+    // 發送備份到郵件
+    sendBackupToEmail: function(backup) {
+        try {
+            console.log('開始發送備份到郵件...');
+            
+            const emailSettings = this.getEmailBackupSettings();
+            
+            // 檢查郵件設置是否完整
+            if (!emailSettings.email || !emailSettings.password) {
+                console.error('郵件備份設置不完整');
+                return false;
+            }
+            
+            // 創建郵件內容
+            const subject = `書籍備份 - ${new Date(backup.timestamp).toLocaleString()}`;
+            const body = `這是一份自動備份的書籍數據，共包含 ${backup.bookCount} 本書籍。`;
+            
+            // 使用nodemailer發送郵件
+            const transporter = nodemailer.createTransport({
+                service: 'gmail',
+                auth: {
+                    user: emailSettings.email,
+                    pass: emailSettings.password
+                }
+            });
+            
+            const mailOptions = {
+                from: emailSettings.email,
+                to: emailSettings.email,
+                subject: subject,
+                text: body,
+                attachments: [
+                    {
+                        filename: `books_backup_${backup.id}.json`,
+                        content: JSON.stringify(backup.data)
+                    }
+                ]
+            };
+            
+            transporter.sendMail(mailOptions, (error, info) => {
+                if (error) {
+                    console.error('發送郵件時發生錯誤:', error);
+                } else {
+                    console.log('郵件發送成功:', info.response);
+                    
+                    // 更新最後發送時間
+                    const updatedSettings = {
+                        ...emailSettings,
+                        lastSent: new Date().toISOString()
+                    };
+                    this.saveEmailBackupSettings(updatedSettings);
+                }
+            });
+            
+            return true;
+        } catch (error) {
+            console.error('發送郵件備份時發生錯誤:', error);
+            return false;
+        }
+    },
+    
+    // 顯示郵件備份設置彈窗
+    showEmailBackupSettingsModal: function() {
+        // 檢查彈窗是否已存在
+        let emailModal = document.getElementById('emailBackupSettingsModal');
+        
+        if (!emailModal) {
+            // 創建彈窗
+            emailModal = document.createElement('div');
+            emailModal.id = 'emailBackupSettingsModal';
+            emailModal.className = 'modal';
+            
+            // 創建彈窗內容
+            const modalContent = document.createElement('div');
+            modalContent.className = 'modal-content';
+            modalContent.style.maxWidth = '500px';
+            
+            // 創建關閉按鈕
+            const closeBtn = document.createElement('span');
+            closeBtn.className = 'close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.addEventListener('click', function() {
+                emailModal.style.display = 'none';
+            });
+            
+            // 創建標題
+            const title = document.createElement('h2');
+            title.textContent = '郵件備份設置';
+            
+            // 創建說明
+            const description = document.createElement('p');
+            description.textContent = '設置自動備份到Gmail的參數';
+            
+            // 創建表單
+            const form = document.createElement('form');
+            form.id = 'emailBackupSettingsForm';
+            
+            // 獲取當前設置
+            const settings = this.getEmailBackupSettings();
+            
+            // 啟用郵件備份選項
+            const enableGroup = document.createElement('div');
+            enableGroup.className = 'form-group';
+            enableGroup.style.display = 'flex';
+            enableGroup.style.alignItems = 'center';
+            
+            const enableCheckbox = document.createElement('input');
+            enableCheckbox.type = 'checkbox';
+            enableCheckbox.id = 'enableEmailBackup';
+            enableCheckbox.checked = settings.enabled;
+            
+            const enableLabel = document.createElement('label');
+            enableLabel.htmlFor = 'enableEmailBackup';
+            enableLabel.textContent = '啟用郵件備份';
+            
+            enableGroup.appendChild(enableCheckbox);
+            enableGroup.appendChild(enableLabel);
+            form.appendChild(enableGroup);
+            
+            // Gmail帳號輸入
+            const emailGroup = document.createElement('div');
+            emailGroup.className = 'form-group';
+            
+            const emailLabel = document.createElement('label');
+            emailLabel.htmlFor = 'emailBackupAddress';
+            emailLabel.textContent = 'Gmail帳號';
+            
+            const emailInput = document.createElement('input');
+            emailInput.type = 'email';
+            emailInput.id = 'emailBackupAddress';
+            emailInput.placeholder = 'your@gmail.com';
+            emailInput.value = settings.email || '';
+            emailInput.required = true;
+            emailInput.style.width = '100%';
+            
+            emailGroup.appendChild(emailLabel);
+            emailGroup.appendChild(emailInput);
+            form.appendChild(emailGroup);
+            
+            // Gmail密碼輸入
+            const passwordGroup = document.createElement('div');
+            passwordGroup.className = 'form-group';
+            
+            const passwordLabel = document.createElement('label');
+            passwordLabel.htmlFor = 'emailBackupPassword';
+            passwordLabel.textContent = 'Gmail密碼';
+            
+            const passwordInput = document.createElement('input');
+            passwordInput.type = 'password';
+            passwordInput.id = 'emailBackupPassword';
+            passwordInput.placeholder = '輸入密碼';
+            passwordInput.value = settings.password || '';
+            passwordInput.required = true;
+            passwordInput.style.width = '100%';
+            
+            passwordGroup.appendChild(passwordLabel);
+            passwordGroup.appendChild(passwordInput);
+            form.appendChild(passwordGroup);
+            
+            // 備份頻率選擇
+            const intervalGroup = document.createElement('div');
+            intervalGroup.className = 'form-group';
+            
+            const intervalLabel = document.createElement('label');
+            intervalLabel.htmlFor = 'emailBackupInterval';
+            intervalLabel.textContent = '備份頻率';
+            
+            const intervalSelect = document.createElement('select');
+            intervalSelect.id = 'emailBackupInterval';
+            intervalSelect.style.width = '100%';
+            
+            const intervals = [
+                { value: 'hourly', label: '每小時' },
+                { value: 'daily', label: '每天' },
+                { value: 'weekly', label: '每週' }
+            ];
+            
+            intervals.forEach(interval => {
+                const option = document.createElement('option');
+                option.value = interval.value;
+                option.textContent = interval.label;
+                if (settings.interval === interval.value) {
+                    option.selected = true;
+                }
+                intervalSelect.appendChild(option);
+            });
+            
+            intervalGroup.appendChild(intervalLabel);
+            intervalGroup.appendChild(intervalSelect);
+            form.appendChild(intervalGroup);
+            
+            // 提交按鈕
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'submit';
+            submitBtn.textContent = '保存設置';
+            submitBtn.className = 'excel-btn';
+            submitBtn.style.marginTop = '20px';
+            
+            form.appendChild(submitBtn);
+            
+            // 綁定表單提交事件
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const newSettings = {
+                    enabled: document.getElementById('enableEmailBackup').checked,
+                    email: document.getElementById('emailBackupAddress').value,
+                    password: document.getElementById('emailBackupPassword').value,
+                    interval: document.getElementById('emailBackupInterval').value
+                };
+                
+                this.saveEmailBackupSettings(newSettings);
+                
+                // 關閉彈窗
+                emailModal.style.display = 'none';
+                
+                // 顯示成功消息
+                alert('郵件備份設置已保存');
+            });
+            
+            // 組裝彈窗
+            modalContent.appendChild(closeBtn);
+            modalContent.appendChild(title);
+            modalContent.appendChild(description);
+            modalContent.appendChild(form);
+            emailModal.appendChild(modalContent);
+            
+            // 添加到頁面
+            document.body.appendChild(emailModal);
+            
+            // 點擊外部關閉彈窗
+            window.addEventListener('click', (e) => {
+                if (e.target === emailModal) {
+                    emailModal.style.display = 'none';
+                }
+            });
+        }
+        
+        // 顯示彈窗
+        emailModal.style.display = 'block';
     },
     
     // 上傳備份到GitHub

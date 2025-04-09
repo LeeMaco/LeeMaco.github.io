@@ -559,4 +559,25 @@ footer {
         padding: 1.2rem;
         margin: 10% auto;
     }
+    
+    /* 新增超小屏幕適配 (375px以下) */
+    @media (max-width: 375px) {
+        .book-card {
+            padding: 0.5rem;
+        }
+        
+        .book-card h3 {
+            font-size: 1rem;
+        }
+        
+        .search-box input, .search-box select, .search-box button {
+            padding: 0.6rem;
+            font-size: 0.9rem;
+        }
+        
+        .modal-content {
+            padding: 0.8rem;
+            margin: 15% auto;
+        }
+    }
 }

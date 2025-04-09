@@ -44,9 +44,93 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化數據並確保數據加載完成
     BookData.init().then(() => {
         console.log('數據初始化完成');
+        
+        // 綁定Excel導入按鈕事件
+        const importExcelBtn = document.getElementById('importExcelBtn');
+        if (importExcelBtn) {
+            importExcelBtn.addEventListener('click', handleExcelImport);
+        }
     }).catch(error => {
         console.error('數據初始化失敗:', error);
     });
+    
+    // 處理Excel文件導入
+    function handleExcelImport() {
+        const fileInput = document.createElement('input');
+        fileInput.type = 'file';
+        fileInput.accept = '.xlsx,.xls';
+        
+        fileInput.addEventListener('change', async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            
+            try {
+                // 顯示處理中提示
+                const progressContainer = document.createElement('div');
+                progressContainer.className = 'progress-container';
+                progressContainer.innerHTML = `
+                    <div class="progress-wrapper">
+                        <div class="progress-bar">
+                            <div class="progress" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-text">正在處理Excel文件 (0%)...</div>
+                    </div>
+                    <p class="progress-message">正在解析Excel數據，請稍候...</p>
+                `;
+                document.body.appendChild(progressContainer);
+                
+                // 模擬進度更新
+                const progressInterval = setInterval(() => {
+                    const progress = progressContainer.querySelector('.progress');
+                    const progressText = progressContainer.querySelector('.progress-text');
+                    const currentWidth = parseInt(progress.style.width) || 0;
+                    const newWidth = Math.min(currentWidth + 10, 90);
+                    progress.style.width = `${newWidth}%`;
+                    progressText.textContent = `正在處理Excel文件 (${newWidth}%)...`;
+                }, 300);
+                
+                // 使用SheetJS庫解析Excel
+                const data = await file.arrayBuffer();
+                const workbook = XLSX.read(data);
+                const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+                const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+                
+                // 更新書籍數據
+                BookData.importBooks(jsonData);
+                
+                // 完成進度
+                clearInterval(progressInterval);
+                const progress = progressContainer.querySelector('.progress');
+                const progressText = progressContainer.querySelector('.progress-text');
+                progress.style.width = '100%';
+                progressText.textContent = '處理完成！';
+                
+                // 顯示結果
+                progressContainer.querySelector('.progress-message').innerHTML = `
+                    <i class="fas fa-check-circle success-icon"></i>
+                    <strong>Excel導入成功！</strong>
+                    <p>共導入 ${jsonData.length} 本書籍。</p>
+                `;
+                
+                // 自動觸發GitHub備份
+                const settings = BackupManager.getBackupSettings();
+                if (settings.autoUploadToGitHub) {
+                    BackupManager.createBackup();
+                }
+                
+                // 5秒後自動關閉提示
+                setTimeout(() => {
+                    progressContainer.remove();
+                }, 5000);
+                
+            } catch (error) {
+                console.error('Excel導入失敗:', error);
+                alert(`Excel導入失敗: ${error.message}`);
+            }
+        });
+        
+        fileInput.click();
+    }
     
     // 綁定搜索按鈕點擊事件
     searchBtn.addEventListener('click', function() {
@@ -57,25 +141,65 @@ document.addEventListener('DOMContentLoaded', function() {
     const removeDuplicatesBtn = document.getElementById('removeDuplicatesBtn');
     if (removeDuplicatesBtn) {
         removeDuplicatesBtn.addEventListener('click', function() {
+            // 禁用按鈕防止重複點擊
+            removeDuplicatesBtn.disabled = true;
+            removeDuplicatesBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 處理中...';
+            
+            // 創建進度容器
             const progressContainer = document.createElement('div');
             progressContainer.className = 'progress-container';
-            progressContainer.innerHTML = '<div class="progress-bar"><div class="progress"></div></div><p>正在移除重複書籍...</p>';
+            progressContainer.innerHTML = `
+                <div class="progress-wrapper">
+                    <div class="progress-bar">
+                        <div class="progress" style="width: 0%"></div>
+                    </div>
+                    <div class="progress-text">正在分析書籍數據 (0%)...</div>
+                </div>
+                <p class="progress-message">正在移除重複書籍，請稍候...</p>
+            `;
             document.body.appendChild(progressContainer);
             
+            // 模擬進度更新
+            const progressInterval = setInterval(() => {
+                const progress = progressContainer.querySelector('.progress');
+                const progressText = progressContainer.querySelector('.progress-text');
+                const currentWidth = parseInt(progress.style.width) || 0;
+                const newWidth = Math.min(currentWidth + 10, 90);
+                progress.style.width = `${newWidth}%`;
+                progressText.textContent = `正在分析書籍數據 (${newWidth}%)...`;
+            }, 300);
+            
             // 執行去重操作
-            const result = BookData.removeDuplicateBooks();
-            
-            // 更新進度顯示
-            progressContainer.innerHTML = `<p>已完成去重！移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本唯一書籍。</p>`;
-            
-            // 觸發數據更新事件
-            const event = new Event('booksUpdated');
-            window.dispatchEvent(event);
-            
-            // 3秒後自動關閉提示
             setTimeout(() => {
-                progressContainer.remove();
-            }, 3000);
+                const result = BookData.removeDuplicateBooks();
+                clearInterval(progressInterval);
+                
+                // 完成進度
+                const progress = progressContainer.querySelector('.progress');
+                const progressText = progressContainer.querySelector('.progress-text');
+                progress.style.width = '100%';
+                progressText.textContent = '分析完成！';
+                
+                // 顯示結果
+                progressContainer.querySelector('.progress-message').innerHTML = `
+                    <i class="fas fa-check-circle success-icon"></i>
+                    <strong>去重完成！</strong>
+                    <p>移除了 ${result.removed} 本重複書籍，剩餘 ${result.total} 本唯一書籍。</p>
+                `;
+                
+                // 啟用按鈕
+                removeDuplicatesBtn.disabled = false;
+                removeDuplicatesBtn.innerHTML = '<i class="fas fa-filter"></i> 去除重複書籍';
+                
+                // 觸發數據更新事件
+                const event = new Event('booksUpdated');
+                window.dispatchEvent(event);
+                
+                // 5秒後自動關閉提示
+                setTimeout(() => {
+                    progressContainer.remove();
+                }, 5000);
+            }, 2000);
         });
     }
     

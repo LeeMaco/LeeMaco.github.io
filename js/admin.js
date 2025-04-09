@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const importExcelBtn = document.getElementById('importExcelBtn');
     const githubSettingsBtn = document.getElementById('githubSettingsBtn');
+    const backupSettingsBtn = document.getElementById('backupSettingsBtn');
     const trashBtn = document.getElementById('trashBtn'); // 垃圾桶按鈕
     const logoutBtn = document.getElementById('logoutBtn');
     const backToHomeBtn = document.getElementById('backToHomeBtn');
@@ -114,6 +115,85 @@ document.addEventListener('DOMContentLoaded', function() {
         window.location.href = 'index.html';
     });
     
+    // 綁定權限變更歷史按鈕點擊事件
+    const permissionHistoryBtn = document.createElement('button');
+    permissionHistoryBtn.id = 'permissionHistoryBtn';
+    permissionHistoryBtn.className = 'excel-btn';
+    permissionHistoryBtn.innerHTML = '<i class="fas fa-history"></i> 權限歷史';
+    
+    // 在登出按鈕前添加權限歷史按鈕
+    const logoutBtn = document.getElementById('logoutBtn');
+    if (logoutBtn) {
+        logoutBtn.parentNode.insertBefore(permissionHistoryBtn, logoutBtn);
+    }
+    
+    permissionHistoryBtn.addEventListener('click', function() {
+        showPermissionHistoryModal();
+    });
+    
+    // 顯示權限變更歷史彈窗
+    function showPermissionHistoryModal() {
+        const modal = document.createElement('div');
+        modal.id = 'permissionHistoryModal';
+        modal.className = 'modal';
+        
+        const modalContent = document.createElement('div');
+        modalContent.className = 'modal-content';
+        modalContent.style.maxWidth = '800px';
+        
+        const closeBtn = document.createElement('span');
+        closeBtn.className = 'close';
+        closeBtn.innerHTML = '&times;';
+        closeBtn.addEventListener('click', function() {
+            modal.style.display = 'none';
+        });
+        
+        const title = document.createElement('h2');
+        title.textContent = '權限變更歷史記錄';
+        title.style.color = '#2c3e50';
+        
+        const historyContainer = document.createElement('div');
+        historyContainer.className = 'history-container';
+        
+        // 獲取權限變更歷史
+        const history = JSON.parse(localStorage.getItem('permission_history') || '[]');
+        
+        if (history.length === 0) {
+            const emptyMsg = document.createElement('p');
+            emptyMsg.textContent = '暫無權限變更記錄';
+            historyContainer.appendChild(emptyMsg);
+        } else {
+            const table = document.createElement('table');
+            table.className = 'history-table';
+            
+            const thead = document.createElement('thead');
+            thead.innerHTML = '<tr><th>時間</th><th>操作者</th><th>操作內容</th></tr>';
+            
+            const tbody = document.createElement('tbody');
+            
+            history.forEach(record => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${new Date(record.timestamp).toLocaleString()}</td>
+                    <td>${record.userName || '未知用戶'}</td>
+                    <td>${record.action}</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            table.appendChild(thead);
+            table.appendChild(tbody);
+            historyContainer.appendChild(table);
+        }
+        
+        modalContent.appendChild(closeBtn);
+        modalContent.appendChild(title);
+        modalContent.appendChild(historyContainer);
+        modal.appendChild(modalContent);
+        document.body.appendChild(modal);
+        modal.style.display = 'block';
+    };
+    
     // 綁定返回首頁按鈕點擊事件
     backToHomeBtn.addEventListener('click', function() {
         window.location.href = 'index.html';
@@ -162,6 +242,19 @@ document.addEventListener('DOMContentLoaded', function() {
         document.getElementById('githubToken').value = localStorage.getItem('githubToken') || '';
         document.getElementById('githubRepo').value = localStorage.getItem('githubRepo') || '';
         document.getElementById('githubBranch').value = localStorage.getItem('githubBranch') || 'main';
+    });
+    
+    // 綁定備份設置按鈕點擊事件
+    backupSettingsBtn.addEventListener('click', function() {
+        // 顯示備份設置彈窗
+        backupSettingsModal.style.display = 'block';
+        
+        // 填充已保存的設置
+        const settings = BackupManager.getBackupSettings();
+        document.getElementById('backupEnabled').checked = settings.enabled;
+        document.getElementById('backupInterval').value = settings.interval;
+        document.getElementById('maxBackupCount').value = settings.maxBackupCount;
+        document.getElementById('autoUploadToGitHub').checked = settings.autoUploadToGitHub;
     });
     
     // 綁定匯入Excel表單提交事件
@@ -546,7 +639,85 @@ document.addEventListener('DOMContentLoaded', function() {
                     }
                 }
             }
+            
+            // 處理批量選擇
+            if (e.target.classList.contains('select-checkbox')) {
+                updateBulkActionsState();
+            }
         });
+        
+        // 綁定批量操作按鈕
+        document.getElementById('bulkRestoreBtn').addEventListener('click', bulkRestoreBooks);
+        document.getElementById('bulkDeleteBtn').addEventListener('click', bulkDeleteBooks);
+    }
+    
+    // 批量恢復書籍
+    function bulkRestoreBooks() {
+        const selectedIds = getSelectedBookIds();
+        if (selectedIds.length === 0) {
+            alert('請至少選擇一本書');
+            return;
+        }
+        
+        if (confirm(`確定要恢復選中的 ${selectedIds.length} 本書嗎？`)) {
+            let successCount = 0;
+            selectedIds.forEach(id => {
+                if (BookData.restoreFromTrash(id)) {
+                    successCount++;
+                }
+            });
+            
+            // 重新加載列表
+            loadTrashBooks();
+            loadBooks();
+            alert(`已成功恢復 ${successCount}/${selectedIds.length} 本書`);
+        }
+    }
+    
+    // 批量刪除書籍
+    function bulkDeleteBooks() {
+        const selectedIds = getSelectedBookIds();
+        if (selectedIds.length === 0) {
+            alert('請至少選擇一本書');
+            return;
+        }
+        
+        if (confirm(`確定要永久刪除選中的 ${selectedIds.length} 本書嗎？此操作無法撤銷！`)) {
+            let successCount = 0;
+            selectedIds.forEach(id => {
+                if (BookData.deleteFromTrash(id)) {
+                    successCount++;
+                }
+            });
+            
+            // 重新加載列表
+            loadTrashBooks();
+            alert(`已成功刪除 ${successCount}/${selectedIds.length} 本書`);
+        }
+    }
+    
+    // 獲取選中的書籍ID
+    function getSelectedBookIds() {
+        const checkboxes = document.querySelectorAll('.select-checkbox:checked');
+        return Array.from(checkboxes).map(checkbox => checkbox.closest('tr').dataset.id);
+    }
+    
+    // 更新批量操作按鈕狀態
+    function updateBulkActionsState() {
+        const selectedCount = document.querySelectorAll('.select-checkbox:checked').length;
+        const bulkRestoreBtn = document.getElementById('bulkRestoreBtn');
+        const bulkDeleteBtn = document.getElementById('bulkDeleteBtn');
+        
+        bulkRestoreBtn.disabled = selectedCount === 0;
+        bulkDeleteBtn.disabled = selectedCount === 0;
+        
+        if (selectedCount > 0) {
+            bulkRestoreBtn.textContent = `恢復選中 (${selectedCount})`;
+            bulkDeleteBtn.textContent = `刪除選中 (${selectedCount})`;
+        } else {
+            bulkRestoreBtn.textContent = '恢復選中';
+            bulkDeleteBtn.textContent = '刪除選中';
+        }
     }
     
     // 加載垃圾桶中的書籍

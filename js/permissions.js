@@ -30,6 +30,29 @@ const PermissionManager = {
         userManagement: false
     },
     
+    // 權限變更歷史記錄
+    PERMISSION_HISTORY_KEY: 'permission_history',
+    
+    // 記錄權限變更
+    logPermissionChange: function(action) {
+        const history = JSON.parse(localStorage.getItem(this.PERMISSION_HISTORY_KEY) || '[]');
+        const currentUser = window.UserManager ? UserManager.getCurrentUser() : {id: 'unknown', name: '未知用戶'};
+        
+        history.push({
+            timestamp: new Date().toISOString(),
+            userId: currentUser.id,
+            userName: currentUser.name,
+            action: action
+        });
+        
+        // 只保留最近的50條記錄
+        if (history.length > 50) {
+            history.shift();
+        }
+        
+        localStorage.setItem(this.PERMISSION_HISTORY_KEY, JSON.stringify(history));
+    },
+    
     // 初始化權限管理
     init: function() {
         // 如果本地存儲中沒有權限設置，則初始化默認設置
@@ -91,6 +114,15 @@ const PermissionManager = {
             
             // 綁定權限設置按鈕點擊事件
             permissionBtn.addEventListener('click', function() {
+                if (window.PermissionManager && !PermissionManager.isEnabled('permissionSettings')) {
+                    // 使用更友好的UI提示代替alert
+                    const notification = document.createElement('div');
+                    notification.className = 'notification error';
+                    notification.innerHTML = '<i class="fas fa-exclamation-circle"></i> 此功能已被管理員禁用';
+                    document.body.appendChild(notification);
+                    setTimeout(() => notification.remove(), 3000);
+                    return;
+                }
                 PermissionManager.showPermissionSettingsModal();
             });
         }
@@ -116,6 +148,7 @@ const PermissionManager = {
             // 創建彈窗內容
             const modalContent = document.createElement('div');
             modalContent.className = 'modal-content';
+            modalContent.style.maxWidth = '500px';
             
             // 創建關閉按鈕
             const closeBtn = document.createElement('span');
@@ -128,10 +161,12 @@ const PermissionManager = {
             // 創建標題
             const title = document.createElement('h2');
             title.textContent = '權限設置驗證';
+            title.style.color = '#2c3e50';
             
             // 創建說明
             const description = document.createElement('p');
             description.textContent = '請輸入權限設置密碼以繼續';
+            description.style.marginBottom = '20px';
             
             // 創建表單
             const form = document.createElement('form');
@@ -140,12 +175,17 @@ const PermissionManager = {
             // 創建密碼輸入框
             const formGroup = document.createElement('div');
             formGroup.className = 'form-group';
+            formGroup.style.marginBottom = '20px';
             
             const passwordInput = document.createElement('input');
             passwordInput.type = 'password';
             passwordInput.id = 'permissionPassword';
             passwordInput.placeholder = '請輸入密碼';
             passwordInput.required = true;
+            passwordInput.style.width = '100%';
+            passwordInput.style.padding = '10px';
+            passwordInput.style.borderRadius = '4px';
+            passwordInput.style.border = '1px solid #ddd';
             
             formGroup.appendChild(passwordInput);
             
@@ -153,6 +193,13 @@ const PermissionManager = {
             const submitBtn = document.createElement('button');
             submitBtn.type = 'submit';
             submitBtn.textContent = '驗證';
+            submitBtn.style.backgroundColor = '#3498db';
+            submitBtn.style.color = 'white';
+            submitBtn.style.border = 'none';
+            submitBtn.style.padding = '10px 20px';
+            submitBtn.style.borderRadius = '4px';
+            submitBtn.style.cursor = 'pointer';
+            submitBtn.style.width = '100%';
             
             // 添加到表單
             form.appendChild(formGroup);
@@ -171,8 +218,20 @@ const PermissionManager = {
                     
                     // 顯示權限設置彈窗
                     PermissionManager.showPermissionSettingsModalAfterVerification();
+                    
+                    // 記錄權限變更歷史
+                    this.logPermissionChange('進入權限設置頁面');
                 } else {
-                    alert('密碼錯誤，請重試');
+                    // 顯示友好的錯誤提示
+                    const errorMsg = document.createElement('p');
+                    errorMsg.textContent = '密碼錯誤，請重試';
+                    errorMsg.style.color = '#e74c3c';
+                    errorMsg.style.marginTop = '10px';
+                    
+                    const form = document.getElementById('passwordVerificationForm');
+                    if (form && !form.querySelector('p')) {
+                        form.appendChild(errorMsg);
+                    }
                 }
             });
             
@@ -1030,8 +1089,13 @@ const PermissionManager = {
     
     // 應用權限設置到界面
     applyPermissions: function() {
+        // 更新權限狀態顯示
+        this.updatePermissionStatus();
         // 獲取權限設置
         const permissions = this.getPermissions();
+        
+        // 更新權限狀態顯示
+        this.updatePermissionStatusDisplay();
         
         // 應用到清空垃圾桶按鈕
         const emptyTrashBtn = document.getElementById('emptyTrashBtn');
@@ -1111,7 +1175,7 @@ const PermissionManager = {
             }
         }
         
-        // 應用到備份歷史按鈕
+        // 應用到備備份歷史按鈕
         const backupHistoryBtn = document.getElementById('backupHistoryBtn');
         if (backupHistoryBtn) {
             if (permissions.backupHistory) {
@@ -1136,6 +1200,36 @@ const PermissionManager = {
                 removeDuplicatesBtn.title = '此功能已被管理員禁用';
             }
         }
+    },
+    
+    // 更新權限狀態顯示
+    updatePermissionStatusDisplay: function() {
+        const statusElement = document.getElementById('permissionStatus');
+        if (!statusElement) return;
+        
+        const permissions = this.getPermissions();
+        const isAdmin = window.UserManager && UserManager.isAdmin();
+        const isSuperAdmin = window.UserManager && UserManager.isSuperAdmin();
+        
+        let statusText = '權限狀態: ';
+        let statusClass = '';
+        
+        if (isSuperAdmin) {
+            statusText += '超級管理員';
+            statusClass = 'super-admin';
+        } else if (isAdmin) {
+            statusText += '管理員';
+            statusClass = 'admin';
+        } else {
+            statusText += '一般用戶';
+            statusClass = 'normal-user';
+        }
+        
+        const permissionText = statusElement.querySelector('.permission-text');
+        const permissionIcon = statusElement.querySelector('.permission-icon');
+        
+        if (permissionText) permissionText.textContent = statusText;
+        if (permissionIcon) permissionIcon.className = `permission-icon ${statusClass}`;
     }
 };
 
