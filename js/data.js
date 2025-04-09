@@ -129,9 +129,12 @@ const BookData = {
         });
         
         return Promise.any(fetchPromises)
-            .then(data => {
-                // fetchPromises 中的每個 Promise 已經返回了解析後的 JSON 數據
-                // 所以這裡直接使用數據，不需要再次調用 response.json()
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('無法加載JSON文件: ' + response.statusText);
+                }
+                return response.json();
+            })
             .then(data => {
                 console.log('從JSON文件加載了', data.length, '本書籍');
                 // 確保所有JSON書籍的ID都是字符串類型

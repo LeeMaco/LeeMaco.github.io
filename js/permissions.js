@@ -98,6 +98,108 @@ const PermissionManager = {
     
     // 顯示權限設置彈窗
     showPermissionSettingsModal: function() {
+        // 先顯示密碼驗證彈窗
+        this.showPasswordVerificationModal();
+    },
+    
+    // 顯示密碼驗證彈窗
+    showPasswordVerificationModal: function() {
+        // 檢查彈窗是否已存在
+        let passwordModal = document.getElementById('passwordVerificationModal');
+        
+        if (!passwordModal) {
+            // 創建彈窗
+            passwordModal = document.createElement('div');
+            passwordModal.id = 'passwordVerificationModal';
+            passwordModal.className = 'modal';
+            
+            // 創建彈窗內容
+            const modalContent = document.createElement('div');
+            modalContent.className = 'modal-content';
+            
+            // 創建關閉按鈕
+            const closeBtn = document.createElement('span');
+            closeBtn.className = 'close';
+            closeBtn.innerHTML = '&times;';
+            closeBtn.addEventListener('click', function() {
+                passwordModal.style.display = 'none';
+            });
+            
+            // 創建標題
+            const title = document.createElement('h2');
+            title.textContent = '權限設置驗證';
+            
+            // 創建說明
+            const description = document.createElement('p');
+            description.textContent = '請輸入權限設置密碼以繼續';
+            
+            // 創建表單
+            const form = document.createElement('form');
+            form.id = 'passwordVerificationForm';
+            
+            // 創建密碼輸入框
+            const formGroup = document.createElement('div');
+            formGroup.className = 'form-group';
+            
+            const passwordInput = document.createElement('input');
+            passwordInput.type = 'password';
+            passwordInput.id = 'permissionPassword';
+            passwordInput.placeholder = '請輸入密碼';
+            passwordInput.required = true;
+            
+            formGroup.appendChild(passwordInput);
+            
+            // 創建提交按鈕
+            const submitBtn = document.createElement('button');
+            submitBtn.type = 'submit';
+            submitBtn.textContent = '驗證';
+            
+            // 添加到表單
+            form.appendChild(formGroup);
+            form.appendChild(submitBtn);
+            
+            // 綁定表單提交事件
+            form.addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const password = document.getElementById('permissionPassword').value;
+                
+                // 驗證密碼 (0211)
+                if (password === '0211') {
+                    // 關閉密碼驗證彈窗
+                    passwordModal.style.display = 'none';
+                    
+                    // 顯示權限設置彈窗
+                    PermissionManager.showPermissionSettingsModalAfterVerification();
+                } else {
+                    alert('密碼錯誤，請重試');
+                }
+            });
+            
+            // 組裝彈窗
+            modalContent.appendChild(closeBtn);
+            modalContent.appendChild(title);
+            modalContent.appendChild(description);
+            modalContent.appendChild(form);
+            passwordModal.appendChild(modalContent);
+            
+            // 添加彈窗到頁面
+            document.body.appendChild(passwordModal);
+            
+            // 點擊彈窗外部關閉彈窗
+            window.addEventListener('click', function(e) {
+                if (e.target === passwordModal) {
+                    passwordModal.style.display = 'none';
+                }
+            });
+        }
+        
+        // 顯示彈窗
+        passwordModal.style.display = 'block';
+    },
+    
+    // 驗證成功後顯示權限設置彈窗
+    showPermissionSettingsModalAfterVerification: function() {
         // 檢查彈窗是否已存在
         let permissionModal = document.getElementById('permissionSettingsModal');
         
