@@ -362,12 +362,26 @@ document.addEventListener('DOMContentLoaded', function() {
         const username = document.getElementById('username').value;
         const password = document.getElementById('password').value;
         
-        if (BookData.validateAdmin(username, password)) {
-            // 登入成功，設置登入狀態並跳轉到管理頁面
-            localStorage.setItem('isLoggedIn', 'true');
-            window.location.href = 'admin.html';
+        // 使用UserManager進行登錄驗證
+        if (window.UserManager) {
+            const result = UserManager.validateLogin(username, password);
+            if (result.success) {
+                // 跳轉到管理頁面
+                window.location.href = 'admin.html';
+            } else {
+                alert(result.message || '帳號或密碼錯誤');
+            }
         } else {
-            alert('帳號或密碼錯誤！');
+            // 向下兼容：使用BookData進行驗證
+            if (BookData.validateAdmin(username, password)) {
+                // 設置登入狀態
+                localStorage.setItem('isLoggedIn', 'true');
+                
+                // 跳轉到管理頁面
+                window.location.href = 'admin.html';
+            } else {
+                alert('帳號或密碼錯誤！');
+            }
         }
     });
     
