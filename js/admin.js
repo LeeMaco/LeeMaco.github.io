@@ -4,22 +4,6 @@
  */
 
 document.addEventListener('DOMContentLoaded', function() {
-    // 移動端下拉菜單控制
-    const adminActionsToggle = document.getElementById('adminActionsToggle');
-    const adminActionsMenu = document.querySelector('.admin-actions-menu');
-    
-    if (adminActionsToggle && adminActionsMenu) {
-        adminActionsToggle.addEventListener('click', function() {
-            adminActionsMenu.classList.toggle('show');
-        });
-        
-        // 點擊菜單外部時關閉菜單
-        document.addEventListener('click', function(event) {
-            if (!event.target.closest('.admin-actions') && adminActionsMenu.classList.contains('show')) {
-                adminActionsMenu.classList.remove('show');
-            }
-        });
-    }
     // 檢查是否已登入
     if (!localStorage.getItem('isLoggedIn')) {
         // 未登入則跳轉到首頁
@@ -70,66 +54,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 加載並顯示所有書籍
     loadBooks();
     
-    // 為表格添加響應式支持
-    addResponsiveTableSupport();
-    
     // 初始化篩選選項
     initFilterOptions();
     
     // 初始化垃圾桶表格事件處理
     initTrashTableEvents();
-    
-    // 添加響應式表格支持函數
-    function addResponsiveTableSupport() {
-        // 為表格行添加data-label屬性的函數
-        function addDataLabelsToTable(tableBody, headerLabels) {
-            // 監聽DOM變化，當表格內容更新時添加data-label
-            const observer = new MutationObserver(function(mutations) {
-                mutations.forEach(function(mutation) {
-                    if (mutation.type === 'childList' && mutation.addedNodes.length > 0) {
-                        mutation.addedNodes.forEach(function(node) {
-                            if (node.nodeName === 'TR') {
-                                const cells = node.querySelectorAll('td');
-                                cells.forEach(function(cell, index) {
-                                    if (index < headerLabels.length) {
-                                        cell.setAttribute('data-label', headerLabels[index]);
-                                    }
-                                });
-                            }
-                        });
-                    }
-                });
-            });
-            
-            // 開始觀察表格變化
-            observer.observe(tableBody, { childList: true });
-            
-            // 處理已存在的行
-            const existingRows = tableBody.querySelectorAll('tr');
-            existingRows.forEach(function(row) {
-                const cells = row.querySelectorAll('td');
-                cells.forEach(function(cell, index) {
-                    if (index < headerLabels.length) {
-                        cell.setAttribute('data-label', headerLabels[index]);
-                    }
-                });
-            });
-        }
-        
-        // 為主表格添加data-label
-        const bookTableBody = document.getElementById('bookTableBody');
-        if (bookTableBody) {
-            const headerLabels = ['書名', '作者', '集數', '出版社', '櫃號', '行號', '創建時間', '操作'];
-            addDataLabelsToTable(bookTableBody, headerLabels);
-        }
-        
-        // 為垃圾桶表格添加data-label
-        const trashTableBody = document.getElementById('trashTableBody');
-        if (trashTableBody) {
-            const trashHeaderLabels = ['書名', '作者', '出版社', '刪除時間', '操作'];
-            addDataLabelsToTable(trashTableBody, trashHeaderLabels);
-        }
-    }
     
     // 綁定垃圾桶按鈕點擊事件
     if (trashBtn) {
