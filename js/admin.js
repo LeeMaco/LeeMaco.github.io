@@ -126,7 +126,7 @@ document.addEventListener('DOMContentLoaded', function() {
         // 為垃圾桶表格添加data-label
         const trashTableBody = document.getElementById('trashTableBody');
         if (trashTableBody) {
-            const trashHeaderLabels = ['書名', '作者', '集數', '櫃號', '行號', '出版社', '刪除原因', '刪除時間', '操作'];
+            const trashHeaderLabels = ['書名', '作者', '出版社', '刪除時間', '操作'];
             addDataLabelsToTable(trashTableBody, trashHeaderLabels);
         }
     }
@@ -640,7 +640,7 @@ document.addEventListener('DOMContentLoaded', function() {
         let html = '';
         
         if (trashBooks.length === 0) {
-            html = `<tr><td colspan="12" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
+            html = `<tr><td colspan="9" style="text-align: center;">垃圾桶中沒有書籍</td></tr>`;
         } else {
             trashBooks.forEach(book => {
                 // 格式化日期
@@ -652,9 +652,6 @@ document.addEventListener('DOMContentLoaded', function() {
                     <tr data-id="${book.id}">
                         <td>${book.title}</td>
                         <td>${book.author}</td>
-                        <td>${book.series || '-'}</td>
-                        <td>${book.cabinet || '-'}</td>
-                        <td>${book.row || '-'}</td>
                         <td>${book.publisher || '-'}</td>
                         <td>${deleteReason}</td>
                         <td>${deletedDate}</td>
@@ -673,18 +670,11 @@ document.addEventListener('DOMContentLoaded', function() {
     // 清空垃圾桶
     function emptyTrash() {
         if (confirm('確定要清空垃圾桶嗎？此操作將永久刪除垃圾桶中的所有書籍，無法撤銷！')) {
-            try {
-                // 確保垃圾桶清空操作成功執行
-                if (BookData.emptyTrash()) {
-                    // 重新加載垃圾桶顯示
-                    loadTrashBooks();
-                    alert('垃圾桶已清空');
-                } else {
-                    alert('清空垃圾桶失敗，請重試');
-                }
-            } catch (error) {
-                console.error('清空垃圾桶時發生錯誤:', error);
-                alert('清空垃圾桶時發生錯誤: ' + error.message);
+            if (BookData.emptyTrash()) {
+                loadTrashBooks();
+                alert('垃圾桶已清空');
+            } else {
+                alert('清空垃圾桶失敗，請重試');
             }
         }
     }
