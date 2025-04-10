@@ -7,10 +7,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     // 初始化數據庫
     await db.init();
     
-    // 檢查登入狀態
-    if (!auth.isAuthenticated()) {
+    // 檢查登入狀態和管理員權限
+    if (!auth.isAuthenticated() || !auth.isAdmin()) {
         document.getElementById('adminContent').classList.add('d-none');
         document.getElementById('loginRequired').classList.remove('d-none');
+        
+        // 如果已登入但不是管理員，顯示權限錯誤
+        if (auth.isAuthenticated() && !auth.isAdmin()) {
+            const loginRequired = document.getElementById('loginRequired');
+            const cardBody = loginRequired.querySelector('.card-body');
+            cardBody.innerHTML = `
+                <p class="mb-4 text-danger">您沒有管理員權限，無法訪問此頁面</p>
+                <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#loginModal">管理員登入</button>
+            `;
+        }
     } else {
         document.getElementById('adminContent').classList.remove('d-none');
         document.getElementById('loginRequired').classList.add('d-none');
@@ -49,7 +59,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             addBookBtn.addEventListener('click', () => {
                 // 重置表單
                 document.getElementById('bookForm').reset();
-                document.getElementById('bookFormTitle').textContent = '添加書籍';
+                document.getElementById('bookModalTitle').textContent = '添加書籍';
                 document.getElementById('bookId').value = '';
                 
                 // 顯示模態框
@@ -116,8 +126,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         
         // 嘗試登入
         if (auth.login(username, password)) {
-            // 登入成功，刷新頁面
-            window.location.reload();
+            // 登入成功，檢查是否為管理員
+            if (auth.isAdmin()) {
+                // 是管理員，刷新頁面
+                window.location.reload();
+            } else {
+                // 不是管理員，顯示錯誤
+                loginError.textContent = '您沒有管理員權限';
+                loginError.classList.remove('d-none');
+                // 登出非管理員用戶
+                auth.logout();
+            }
         } else {
             // 登入失敗
             loginError.textContent = '帳號或密碼錯誤';

@@ -242,6 +242,12 @@ document.addEventListener('DOMContentLoaded', async () => {
             // 更新登入按鈕
             updateLoginButton();
             
+            // 檢查是否為管理員，如果是則跳轉到管理頁面
+            if (auth.isAdmin()) {
+                window.location.href = 'admin.html';
+                return;
+            }
+            
             // 如果在管理頁面，刷新頁面
             if (window.location.pathname.includes('admin.html')) {
                 window.location.reload();
