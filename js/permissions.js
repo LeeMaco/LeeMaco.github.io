@@ -101,9 +101,9 @@ const PermissionManager = {
                 }
                 
                 // 綁定用戶管理按鈕點擊事件
-                userManagementBtn.addEventListener('click', function() {
+                userManagementBtn.onclick = function() {
                     PermissionManager.showUserManagementModal();
-                });
+                };
             } else {
                 if (logoutBtn) {
                     adminActions.insertBefore(permissionBtn, logoutBtn);
@@ -113,10 +113,10 @@ const PermissionManager = {
             }
             
             // 綁定權限設置按鈕點擊事件
-            permissionBtn.addEventListener('click', function() {
+            permissionBtn.onclick = function() {
                 // 權限設置按鈕不需要檢查權限，因為它是基本功能
                 PermissionManager.showPermissionSettingsModal();
-            });
+            };
         }
     },
     
@@ -146,9 +146,9 @@ const PermissionManager = {
             const closeBtn = document.createElement('span');
             closeBtn.className = 'close';
             closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', function() {
+            closeBtn.onclick = function() {
                 passwordModal.style.display = 'none';
-            });
+            };
             
             // 創建標題
             const title = document.createElement('h2');
@@ -198,7 +198,7 @@ const PermissionManager = {
             form.appendChild(submitBtn);
             
             // 綁定表單提交事件
-            form.addEventListener('submit', function(e) {
+            form.onsubmit = function(e) {
                 e.preventDefault();
                 
                 const password = document.getElementById('permissionPassword').value;
@@ -225,7 +225,7 @@ const PermissionManager = {
                         form.appendChild(errorMsg);
                     }
                 }
-            });
+            };
             
             // 組裝彈窗
             modalContent.appendChild(closeBtn);
@@ -238,11 +238,11 @@ const PermissionManager = {
             document.body.appendChild(passwordModal);
             
             // 點擊彈窗外部關閉彈窗
-            window.addEventListener('click', function(e) {
+            window.onclick = function(e) {
                 if (e.target === passwordModal) {
                     passwordModal.style.display = 'none';
                 }
-            });
+            };
         }
         
         // 顯示彈窗
@@ -268,9 +268,9 @@ const PermissionManager = {
             const closeBtn = document.createElement('span');
             closeBtn.className = 'close';
             closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', function() {
+            closeBtn.onclick = function() {
                 permissionModal.style.display = 'none';
-            });
+            };
             
             // 創建標題
             const title = document.createElement('h2');
@@ -344,7 +344,7 @@ const PermissionManager = {
             form.appendChild(submitBtn);
             
             // 綁定表單提交事件
-            form.addEventListener('submit', function(e) {
+            form.onsubmit = function(e) {
                 e.preventDefault();
                 
                 // 獲取表單數據
@@ -375,7 +375,7 @@ const PermissionManager = {
                 
                 // 顯示成功消息
                 alert('權限設置已保存');
-            });
+            };
             
             // 組裝彈窗
             modalContent.appendChild(closeBtn);
@@ -388,11 +388,11 @@ const PermissionManager = {
             document.body.appendChild(permissionModal);
             
             // 點擊彈窗外部關閉彈窗
-            window.addEventListener('click', function(e) {
+            window.onclick = function(e) {
                 if (e.target === permissionModal) {
                     permissionModal.style.display = 'none';
                 }
-            });
+            };
         } else {
             // 更新彈窗內容
             const description = permissionModal.querySelector('p');
@@ -446,9 +446,9 @@ const PermissionManager = {
             const closeBtn = document.createElement('span');
             closeBtn.className = 'close';
             closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', function() {
+            closeBtn.onclick = function() {
                 userManagementModal.style.display = 'none';
-            });
+            };
             
             // 創建標題
             const title = document.createElement('h2');
@@ -507,16 +507,16 @@ const PermissionManager = {
             document.body.appendChild(userManagementModal);
             
             // 點擊彈窗外部關閉彈窗
-            window.addEventListener('click', function(e) {
+            window.onclick = function(e) {
                 if (e.target === userManagementModal) {
                     userManagementModal.style.display = 'none';
                 }
-            });
+            };
             
             // 綁定添加用戶按鈕點擊事件
-            addUserBtn.addEventListener('click', function() {
+            addUserBtn.onclick = function() {
                 PermissionManager.showAddUserModal();
-            });
+            };
         }
         
         // 加載用戶列表
@@ -904,9 +904,9 @@ const PermissionManager = {
             const closeBtn = document.createElement('span');
             closeBtn.className = 'close';
             closeBtn.innerHTML = '&times;';
-            closeBtn.addEventListener('click', function() {
+            closeBtn.onclick = function() {
                 userPermissionModal.style.display = 'none';
-            });
+            };
             
             // 創建標題
             const title = document.createElement('h2');
@@ -972,7 +972,7 @@ const PermissionManager = {
             form.appendChild(submitBtn);
             
             // 綁定表單提交事件
-            form.addEventListener('submit', function(e) {
+            form.onsubmit = function(e) {
                 e.preventDefault();
                 
                 const userId = document.getElementById('permissionUserId').value;
@@ -991,7 +991,7 @@ const PermissionManager = {
                 
                 // 顯示成功消息
                 alert('權限設置已保存');
-            });
+            };
             
             // 組裝模態框
             modalContent.appendChild(closeBtn);
