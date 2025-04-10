@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍管理系統 - 管理頁面</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/error.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1>書籍查詢管理系統</h1>
+            <div class="admin-login">
+                <button id="backToHomeBtn"><i class="fas fa-home"></i> 返回首頁</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section>
+            <div class="admin-header">
+                <h2>書籍管理</h2>
+                <div class="admin-actions">
+                    <button id="addBookBtn" class="add-btn"><i class="fas fa-plus"></i> 新增書籍</button>
+                    <button id="removeDuplicatesBtn" class="excel-btn"><i class="fas fa-broom"></i> 去除重複</button>
+                    <button id="exportExcelBtn" class="excel-btn"><i class="fas fa-file-export"></i> 匯出Excel</button>
+                    <button id="exportJsonBtn" class="excel-btn"><i class="fas fa-file-code"></i> 匯出JSON</button>
+                    <button id="importExcelBtn" class="excel-btn"><i class="fas fa-file-import"></i> 匯入Excel</button>
+                    <button id="githubSettingsBtn" class="excel-btn"><i class="fab fa-github"></i> GitHub設置</button>
+                    <button id="backupSettingsBtn" class="excel-btn"><i class="fas fa-cog"></i> 備份設置</button>
+                    <button id="backupHistoryBtn" class="excel-btn"><i class="fas fa-history"></i> 備份歷史</button>
+                    <button id="trashBtn" class="excel-btn"><i class="fas fa-trash-alt"></i> 垃圾桶</button>
+                    <button id="logoutBtn" class="logout-btn"><i class="fas fa-sign-out-alt"></i> 登出</button>
+                </div>
+            </div>
+            
+            <!-- 查詢、篩選和排序區域 -->
+            <div class="search-filter-section">
+                <form id="searchFilterForm">
+                    <div class="search-row">
+                        <div class="search-group">
+                            <label for="searchKeyword">關鍵字搜索：</label>
+                            <input type="text" id="searchKeyword" placeholder="輸入關鍵字...">
+                        </div>
+                        <div class="search-group">
+                            <label for="searchField">搜索欄位：</label>
+                            <select id="searchField">
+                                <option value="title">書名</option>
+                                <option value="author">作者</option>
+                                <option value="series">集數</option>
+                                <option value="publisher">出版社</option>
+                                <option value="cabinet">櫃號</option>
+                                <option value="row">行號</option>
+                                <option value="isbn">ISBN</option>
+                                <option value="all">全部欄位</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label for="filterPublisher">出版社：</label>
+                            <select id="filterPublisher">
+                                <option value="">全部</option>
+                                <!-- 出版社選項將由JavaScript動態生成 -->
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label for="filterCabinet">櫃號：</label>
+                            <select id="filterCabinet">
+                                <option value="">全部</option>
+                                <!-- 櫃號選項將由JavaScript動態生成 -->
+                            </select>
+                        </div>
+                    </div>
+                    <div class="sort-row">
+                        <div class="sort-group">
+                            <label for="sortField">排序依據：</label>
+                            <select id="sortField">
+                                <option value="title">書名</option>
+                                <option value="author">作者</option>
+                                <option value="series">集數</option>
+                                <option value="publisher">出版社</option>
+                                <option value="cabinet">櫃號</option>
+                                <option value="row">行號</option>
+                                <option value="createdAt">創建時間</option>
+                                <option value="updatedAt">更新時間</option>
+                            </select>
+                        </div>
+                        <div class="sort-group">
+                            <label for="sortOrder">排序方式：</label>
+                            <select id="sortOrder">
+                                <option value="asc">升序</option>
+                                <option value="desc">降序</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="button-row">
+                        <button type="submit" id="applyFiltersBtn"><i class="fas fa-search"></i> 搜索</button>
+                        <button type="reset" id="resetFiltersBtn"><i class="fas fa-undo"></i> 重置</button>
+                    </div>
+                </form>
+            </div>
+            
+            <div class="admin-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>書名</th>
+                            <th>作者</th>
+                            <th>集數</th>
+                            <th>出版社</th>
+                            <th>櫃號</th>
+                            <th>行號</th>
+                            <th>創建時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="bookTableBody">
+                        <!-- 書籍資料將在這裡顯示 -->
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </main>
+
+    <!-- 新增/編輯書籍彈窗 -->
+    <div id="bookFormModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2 id="formTitle">新增書籍</h2>
+            <form id="bookForm">
+                <input type="hidden" id="bookId">
+                <div class="form-group">
+                    <label for="title">書名：</label>
+                    <input type="text" id="title" required>
+                </div>
+                <div class="form-group">
+                    <label for="author">作者：</label>
+                    <input type="text" id="author" required>
+                </div>
+                <div class="form-group">
+                    <label for="series">集數：</label>
+                    <input type="text" id="series">
+                </div>
+                <div class="form-group">
+                    <label for="publisher">出版社：</label>
+                    <input type="text" id="publisher">
+                </div>
+                <div class="form-group">
+                    <label for="description">描述：</label>
+                    <textarea id="description"></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="cabinet">櫃號：</label>
+                    <input type="text" id="cabinet">
+                </div>
+                <div class="form-group">
+                    <label for="row">行號：</label>
+                    <input type="text" id="row">
+                </div>
+                <div class="form-group">
+                    <label for="isbn">ISBN號：</label>
+                    <input type="text" id="isbn">
+                </div>
+                <div class="form-group">
+                    <label for="notes">備註：</label>
+                    <textarea id="notes"></textarea>
+                </div>
+                <button type="submit">儲存</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 確認刪除彈窗 -->
+    <div id="deleteConfirmModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>確認刪除</h2>
+            <p>您確定要刪除這本書嗎？此操作無法撤銷。</p>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 20px;">
+                <button id="cancelDeleteBtn" style="background-color: #7f8c8d;">取消</button>
+                <button id="confirmDeleteBtn" style="background-color: #e74c3c;">確認刪除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 垃圾桶彈窗 -->
+    <div id="trashModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>垃圾桶</h2>
+            <p>這裡顯示被刪除的書籍和自動去重的重複書籍，超過30天將自動永久刪除。</p>
+            <div class="trash-actions" style="margin-bottom: 15px;">
+                <button id="emptyTrashBtn" class="delete-btn"><i class="fas fa-trash"></i> 清空垃圾桶</button>
+            </div>
+            <div class="admin-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>書名</th>
+                            <th>作者</th>
+                            <th>出版社</th>
+                            <th>刪除原因</th>
+                            <th>刪除時間</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="trashTableBody">
+                        <!-- 垃圾桶中的書籍將在這裡顯示 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯入Excel彈窗 -->
+    <div id="importExcelModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>匯入Excel</h2>
+            <p>請選擇Excel文件進行匯入。文件格式應包含：書名、作者、出版社、ISBN號等欄位。</p>
+            <form id="importExcelForm">
+                <div class="form-group">
+                    <input type="file" id="excelFile" accept=".xlsx" required>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="autoUpload" style="margin-right: 8px;">
+                    <label for="autoUpload">自動上傳到GitHub</label>
+                </div>
+                <div id="uploadStatus" style="margin-top: 10px; font-weight: bold;"></div>
+                <button type="submit">匯入</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 去除重複書籍彈窗 -->
+    <div id="removeDuplicatesModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>去除重複書籍</h2>
+            <p>請選擇用於判斷重複的標準：</p>
+            <form id="removeDuplicatesForm">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaTitle" checked style="margin-right: 8px;">
+                    <label for="criteriaTitle">書名</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaAuthor" checked style="margin-right: 8px;">
+                    <label for="criteriaAuthor">作者</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaISBN" checked style="margin-right: 8px;">
+                    <label for="criteriaISBN">ISBN</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaPublisher" style="margin-right: 8px;">
+                    <label for="criteriaPublisher">出版社</label>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="criteriaSeries" style="margin-right: 8px;">
+                    <label for="criteriaSeries">集數</label>
+                </div>
+                <div id="duplicateStatus" style="margin-top: 10px; font-weight: bold;"></div>
+                <button type="submit">開始去重</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- GitHub設置彈窗 -->
+    <div id="githubSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>GitHub設置</h2>
+            <p>請設置GitHub相關信息，用於自動上傳功能。</p>
+            <form id="githubSettingsForm">
+                <div class="form-group">
+                    <label for="githubToken">個人訪問令牌 (PAT)：</label>
+                    <input type="password" id="githubToken" placeholder="輸入您的GitHub個人訪問令牌" required>
+                </div>
+                <div class="form-group">
+                    <label for="githubRepo">倉庫名稱：</label>
+                    <input type="text" id="githubRepo" placeholder="格式：用戶名/倉庫名" required>
+                </div>
+                <div class="form-group">
+                    <label for="githubBranch">分支名稱：</label>
+                    <input type="text" id="githubBranch" placeholder="例如：main 或 master" value="main">
+                </div>
+                <button type="submit">保存設置</button>
+            </form>
+        </div>
+    </div>
+
+    <!-- 備份設置彈窗 -->
+    <div id="backupSettingsModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>備份設置</h2>
+            <p>請設置自動備份相關信息。</p>
+            <form id="backupSettingsForm">
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="backupEnabled" style="margin-right: 8px;">
+                    <label for="backupEnabled">啟用自動備份</label>
+                </div>
+                <div class="form-group">
+                    <label for="backupInterval">備份頻率：</label>
+                    <select id="backupInterval">
+                        <option value="hourly">每小時</option>
+                        <option value="daily" selected>每天</option>
+                        <option value="weekly">每週</option>
+                        <option value="manual">手動備份</option>
+                    </select>
+                </div>
+                <div class="form-group" style="display: flex; align-items: center;">
+                    <input type="checkbox" id="autoUploadToGitHub" style="margin-right: 8px;">
+                    <label for="autoUploadToGitHub">自動上傳到GitHub</label>
+                </div>
+                <div class="form-group">
+                    <label for="maxBackupCount">保留備份數量：</label>
+                    <input type="number" id="maxBackupCount" min="1" max="50" value="10">
+                </div>
+                <div class="form-group">
+                    <label>最後備份時間：</label>
+                    <span id="lastBackupTime">從未備份</span>
+                </div>
+                <button type="submit">保存設置</button>
+            </form>
+        </div>
+    </div>
+    
+    <!-- 備份歷史彈窗 -->
+    <div id="backupHistoryModal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <h2>備份歷史</h2>
+            <p>這裡顯示所有的備份記錄，您可以恢復或刪除備份。</p>
+            <div class="backup-actions" style="margin-bottom: 15px;">
+                <button id="createBackupBtn" class="add-btn"><i class="fas fa-plus"></i> 立即備份</button>
+                <button id="clearBackupHistoryBtn" class="delete-btn"><i class="fas fa-trash"></i> 清空歷史</button>
+            </div>
+            <div class="admin-content">
+                <table class="admin-table">
+                    <thead>
+                        <tr>
+                            <th>備份時間</th>
+                            <th>書籍數量</th>
+                            <th>已上傳GitHub</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="backupHistoryTableBody">
+                        <!-- 備份歷史記錄將在這裡顯示 -->
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 書籍查詢管理系統</p>
+        </div>
+    </footer>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="js/data.js"></script>
+    <script src="js/user-manager.js"></script>
+    <script src="js/permissions.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/backup.js"></script>
+    <script src="js/backup-ui.js"></script>
+</body>
+</html>
