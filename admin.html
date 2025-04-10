@@ -3,300 +3,127 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理員界面 - 書籍查詢管理系統</title>
-    <link rel="stylesheet" href="css/style.css">
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <title>書籍管理系統 - 管理員</title>
+    <link rel="stylesheet" href="assets/css/style.css">
+    <link rel="stylesheet" href="assets/css/admin.css">
 </head>
 <body>
-    <div class="container-fluid p-0">
-        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
-            <div class="container">
-                <a class="navbar-brand" href="index.html">書籍查詢系統</a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav me-auto">
-                        <li class="nav-item">
-                            <a class="nav-link" href="index.html">首頁</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link active" href="admin.html">管理界面</a>
-                        </li>
-                    </ul>
-                    <div class="d-flex">
-                        <span id="welcomeMessage" class="text-white me-3 d-none">歡迎，<span id="adminName"></span></span>
-                        <button id="logoutBtn" class="btn btn-outline-light">登出</button>
-                    </div>
-                </div>
-            </div>
-        </nav>
-
-        <div id="adminContent" class="container mt-4 d-none">
-            <div class="row mb-4">
-                <div class="col-md-12">
-                    <div class="card">
-                        <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
-                            <h4 class="mb-0">書籍管理</h4>
-                            <div>
-                                <button id="addBookBtn" class="btn btn-light btn-sm me-2" data-bs-toggle="modal" data-bs-target="#bookModal">
-                                    <i class="fas fa-plus"></i> 新增書籍
-                                </button>
-                                <div class="btn-group">
-                                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                        <i class="fas fa-file-export"></i> 導入/導出
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="#" id="importBtn">導入數據 (Excel/CSV)</a></li>
-                                        <li><a class="dropdown-item" href="#" id="exportBtn">導出數據 (Excel)</a></li>
-                                    </ul>
-                                </div>
-                                <div class="btn-group">
-                                    <button class="btn btn-light btn-sm dropdown-toggle" type="button" data-bs-toggle="dropdown">
-                                        <i class="fas fa-database"></i> 備份
-                                    </button>
-                                    <ul class="dropdown-menu">
-                                        <li><a class="dropdown-item" href="#" id="backupNowBtn">立即備份</a></li>
-                                        <li><a class="dropdown-item" href="#" id="scheduleBackupBtn" data-bs-toggle="modal" data-bs-target="#backupModal">排程備份</a></li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
-                        <div class="card-body">
-                            <div class="table-responsive">
-                                <table class="table table-striped table-hover">
-                                    <thead>
-                                        <tr>
-                                            <th>書名</th>
-                                            <th>作者</th>
-                                            <th>集數</th>
-                                            <th>類別</th>
-                                            <th>櫃號</th>
-                                            <th>行號</th>
-                                            <th>出版社</th>
-                                            <th>ISBN號</th>
-                                            <th>操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="bookTableBody">
-                                        <!-- 書籍數據將在這裡動態加載 -->
-                                    </tbody>
-                                </table>
-                            </div>
-                            <div id="booksPagination" class="d-flex justify-content-center mt-3">
-                                <!-- 分頁控制將在這裡動態加載 -->
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
+    <div id="login-modal" class="modal">
+        <div class="modal-content">
+            <h2>管理員登入</h2>
+            <input type="password" id="admin-password" placeholder="輸入管理員密碼">
+            <button id="login-btn">登入</button>
+            <p id="login-error" class="error-message"></p>
         </div>
-
-        <div id="loginRequired" class="container mt-5">
-            <div class="row justify-content-center">
-                <div class="col-md-6">
-                    <div class="card">
-                        <div class="card-header bg-primary text-white">
-                            <h4 class="mb-0">需要登入</h4>
-                        </div>
-                        <div class="card-body text-center">
-                            <p class="mb-4">您需要登入才能訪問管理界面</p>
-                            <button class="btn btn-primary" data-bs-toggle="modal" data-bs-target="#loginModal">管理員登入</button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 書籍表單模態框 -->
-        <div class="modal fade" id="bookModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog modal-lg">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title" id="bookModalTitle">新增書籍</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="bookForm">
-                            <input type="hidden" id="bookId">
-                            <div class="row">
-                                <div class="col-md-6 mb-3">
-                                    <label for="title" class="form-label">書名 *</label>
-                                    <input type="text" class="form-control" id="title" required>
-                                </div>
-                                <div class="col-md-6 mb-3">
-                                    <label for="author" class="form-label">作者 *</label>
-                                    <input type="text" class="form-control" id="author" required>
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="volume" class="form-label">集數</label>
-                                    <input type="text" class="form-control" id="volume">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="category" class="form-label">類別</label>
-                                    <input type="text" class="form-control" id="category">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="isbn" class="form-label">ISBN號</label>
-                                    <input type="text" class="form-control" id="isbn">
-                                </div>
-                            </div>
-                            <div class="row">
-                                <div class="col-md-4 mb-3">
-                                    <label for="cabinet" class="form-label">櫃號</label>
-                                    <input type="text" class="form-control" id="cabinet">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="row" class="form-label">行號</label>
-                                    <input type="text" class="form-control" id="row">
-                                </div>
-                                <div class="col-md-4 mb-3">
-                                    <label for="publisher" class="form-label">出版社</label>
-                                    <input type="text" class="form-control" id="publisher">
-                                </div>
-                            </div>
-                            <div class="mb-3">
-                                <label for="description" class="form-label">描述</label>
-                                <textarea class="form-control" id="description" rows="3"></textarea>
-                            </div>
-                            <div class="mb-3">
-                                <label for="notes" class="form-label">備註</label>
-                                <textarea class="form-control" id="notes" rows="2"></textarea>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-primary" id="saveBookBtn">保存</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 備份設置模態框 -->
-        <div class="modal fade" id="backupModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">備份設置</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="backupForm">
-                            <div class="mb-3">
-                                <label for="backupEmail" class="form-label">備份郵箱 (Gmail)</label>
-                                <input type="email" class="form-control" id="backupEmail" placeholder="example@gmail.com" required>
-                            </div>
-                            <div class="mb-3">
-                                <label class="form-label">備份頻率</label>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="backupFrequency" id="backupDaily" value="daily">
-                                    <label class="form-check-label" for="backupDaily">每日</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="backupFrequency" id="backupWeekly" value="weekly" checked>
-                                    <label class="form-check-label" for="backupWeekly">每週</label>
-                                </div>
-                                <div class="form-check">
-                                    <input class="form-check-input" type="radio" name="backupFrequency" id="backupMonthly" value="monthly">
-                                    <label class="form-check-label" for="backupMonthly">每月</label>
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-primary" id="saveBackupBtn">保存設置</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 導入文件模態框 -->
-        <div class="modal fade" id="importModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">導入數據</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="importForm">
-                            <div class="mb-3">
-                                <label for="importFile" class="form-label">選擇Excel或CSV文件</label>
-                                <input class="form-control" type="file" id="importFile" accept=".xlsx,.xls,.csv" required>
-                            </div>
-                            <div class="form-check mb-3">
-                                <input class="form-check-input" type="checkbox" id="filterDuplicates" checked>
-                                <label class="form-check-label" for="filterDuplicates">
-                                    自動過濾重複數據
-                                </label>
-                            </div>
-                            <div id="importPreview" class="d-none">
-                                <h6>預覽 (前5條記錄):</h6>
-                                <div class="table-responsive">
-                                    <table class="table table-sm table-bordered">
-                                        <thead id="importPreviewHeader"></thead>
-                                        <tbody id="importPreviewBody"></tbody>
-                                    </table>
-                                </div>
-                                <div class="alert alert-info">
-                                    <span id="totalRecords">0</span> 條記錄將被導入，
-                                    <span id="duplicateRecords">0</span> 條重複記錄將被過濾
-                                </div>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                        <button type="button" class="btn btn-primary" id="previewImportBtn">預覽</button>
-                        <button type="button" class="btn btn-success d-none" id="confirmImportBtn">確認導入</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- 登入彈窗 -->
-        <div class="modal fade" id="loginModal" tabindex="-1" aria-hidden="true">
-            <div class="modal-dialog">
-                <div class="modal-content">
-                    <div class="modal-header bg-primary text-white">
-                        <h5 class="modal-title">管理員登入</h5>
-                        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
-                    </div>
-                    <div class="modal-body">
-                        <form id="loginForm">
-                            <div class="mb-3">
-                                <label for="username" class="form-label">帳號</label>
-                                <input type="text" class="form-control" id="username" required>
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">密碼</label>
-                                <input type="password" class="form-control" id="password" required>
-                            </div>
-                            <div id="loginError" class="alert alert-danger d-none"></div>
-                            <button type="submit" class="btn btn-primary w-100">登入</button>
-                        </form>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <footer class="bg-dark text-white mt-5 py-3">
-            <div class="container text-center">
-                <p class="mb-0">© 2023 書籍查詢管理系統 - 使用 GitHub Pages 託管</p>
-            </div>
-        </footer>
     </div>
-
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="js/config.js"></script>
-    <script src="js/database.js"></script>
-    <script src="js/auth.js"></script>
-    <script src="js/admin.js"></script>
+    
+    <div id="admin-interface" class="hidden">
+        <header>
+            <h1>書籍管理系統 - 管理員面板</h1>
+            <button id="logout-btn">登出</button>
+        </header>
+        
+        <main>
+            <section class="admin-tools">
+                <div class="tool-buttons">
+                    <button id="add-book-btn">新增書籍</button>
+                    <button id="import-btn">導入數據</button>
+                    <button id="export-btn">導出數據</button>
+                    <button id="backup-btn">立即備份</button>
+                    <input type="file" id="file-input" accept=".xlsx,.xls,.csv" style="display: none;">
+                </div>
+                
+                <div class="backup-settings">
+                    <h3>自動備份設置</h3>
+                    <select id="backup-frequency">
+                        <option value="disabled">不自動備份</option>
+                        <option value="daily">每日</option>
+                        <option value="weekly">每週</option>
+                        <option value="monthly">每月</option>
+                    </select>
+                    <input type="email" id="backup-email" placeholder="備份接收郵箱">
+                    <button id="save-settings-btn">保存設置</button>
+                </div>
+            </section>
+            
+            <section class="book-editor">
+                <div class="editor-form hidden" id="editor-form">
+                    <h2 id="editor-title">新增書籍</h2>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="edit-title">書名*</label>
+                            <input type="text" id="edit-title" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-author">作者*</label>
+                            <input type="text" id="edit-author" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-volume">集數</label>
+                            <input type="number" id="edit-volume" min="1">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-category">類別</label>
+                            <select id="edit-category">
+                                <option value="fiction">小說</option>
+                                <option value="non-fiction">非小說</option>
+                                <option value="science">科學</option>
+                                <option value="history">歷史</option>
+                                <option value="other">其他</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-cabinet">櫃號</label>
+                            <input type="text" id="edit-cabinet">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-row">行號</label>
+                            <input type="text" id="edit-row">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-publisher">出版社</label>
+                            <input type="text" id="edit-publisher">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-description">描述</label>
+                            <textarea id="edit-description"></textarea>
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-isbn">ISBN號</label>
+                            <input type="text" id="edit-isbn">
+                        </div>
+                        <div class="form-group">
+                            <label for="edit-notes">備註</label>
+                            <textarea id="edit-notes"></textarea>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button id="cancel-edit-btn">取消</button>
+                        <button id="save-book-btn">保存</button>
+                    </div>
+                </div>
+                
+                <div class="book-list-container">
+                    <h2>書籍列表</h2>
+                    <div class="list-controls">
+                        <input type="text" id="admin-search" placeholder="搜索書籍...">
+                        <select id="admin-filter-category">
+                            <option value="all">所有類別</option>
+                            <option value="fiction">小說</option>
+                            <option value="non-fiction">非小說</option>
+                            <option value="science">科學</option>
+                            <option value="history">歷史</option>
+                        </select>
+                    </div>
+                    <div id="admin-book-list" class="book-list">
+                        <!-- 書籍列表將在這裡動態生成 -->
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+    
+    <script src="assets/js/xlsx.full.min.js"></script>
+    <script src="assets/js/admin.js"></script>
 </body>
 </html>
