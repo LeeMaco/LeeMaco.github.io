@@ -114,15 +114,7 @@ const PermissionManager = {
             
             // 綁定權限設置按鈕點擊事件
             permissionBtn.addEventListener('click', function() {
-                if (window.PermissionManager && !PermissionManager.isEnabled('permissionSettings')) {
-                    // 使用更友好的UI提示代替alert
-                    const notification = document.createElement('div');
-                    notification.className = 'notification error';
-                    notification.innerHTML = '<i class="fas fa-exclamation-circle"></i> 此功能已被管理員禁用';
-                    document.body.appendChild(notification);
-                    setTimeout(() => notification.remove(), 3000);
-                    return;
-                }
+                // 權限設置按鈕不需要檢查權限，因為它是基本功能
                 PermissionManager.showPermissionSettingsModal();
             });
         }
@@ -220,7 +212,7 @@ const PermissionManager = {
                     PermissionManager.showPermissionSettingsModalAfterVerification();
                     
                     // 記錄權限變更歷史
-                    this.logPermissionChange('進入權限設置頁面');
+                    PermissionManager.logPermissionChange('進入權限設置頁面');
                 } else {
                     // 顯示友好的錯誤提示
                     const errorMsg = document.createElement('p');
@@ -1084,7 +1076,19 @@ const PermissionManager = {
     // 檢查功能是否啟用
     isEnabled: function(feature) {
         const permissions = this.getPermissions();
-        return permissions[feature] === true;
+        
+        // 如果feature是'permissionSettings'，這是一個特殊情況，我們總是允許它
+        if (feature === 'permissionSettings') {
+            return true;
+        }
+        
+        // 如果權限設置中明確定義了該功能的權限，則返回其值
+        if (permissions.hasOwnProperty(feature)) {
+            return permissions[feature] === true;
+        }
+        
+        // 對於未明確定義的功能，默認允許訪問
+        return true;
     },
     
     // 應用權限設置到界面

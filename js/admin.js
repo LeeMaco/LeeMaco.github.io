@@ -201,6 +201,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定新增書籍按鈕點擊事件
     addBookBtn.addEventListener('click', function() {
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('addBook')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
         // 重置表單
         bookForm.reset();
         document.getElementById('bookId').value = '';
@@ -211,6 +216,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定去除重複按鈕點擊事件
     removeDuplicatesBtn.addEventListener('click', function() {
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('removeDuplicates')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
         // 顯示去重彈窗
         removeDuplicatesModal.style.display = 'block';
         // 清空之前的狀態信息
@@ -230,11 +240,21 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定匯入Excel按鈕點擊事件
     importExcelBtn.addEventListener('click', function() {
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('importExcel')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
         importExcelModal.style.display = 'block';
     });
     
     // 綁定GitHub設置按鈕點擊事件
     githubSettingsBtn.addEventListener('click', function() {
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('githubSettings')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
         // 顯示GitHub設置彈窗
         githubSettingsModal.style.display = 'block';
         
@@ -246,6 +266,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     // 綁定備份設置按鈕點擊事件
     backupSettingsBtn.addEventListener('click', function() {
+        // 檢查權限
+        if (window.PermissionManager && !PermissionManager.isEnabled('backupSettings')) {
+            alert('此功能已被管理員禁用');
+            return;
+        }
         // 顯示備份設置彈窗
         backupSettingsModal.style.display = 'block';
         
