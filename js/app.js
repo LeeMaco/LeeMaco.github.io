@@ -1,0 +1,686 @@
+/**
+ * 主應用模組 - 整合所有功能並處理用戶界面交互
+ */
+
+class App {
+    constructor() {
+        // 初始化元素引用
+        this.initElements();
+        
+        // 初始化事件監聽器
+        this.initEventListeners();
+        
+        // 載入書籍數據
+        this.loadBooks();
+        
+        // 載入類別選項
+        this.loadCategories();
+    }
+    
+    /**
+     * 初始化元素引用
+     */
+    initElements() {
+        // 搜尋元素
+        this.searchInput = document.getElementById('searchInput');
+        this.searchCategory = document.getElementById('searchCategory');
+        this.searchBtn = document.getElementById('searchBtn');
+        this.resetBtn = document.getElementById('resetBtn');
+        
+        // 表格元素
+        this.booksTable = document.getElementById('booksTable');
+        this.booksTableBody = document.getElementById('booksTableBody');
+        this.resultCount = document.getElementById('resultCount');
+        this.noResults = document.getElementById('noResults');
+        
+        // 書籍表單元素
+        this.bookForm = document.getElementById('bookForm');
+        this.bookId = document.getElementById('bookId');
+        this.bookTitle = document.getElementById('bookTitle');
+        this.bookAuthor = document.getElementById('bookAuthor');
+        this.bookSeries = document.getElementById('bookSeries');
+        this.bookCategory = document.getElementById('bookCategory');
+        this.bookCabinet = document.getElementById('bookCabinet');
+        this.bookRow = document.getElementById('bookRow');
+        this.bookPublisher = document.getElementById('bookPublisher');
+        this.bookDescription = document.getElementById('bookDescription');
+        this.bookISBN = document.getElementById('bookISBN');
+        this.bookNotes = document.getElementById('bookNotes');
+        this.saveBookBtn = document.getElementById('saveBookBtn');
+        
+        // 匯入/匯出元素
+        this.importFile = document.getElementById('importFile');
+        this.filterDuplicates = document.getElementById('filterDuplicates');
+        this.confirmImportBtn = document.getElementById('confirmImportBtn');
+        this.importStatus = document.getElementById('importStatus');
+        this.exportBtn = document.getElementById('exportBtn');
+        
+        // 備份元素
+        this.backupEmail = document.getElementById('backupEmail');
+        this.manualBackup = document.getElementById('manualBackup');
+        this.autoBackup = document.getElementById('autoBackup');
+        this.backupFrequency = document.getElementById('backupFrequency');
+        this.autoBackupOptions = document.getElementById('autoBackupOptions');
+        this.manualBackupBtn = document.getElementById('manualBackupBtn');
+        this.saveBackupSettingsBtn = document.getElementById('saveBackupSettingsBtn');
+        this.backupStatus = document.getElementById('backupStatus');
+        
+        // 書籍詳情元素
+        this.bookDetailsTitle = document.getElementById('bookDetailsTitle');
+        this.detailAuthor = document.getElementById('detailAuthor');
+        this.detailSeries = document.getElementById('detailSeries');
+        this.detailCategory = document.getElementById('detailCategory');
+        this.detailCabinet = document.getElementById('detailCabinet');
+        this.detailRow = document.getElementById('detailRow');
+        this.detailPublisher = document.getElementById('detailPublisher');
+        this.detailDescription = document.getElementById('detailDescription');
+        this.detailISBN = document.getElementById('detailISBN');
+        this.detailNotes = document.getElementById('detailNotes');
+        
+        // 刪除確認元素
+        this.deleteBookTitle = document.getElementById('deleteBookTitle');
+        this.confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+    }
+    
+    /**
+     * 初始化事件監聽器
+     */
+    initEventListeners() {
+        // 搜尋事件
+        this.searchBtn.addEventListener('click', () => this.searchBooks());
+        this.resetBtn.addEventListener('click', () => this.resetSearch());
+        this.searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') this.searchBooks();
+        });
+        
+        // 書籍表單事件
+        this.saveBookBtn.addEventListener('click', () => this.saveBook());
+        
+        // 匯入/匯出事件
+        this.confirmImportBtn.addEventListener('click', () => this.importBooks());
+        this.exportBtn.addEventListener('click', () => this.exportBooks());
+        
+        // 備份設定事件
+        this.manualBackup.addEventListener('change', () => this.toggleBackupOptions());
+        this.autoBackup.addEventListener('change', () => this.toggleBackupOptions());
+        this.manualBackupBtn.addEventListener('click', () => this.performBackup());
+        this.saveBackupSettingsBtn.addEventListener('click', () => this.saveBackupSettings());
+        
+        // 載入備份設定
+        this.loadBackupSettings();
+    }
+    
+    /**
+     * 載入書籍數據
+     */
+    loadBooks() {
+        const books = db.getAllBooks();
+        this.displayBooks(books);
+    }
+    
+    /**
+     * 載入類別選項
+     */
+    loadCategories() {
+        const categories = db.getAllCategories();
+        const select = this.searchCategory;
+        
+        // 清空現有選項（保留第一個）
+        while (select.options.length > 1) {
+            select.remove(1);
+        }
+        
+        // 添加類別選項
+        categories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = category;
+            select.appendChild(option);
+        });
+    }
+    
+    /**
+     * 顯示書籍列表
+     * @param {Array} books 書籍數組
+     */
+    displayBooks(books) {
+        // 清空表格
+        this.booksTableBody.innerHTML = '';
+        
+        // 更新結果計數
+        this.resultCount.textContent = `${books.length} 筆資料`;
+        
+        // 檢查是否有結果
+        if (books.length === 0) {
+            this.noResults.classList.remove('d-none');
+            this.booksTable.classList.add('d-none');
+            return;
+        }
+        
+        // 顯示表格，隱藏無結果提示
+        this.booksTable.classList.remove('d-none');
+        this.noResults.classList.add('d-none');
+        
+        // 檢查是否為管理員
+        const isAdmin = auth.isLoggedIn();
+        
+        // 添加每本書籍到表格
+        books.forEach(book => {
+            const row = document.createElement('tr');
+            
+            // 書籍標題（可點擊查看詳情）
+            const titleCell = document.createElement('td');
+            const titleLink = document.createElement('a');
+            titleLink.href = '#';
+            titleLink.className = 'book-title';
+            titleLink.textContent = book.title;
+            titleLink.addEventListener('click', (e) => {
+                e.preventDefault();
+                this.showBookDetails(book);
+            });
+            titleCell.appendChild(titleLink);
+            row.appendChild(titleCell);
+            
+            // 其他基本信息
+            row.appendChild(this.createCell(book.author));
+            row.appendChild(this.createCell(book.series || '-'));
+            row.appendChild(this.createCell(book.category));
+            row.appendChild(this.createCell(book.cabinet || '-'));
+            row.appendChild(this.createCell(book.row || '-'));
+            row.appendChild(this.createCell(book.publisher || '-'));
+            row.appendChild(this.createCell(book.isbn || '-'));
+            
+            // 管理員操作按鈕
+            if (isAdmin) {
+                const actionCell = document.createElement('td');
+                
+                // 編輯按鈕
+                const editBtn = document.createElement('button');
+                editBtn.className = 'btn btn-sm btn-outline-primary me-1 action-btn';
+                editBtn.innerHTML = '<i class="fas fa-edit"></i>';
+                editBtn.title = '編輯';
+                editBtn.addEventListener('click', () => this.editBook(book));
+                actionCell.appendChild(editBtn);
+                
+                // 刪除按鈕
+                const deleteBtn = document.createElement('button');
+                deleteBtn.className = 'btn btn-sm btn-outline-danger action-btn';
+                deleteBtn.innerHTML = '<i class="fas fa-trash"></i>';
+                deleteBtn.title = '刪除';
+                deleteBtn.addEventListener('click', () => this.confirmDelete(book));
+                actionCell.appendChild(deleteBtn);
+                
+                row.appendChild(actionCell);
+            }
+            
+            this.booksTableBody.appendChild(row);
+        });
+        
+        // 顯示/隱藏操作列
+        const actionHeader = document.getElementById('actionHeader');
+        if (isAdmin) {
+            actionHeader.classList.remove('d-none');
+        } else {
+            actionHeader.classList.add('d-none');
+        }
+    }
+    
+    /**
+     * 創建表格單元格
+     * @param {string} text 單元格文本
+     * @returns {HTMLElement} 單元格元素
+     */
+    createCell(text) {
+        const cell = document.createElement('td');
+        cell.textContent = text;
+        return cell;
+    }
+    
+    /**
+     * 搜尋書籍
+     */
+    searchBooks() {
+        const query = this.searchInput.value.trim().toLowerCase();
+        const category = this.searchCategory.value;
+        
+        let results = db.getAllBooks();
+        
+        // 按類別篩選
+        if (category) {
+            results = results.filter(book => book.category === category);
+        }
+        
+        // 按關鍵字搜尋（書名或作者）
+        if (query) {
+            results = results.filter(book => 
+                book.title.toLowerCase().includes(query) || 
+                book.author.toLowerCase().includes(query)
+            );
+        }
+        
+        this.displayBooks(results);
+    }
+    
+    /**
+     * 重置搜尋
+     */
+    resetSearch() {
+        this.searchInput.value = '';
+        this.searchCategory.selectedIndex = 0;
+        this.loadBooks();
+    }
+    
+    /**
+     * 顯示書籍詳情
+     * @param {Object} book 書籍對象
+     */
+    showBookDetails(book) {
+        this.bookDetailsTitle.textContent = book.title;
+        this.detailAuthor.textContent = book.author || '-';
+        this.detailSeries.textContent = book.series || '-';
+        this.detailCategory.textContent = book.category || '-';
+        this.detailCabinet.textContent = book.cabinet || '-';
+        this.detailRow.textContent = book.row || '-';
+        this.detailPublisher.textContent = book.publisher || '-';
+        this.detailDescription.textContent = book.description || '-';
+        this.detailISBN.textContent = book.isbn || '-';
+        this.detailNotes.textContent = book.notes || '-';
+        
+        // 顯示詳情彈窗
+        const modal = new bootstrap.Modal(document.getElementById('bookDetailsModal'));
+        modal.show();
+    }
+    
+    /**
+     * 編輯書籍
+     * @param {Object} book 書籍對象
+     */
+    editBook(book) {
+        // 設置表單標題
+        document.getElementById('bookModalTitle').textContent = '編輯書籍';
+        
+        // 填充表單數據
+        this.bookId.value = book.id;
+        this.bookTitle.value = book.title;
+        this.bookAuthor.value = book.author;
+        this.bookSeries.value = book.series || '';
+        this.bookCategory.value = book.category;
+        this.bookCabinet.value = book.cabinet || '';
+        this.bookRow.value = book.row || '';
+        this.bookPublisher.value = book.publisher || '';
+        this.bookDescription.value = book.description || '';
+        this.bookISBN.value = book.isbn || '';
+        this.bookNotes.value = book.notes || '';
+        
+        // 顯示表單彈窗
+        const modal = new bootstrap.Modal(document.getElementById('bookModal'));
+        modal.show();
+    }
+    
+    /**
+     * 新增書籍
+     */
+    addBook() {
+        // 設置表單標題
+        document.getElementById('bookModalTitle').textContent = '新增書籍';
+        
+        // 清空表單
+        this.bookForm.reset();
+        this.bookId.value = '';
+        
+        // 顯示表單彈窗
+        const modal = new bootstrap.Modal(document.getElementById('bookModal'));
+        modal.show();
+    }
+    
+    /**
+     * 儲存書籍
+     */
+    saveBook() {
+        // 檢查必填欄位
+        if (!this.bookTitle.value.trim() || !this.bookAuthor.value.trim() || !this.bookCategory.value.trim()) {
+            alert('請填寫必填欄位：書名、作者和類別');
+            return;
+        }
+        
+        // 構建書籍對象
+        const book = {
+            title: this.bookTitle.value.trim(),
+            author: this.bookAuthor.value.trim(),
+            series: this.bookSeries.value.trim(),
+            category: this.bookCategory.value.trim(),
+            cabinet: this.bookCabinet.value.trim(),
+            row: this.bookRow.value.trim(),
+            publisher: this.bookPublisher.value.trim(),
+            description: this.bookDescription.value.trim(),
+            isbn: this.bookISBN.value.trim(),
+            notes: this.bookNotes.value.trim()
+        };
+        
+        // 新增或更新書籍
+        if (this.bookId.value) {
+            // 更新現有書籍
+            book.id = this.bookId.value;
+            db.updateBook(book);
+            this.showMessage('書籍已更新', 'success');
+        } else {
+            // 新增書籍
+            db.addBook(book);
+            this.showMessage('書籍已新增', 'success');
+        }
+        
+        // 關閉彈窗
+        const modal = bootstrap.Modal.getInstance(document.getElementById('bookModal'));
+        modal.hide();
+        
+        // 重新載入書籍和類別
+        this.loadBooks();
+        this.loadCategories();
+    }
+    
+    /**
+     * 確認刪除書籍
+     * @param {Object} book 書籍對象
+     */
+    confirmDelete(book) {
+        this.deleteBookTitle.textContent = book.title;
+        this.confirmDeleteBtn.onclick = () => {
+            this.deleteBook(book.id);
+            const modal = bootstrap.Modal.getInstance(document.getElementById('deleteConfirmModal'));
+            modal.hide();
+        };
+        
+        // 顯示確認彈窗
+        const modal = new bootstrap.Modal(document.getElementById('deleteConfirmModal'));
+        modal.show();
+    }
+    
+    /**
+     * 刪除書籍
+     * @param {string} id 書籍ID
+     */
+    deleteBook(id) {
+        db.deleteBook(id);
+        this.showMessage('書籍已刪除', 'success');
+        this.loadBooks();
+    }
+    
+    /**
+     * 匯入書籍
+     */
+    importBooks() {
+        const file = this.importFile.files[0];
+        if (!file) {
+            this.showImportStatus('請選擇Excel檔案', 'danger');
+            return;
+        }
+        
+        const filterDuplicates = this.filterDuplicates.checked;
+        
+        // 顯示處理中狀態
+        this.showImportStatus('正在處理檔案...', 'info');
+        
+        // 使用數據處理器解析Excel
+        dataProcessor.parseExcelFile(file)
+            .then(books => {
+                if (books.length === 0) {
+                    this.showImportStatus('Excel檔案中沒有資料', 'warning');
+                    return;
+                }
+                
+                // 處理匯入的書籍
+                const result = db.importBooks(books, filterDuplicates);
+                
+                // 顯示匯入結果
+                this.showImportStatus(
+                    `成功匯入 ${result.imported} 筆資料${filterDuplicates ? `，過濾 ${result.filtered} 筆重複資料` : ''}`,
+                    'success'
+                );
+                
+                // 重新載入書籍和類別
+                this.loadBooks();
+                this.loadCategories();
+            })
+            .catch(error => {
+                console.error('匯入錯誤:', error);
+                this.showImportStatus('匯入失敗，請檢查檔案格式', 'danger');
+            });
+    }
+    
+    /**
+     * 顯示匯入狀態
+     * @param {string} message 訊息
+     * @param {string} type 類型 (success, danger, warning)
+     */
+    showImportStatus(message, type) {
+        this.importStatus.textContent = message;
+        this.importStatus.className = `alert alert-${type}`;
+        this.importStatus.classList.remove('d-none');
+    }
+    
+    /**
+     * 匯出書籍
+     */
+    exportBooks() {
+        const books = db.getAllBooks();
+        
+        if (books.length === 0) {
+            this.showMessage('沒有資料可匯出', 'warning');
+            return;
+        }
+        
+        // 使用數據處理器創建工作表
+        const workbook = dataProcessor.createExcelWorkbook(books);
+        
+        // 生成檔案名稱
+        const fileName = dataProcessor.generateTimestampFileName('書籍資料');
+        
+        // 匯出Excel檔案
+        XLSX.writeFile(workbook, fileName);
+        this.showMessage('資料已匯出', 'success');
+    }
+    
+    /**
+     * 切換備份選項
+     */
+    toggleBackupOptions() {
+        if (this.autoBackup.checked) {
+            this.autoBackupOptions.classList.remove('d-none');
+        } else {
+            this.autoBackupOptions.classList.add('d-none');
+        }
+    }
+    
+    /**
+     * 載入備份設定
+     */
+    loadBackupSettings() {
+        const settings = db.getBackupSettings();
+        
+        if (settings) {
+            this.backupEmail.value = settings.email || '';
+            
+            if (settings.type === 'auto') {
+                this.autoBackup.checked = true;
+                this.backupFrequency.value = settings.frequency || 'daily';
+                this.autoBackupOptions.classList.remove('d-none');
+            } else {
+                this.manualBackup.checked = true;
+                this.autoBackupOptions.classList.add('d-none');
+            }
+        }
+    }
+    
+    /**
+     * 儲存備份設定
+     */
+    saveBackupSettings() {
+        const email = this.backupEmail.value.trim();
+        
+        if (!email) {
+            this.showBackupStatus('請輸入Email地址', 'danger');
+            return;
+        }
+        
+        // 使用郵件服務驗證Email格式
+        if (!emailService.validateEmail(email)) {
+            this.showBackupStatus('請輸入有效的Email地址', 'danger');
+            return;
+        }
+        
+        // 構建設定對象
+        const settings = {
+            email: email,
+            type: this.autoBackup.checked ? 'auto' : 'manual'
+        };
+        
+        // 如果是自動備份，添加頻率
+        if (settings.type === 'auto') {
+            settings.frequency = this.backupFrequency.value;
+        }
+        
+        // 儲存設定
+        db.saveBackupSettings(settings);
+        this.showBackupStatus('備份設定已儲存', 'success');
+        
+        // 如果是自動備份，設置定時任務
+        if (settings.type === 'auto') {
+            const scheduleInfo = emailService.setupBackupSchedule(settings);
+            this.showBackupStatus(`自動備份已設定，下次備份時間：${scheduleInfo.nextBackupTime}`, 'success');
+        }
+    }
+    
+    /**
+     * 設置自動備份
+     * @param {Object} settings 備份設定
+     */
+    setupAutoBackup(settings) {
+        // 使用郵件服務設置自動備份排程
+        return emailService.setupBackupSchedule(settings);
+    }
+    
+    /**
+     * 執行備份
+     */
+    performBackup() {
+        const settings = db.getBackupSettings();
+        
+        if (!settings || !settings.email) {
+            this.showBackupStatus('請先設定備份Email', 'danger');
+            return;
+        }
+        
+        // 匯出資料
+        const books = db.getAllBooks();
+        
+        if (books.length === 0) {
+            this.showBackupStatus('沒有資料可備份', 'warning');
+            return;
+        }
+        
+        // 顯示處理中狀態
+        this.showBackupStatus('正在處理備份...', 'info');
+        
+        // 使用數據處理器創建工作表
+        const workbook = dataProcessor.createExcelWorkbook(books);
+        
+        // 生成檔案名稱
+        const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
+        
+        // 匯出Excel檔案
+        XLSX.writeFile(workbook, fileName);
+        
+        // 使用郵件服務發送備份
+        emailService.sendBackupEmail(settings.email, books, fileName)
+            .then(() => {
+                this.showBackupStatus(`備份已完成，檔案已下載 (${fileName})。在實際環境中，備份將發送至 ${settings.email}`, 'success');
+            })
+            .catch(error => {
+                console.error('備份錯誤:', error);
+                this.showBackupStatus('備份過程中發生錯誤，請稍後再試', 'danger');
+            });
+    }
+    
+    /**
+     * 顯示備份狀態
+     * @param {string} message 訊息
+     * @param {string} type 類型 (success, danger, warning)
+     */
+    showBackupStatus(message, type) {
+        this.backupStatus.textContent = message;
+        this.backupStatus.className = `alert alert-${type}`;
+        this.backupStatus.classList.remove('d-none');
+    }
+    
+    /**
+     * 顯示訊息
+     * @param {string} message 訊息
+     * @param {string} type 類型 (success, danger, warning)
+     */
+    showMessage(message, type) {
+        // 創建Toast元素
+        const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
+        const toastId = 'toast-' + Date.now();
+        
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center text-white bg-${type} border-0`;
+        toast.id = toastId;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        const toastContent = document.createElement('div');
+        toastContent.className = 'd-flex';
+        
+        const toastBody = document.createElement('div');
+        toastBody.className = 'toast-body';
+        toastBody.textContent = message;
+        
+        const closeButton = document.createElement('button');
+        closeButton.type = 'button';
+        closeButton.className = 'btn-close btn-close-white me-2 m-auto';
+        closeButton.setAttribute('data-bs-dismiss', 'toast');
+        closeButton.setAttribute('aria-label', '關閉');
+        
+        toastContent.appendChild(toastBody);
+        toastContent.appendChild(closeButton);
+        toast.appendChild(toastContent);
+        toastContainer.appendChild(toast);
+        
+        // 初始化並顯示Toast
+        const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+        bsToast.show();
+        
+        // 自動移除
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+        });
+    }
+    
+    /**
+     * 創建Toast容器
+     * @returns {HTMLElement} Toast容器
+     */
+    createToastContainer() {
+        const container = document.createElement('div');
+        container.id = 'toastContainer';
+        container.className = 'toast-container position-fixed top-0 end-0 p-3';
+        container.style.zIndex = '1060';
+        document.body.appendChild(container);
+        return container;
+    }
+}
+
+// 初始化應用
+document.addEventListener('DOMContentLoaded', () => {
+    // 檢查是否已登入
+    auth.checkLoginStatus();
+    
+    // 初始化應用
+    window.app = new App();
+    
+    // 設置新增書籍按鈕事件
+    document.getElementById('addBookBtn').addEventListener('click', () => {
+        window.app.addBook();
+    });
+});
