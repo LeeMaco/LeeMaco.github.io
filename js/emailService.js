@@ -20,7 +20,9 @@ class EmailService {
             const jsonData = JSON.stringify(data, null, 2);
             
             // 在實際應用中，這裡會將數據作為附件發送
-            console.log(`備份數據已準備：${data.length} 筆記錄`);
+            // 檢查data是否為數組，如果不是，則獲取對象的鍵數量
+            const recordCount = Array.isArray(data) ? data.length : Object.keys(data).length;
+            console.log(`備份數據已準備：${recordCount} 筆記錄`);
             
             // 模擬發送過程
             setTimeout(() => {

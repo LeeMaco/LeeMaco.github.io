@@ -202,11 +202,32 @@ class Admin {
             .then(response => {
                 if (!response.ok) {
                     const errorMsg = `上傳失敗: ${response.status} - ${response.statusText}`;
-                    this.updateProgress(80, `錯誤：${errorMsg}`, 'danger');
-                    throw new Error(errorMsg);
+                    let detailedMsg = errorMsg;
+                    
+                    // 提供更詳細的錯誤信息
+                    if (response.status === 401) {
+                        detailedMsg = '授權失敗：請檢查您的GitHub個人訪問令牌是否有效';
+                    } else if (response.status === 403) {
+                        detailedMsg = '權限不足：請確保您的令牌有足夠的權限操作此倉庫';
+                    } else if (response.status === 404) {
+                        detailedMsg = '找不到資源：請檢查倉庫名稱和路徑是否正確';
+                    } else if (response.status === 422) {
+                        detailedMsg = '請求無效：可能是提交訊息或內容格式有問題';
+                    }
+                    
+                    this.updateProgress(80, `錯誤：${detailedMsg}`, 'danger');
+                    throw new Error(detailedMsg);
                 }
                 this.updateProgress(90, '上傳成功，正在完成...', 'info');
                 return response.json();
+            })
+            .catch(error => {
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    console.error('網絡連接錯誤:', error);
+                    this.updateProgress(80, '錯誤：網絡連接失敗，請檢查您的網絡連接', 'danger');
+                    throw new Error('網絡連接失敗，請檢查您的網絡連接');
+                }
+                throw error;
             })
             .then(data => {
                 console.log('上傳成功:', data);
@@ -221,7 +242,36 @@ class Admin {
             })
             .catch(error => {
                 console.error('上傳錯誤:', error);
-                this.updateProgress(100, `錯誤：${error.message}`, 'danger');
+                
+                // 提供更友好的錯誤訊息
+                let userFriendlyMessage = error.message;
+                if (error.message.includes('Failed to fetch') || error.message.includes('Network Error')) {
+                    userFriendlyMessage = '網絡連接失敗，請檢查您的網絡連接';
+                } else if (error.message.includes('timeout')) {
+                    userFriendlyMessage = '請求超時，請稍後再試';
+                } else if (error.message.includes('JSON')) {
+                    userFriendlyMessage = 'GitHub API返回了無效的數據格式';
+                }
+                
+                this.updateProgress(100, `錯誤：${userFriendlyMessage}`, 'danger');
+                
+                // 顯示重試按鈕
+                const progressContainer = document.getElementById('githubProgressContainer');
+                if (progressContainer) {
+                    const retryBtn = document.createElement('button');
+                    retryBtn.className = 'btn btn-warning mt-2';
+                    retryBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>重試上傳';
+                    retryBtn.onclick = () => {
+                        // 移除重試按鈕
+                        retryBtn.remove();
+                        // 重置進度條
+                        this.updateProgress(0, '準備重新上傳...', 'info');
+                        // 重新嘗試上傳
+                        setTimeout(() => this.uploadToGitHub(data).then(resolve).catch(reject), 1000);
+                    };
+                    progressContainer.appendChild(retryBtn);
+                }
+                
                 reject(error);
             });
         });

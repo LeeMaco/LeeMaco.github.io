@@ -110,7 +110,7 @@ class App {
         this.searchBtn.addEventListener('click', this.searchBooks.bind(this));
         this.resetBtn.addEventListener('click', this.resetSearch.bind(this));
         this.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.searchBooks.bind(this)();
+            if (e.key === 'Enter') this.searchBooks();
         });
         
         // 書籍表單事件
@@ -259,32 +259,56 @@ class App {
      * 搜尋書籍
      */
     searchBooks() {
-        const query = this.searchInput.value.trim().toLowerCase();
-        
-        let results = db.getAllBooks();
-        
-        // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
-        if (query) {
-            results = results.filter(book => 
-                (book.title && book.title.toLowerCase().includes(query)) || 
-                (book.author && book.author.toLowerCase().includes(query)) ||
-                (book.description && book.description.toLowerCase().includes(query)) ||
-                (book.notes && book.notes.toLowerCase().includes(query)) ||
-                (book.publisher && book.publisher.toLowerCase().includes(query)) ||
-                (book.isbn && book.isbn.toLowerCase().includes(query)) ||
-                (book.series && book.series.toLowerCase().includes(query)) ||
-                (book.category && book.category.toLowerCase().includes(query)) ||
-                (book.cabinet && book.cabinet.toLowerCase().includes(query)) ||
-                (book.row && book.row.toLowerCase().includes(query))
-            );
-        }
-        
-        // 顯示搜尋結果和狀態提示
-        this.displayBooks(results);
-        
-        // 顯示搜尋條件的狀態提示
-        if (query) {
-            this.showMessage(`搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
+        try {
+            const query = this.searchInput.value.trim().toLowerCase();
+            
+            // 顯示搜尋中的狀態提示
+            this.showMessage('正在搜尋...', 'info');
+            
+            let results = db.getAllBooks();
+            
+            // 檢查數據庫是否返回有效數據
+            if (!Array.isArray(results)) {
+                throw new Error('數據庫返回無效數據');
+            }
+            
+            // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
+            if (query) {
+                results = results.filter(book => 
+                    (book.title && book.title.toLowerCase().includes(query)) || 
+                    (book.author && book.author.toLowerCase().includes(query)) ||
+                    (book.description && book.description.toLowerCase().includes(query)) ||
+                    (book.notes && book.notes.toLowerCase().includes(query)) ||
+                    (book.publisher && book.publisher.toLowerCase().includes(query)) ||
+                    (book.isbn && book.isbn.toLowerCase().includes(query)) ||
+                    (book.series && book.series.toLowerCase().includes(query)) ||
+                    (book.category && book.category.toLowerCase().includes(query)) ||
+                    (book.cabinet && book.cabinet.toLowerCase().includes(query)) ||
+                    (book.row && book.row.toLowerCase().includes(query))
+                );
+            }
+            
+            // 顯示搜尋結果和狀態提示
+            this.displayBooks(results);
+            
+            // 顯示搜尋條件的狀態提示
+            if (query) {
+                this.showMessage(`搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
+            }
+        } catch (error) {
+            console.error('搜尋錯誤:', error);
+            this.showMessage(`搜尋時發生錯誤: ${error.message}`, 'danger');
+            
+            // 顯示錯誤提示在noResults區域
+            if (this.noResults) {
+                this.noResults.classList.remove('d-none');
+                this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>搜尋時發生錯誤: ${error.message}</div>`;
+            }
+            
+            // 隱藏表格
+            if (this.booksTable) {
+                this.booksTable.classList.add('d-none');
+            }
         }
     }
     
@@ -881,3 +905,68 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app.addBook();
     });
 });
+
+    /**
+     * 顯示消息提示
+     * @param {string} message 消息內容
+     * @param {string} type 消息類型 (success, info, warning, danger)
+     */
+    showMessage(message, type = 'info') {
+        // 創建或獲取消息容器
+        let messageContainer = document.getElementById('messageContainer');
+        
+        if (!messageContainer) {
+            messageContainer = document.createElement('div');
+            messageContainer.id = 'messageContainer';
+            messageContainer.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
+            messageContainer.style.zIndex = '1050';
+            document.body.appendChild(messageContainer);
+        }
+        
+        // 創建消息元素
+        const messageElement = document.createElement('div');
+        messageElement.className = `alert alert-${type} alert-dismissible fade show`;
+        messageElement.role = 'alert';
+        
+        // 根據類型選擇圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
+        
+        // 設置消息內容
+        messageElement.innerHTML = `
+            ${icon}${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="關閉"></button>
+        `;
+        
+        // 添加到容器
+        messageContainer.appendChild(messageElement);
+        
+        // 自動關閉（3秒後）
+        setTimeout(() => {
+            if (messageElement && messageElement.parentNode) {
+                // 使用Bootstrap的淡出效果
+                messageElement.classList.remove('show');
+                
+                // 等待淡出動畫完成後移除元素
+                setTimeout(() => {
+                    if (messageElement && messageElement.parentNode) {
+                        messageElement.parentNode.removeChild(messageElement);
+                    }
+                }, 150);
+            }
+        }, 3000);
+    }
