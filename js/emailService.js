@@ -16,10 +16,25 @@ class EmailService {
             // 在實際應用中，這裡會使用郵件API發送郵件
             console.log(`模擬發送備份郵件到 ${email}，檔案名稱：${fileName}`);
             
+            // 創建備份數據的JSON字符串
+            const jsonData = JSON.stringify(data, null, 2);
+            
+            // 在實際應用中，這裡會將數據作為附件發送
+            console.log(`備份數據已準備：${data.length} 筆記錄`);
+            
             // 模擬發送過程
             setTimeout(() => {
-                console.log('郵件發送完成');
-                resolve(true);
+                // 將備份數據存儲在localStorage中，模擬郵件發送成功
+                try {
+                    localStorage.setItem('lastBackupData', jsonData);
+                    localStorage.setItem('lastBackupTime', new Date().toISOString());
+                    localStorage.setItem('lastBackupEmail', email);
+                    console.log('郵件發送完成，備份數據已保存');
+                    resolve(true);
+                } catch (error) {
+                    console.error('備份數據保存失敗:', error);
+                    resolve(false);
+                }
             }, 1500);
         });
     }

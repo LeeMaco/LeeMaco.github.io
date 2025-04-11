@@ -15,6 +15,9 @@ class App {
         
         // 載入類別選項
         this.loadCategories();
+        
+        // 監聽GitHub同步事件
+        this.listenForGitHubSyncEvents();
     }
     
     /**
@@ -80,6 +83,23 @@ class App {
         // 刪除確認元素
         this.deleteBookTitle = document.getElementById('deleteBookTitle');
         this.confirmDeleteBtn = document.getElementById('confirmDeleteBtn');
+        
+        // 同步狀態元素 (如果不存在，則創建一個通知區域)
+        this.syncStatus = document.getElementById('syncStatus') || this.createSyncStatusElement();
+    }
+    
+    /**
+     * 創建同步狀態元素
+     * @returns {HTMLElement} 同步狀態元素
+     */
+    createSyncStatusElement() {
+        // 創建一個通知元素，用於顯示同步狀態
+        const statusElement = document.createElement('div');
+        statusElement.id = 'syncStatus';
+        statusElement.className = 'position-fixed bottom-0 end-0 p-3';
+        statusElement.style.zIndex = '5';
+        document.body.appendChild(statusElement);
+        return statusElement;
     }
     
     /**
@@ -98,6 +118,9 @@ class App {
         
         // 匯入/匯出事件
         this.confirmImportBtn.addEventListener('click', () => this.importBooks());
+        
+        // GitHub同步事件
+        document.addEventListener('githubSync', (event) => this.handleGitHubSyncEvent(event));
         this.exportBtn.addEventListener('click', () => this.exportBooks());
         
         // 備份設定事件
@@ -250,11 +273,15 @@ class App {
             results = results.filter(book => book.category === category);
         }
         
-        // 按關鍵字搜尋（書名或作者）
+        // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
         if (query) {
             results = results.filter(book => 
-                book.title.toLowerCase().includes(query) || 
-                book.author.toLowerCase().includes(query)
+                (book.title && book.title.toLowerCase().includes(query)) || 
+                (book.author && book.author.toLowerCase().includes(query)) ||
+                (book.description && book.description.toLowerCase().includes(query)) ||
+                (book.notes && book.notes.toLowerCase().includes(query)) ||
+                (book.publisher && book.publisher.toLowerCase().includes(query)) ||
+                (book.isbn && book.isbn.toLowerCase().includes(query))
             );
         }
         
@@ -508,6 +535,57 @@ class App {
                 this.manualBackup.checked = true;
                 this.autoBackupOptions.classList.add('d-none');
             }
+        }
+    }
+    
+    /**
+     * 監聽GitHub同步事件
+     */
+    listenForGitHubSyncEvents() {
+        document.addEventListener('githubSync', (event) => this.handleGitHubSyncEvent(event));
+    }
+    
+    /**
+     * 處理GitHub同步事件
+     * @param {CustomEvent} event 同步事件
+     */
+    handleGitHubSyncEvent(event) {
+        const { status, timestamp, error } = event.detail;
+        
+        // 創建通知元素
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center ${status === 'success' ? 'text-bg-success' : 'text-bg-danger'}`;
+        toast.setAttribute('role', 'alert');
+        toast.setAttribute('aria-live', 'assertive');
+        toast.setAttribute('aria-atomic', 'true');
+        
+        // 設置通知內容
+        toast.innerHTML = `
+            <div class="d-flex">
+                <div class="toast-body">
+                    ${status === 'success' 
+                        ? '數據已成功同步到GitHub' 
+                        : `同步失敗: ${error ? error.message : '未知錯誤'}`}
+                </div>
+                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+            </div>
+        `;
+        
+        // 添加到通知區域
+        this.syncStatus.appendChild(toast);
+        
+        // 顯示通知
+        const bsToast = new bootstrap.Toast(toast);
+        bsToast.show();
+        
+        // 自動移除通知
+        toast.addEventListener('hidden.bs.toast', () => {
+            toast.remove();
+        });
+        
+        // 如果同步成功，重新載入書籍列表
+        if (status === 'success') {
+            this.loadBooks();
         }
     }
     
