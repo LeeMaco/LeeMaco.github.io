@@ -274,18 +274,24 @@ class App {
             
             // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
             if (query) {
-                results = results.filter(book => 
-                    (book.title && book.title.toLowerCase().includes(query)) || 
-                    (book.author && book.author.toLowerCase().includes(query)) ||
-                    (book.description && book.description.toLowerCase().includes(query)) ||
-                    (book.notes && book.notes.toLowerCase().includes(query)) ||
-                    (book.publisher && book.publisher.toLowerCase().includes(query)) ||
-                    (book.isbn && book.isbn.toLowerCase().includes(query)) ||
-                    (book.series && book.series.toLowerCase().includes(query)) ||
-                    (book.category && book.category.toLowerCase().includes(query)) ||
-                    (book.cabinet && book.cabinet.toLowerCase().includes(query)) ||
-                    (book.row && book.row.toLowerCase().includes(query))
-                );
+                results = results.filter(book => {
+                    // 安全地檢查每個屬性是否存在且為字符串類型
+                    const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
+                    const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
+                    const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
+                    const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
+                    const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
+                    const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
+                    const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
+                    const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
+                    const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
+                    const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
+                    
+                    // 返回任一屬性匹配的結果
+                    return titleMatch || authorMatch || descriptionMatch || notesMatch || 
+                           publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
+                           cabinetMatch || rowMatch;
+                });
             }
             
             // 顯示搜尋結果和狀態提示
@@ -905,68 +911,3 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app.addBook();
     });
 });
-
-    /**
-     * 顯示消息提示
-     * @param {string} message 消息內容
-     * @param {string} type 消息類型 (success, info, warning, danger)
-     */
-    showMessage(message, type = 'info') {
-        // 創建或獲取消息容器
-        let messageContainer = document.getElementById('messageContainer');
-        
-        if (!messageContainer) {
-            messageContainer = document.createElement('div');
-            messageContainer.id = 'messageContainer';
-            messageContainer.className = 'position-fixed top-0 start-50 translate-middle-x p-3';
-            messageContainer.style.zIndex = '1050';
-            document.body.appendChild(messageContainer);
-        }
-        
-        // 創建消息元素
-        const messageElement = document.createElement('div');
-        messageElement.className = `alert alert-${type} alert-dismissible fade show`;
-        messageElement.role = 'alert';
-        
-        // 根據類型選擇圖標
-        let icon = '';
-        switch(type) {
-            case 'success':
-                icon = '<i class="fas fa-check-circle me-2"></i>';
-                break;
-            case 'danger':
-                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-                break;
-            case 'warning':
-                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
-                break;
-            case 'info':
-            default:
-                icon = '<i class="fas fa-info-circle me-2"></i>';
-                break;
-        }
-        
-        // 設置消息內容
-        messageElement.innerHTML = `
-            ${icon}${message}
-            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="關閉"></button>
-        `;
-        
-        // 添加到容器
-        messageContainer.appendChild(messageElement);
-        
-        // 自動關閉（3秒後）
-        setTimeout(() => {
-            if (messageElement && messageElement.parentNode) {
-                // 使用Bootstrap的淡出效果
-                messageElement.classList.remove('show');
-                
-                // 等待淡出動畫完成後移除元素
-                setTimeout(() => {
-                    if (messageElement && messageElement.parentNode) {
-                        messageElement.parentNode.removeChild(messageElement);
-                    }
-                }, 150);
-            }
-        }, 3000);
-    }
