@@ -143,23 +143,12 @@ class App {
     
     /**
      * 載入類別選項
+     * 注意：類別篩選功能已移除，此函數保留用於其他可能的用途
      */
     loadCategories() {
+        // 獲取所有類別（可能用於其他功能）
         const categories = db.getAllCategories();
-        const select = this.searchCategory;
-        
-        // 清空現有選項（保留第一個）
-        while (select.options.length > 1) {
-            select.remove(1);
-        }
-        
-        // 添加類別選項
-        categories.forEach(category => {
-            const option = document.createElement('option');
-            option.value = category;
-            option.textContent = category;
-            select.appendChild(option);
-        });
+        // 類別篩選下拉框已移除，不再需要填充選項
     }
     
     /**
@@ -271,14 +260,8 @@ class App {
      */
     searchBooks() {
         const query = this.searchInput.value.trim().toLowerCase();
-        const category = this.searchCategory.value;
         
         let results = db.getAllBooks();
-        
-        // 按類別篩選（只有當選擇了特定類別時才過濾）
-        if (category) {
-            results = results.filter(book => book.category === category);
-        }
         
         // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
         if (query) {
@@ -288,7 +271,11 @@ class App {
                 (book.description && book.description.toLowerCase().includes(query)) ||
                 (book.notes && book.notes.toLowerCase().includes(query)) ||
                 (book.publisher && book.publisher.toLowerCase().includes(query)) ||
-                (book.isbn && book.isbn.toLowerCase().includes(query))
+                (book.isbn && book.isbn.toLowerCase().includes(query)) ||
+                (book.series && book.series.toLowerCase().includes(query)) ||
+                (book.category && book.category.toLowerCase().includes(query)) ||
+                (book.cabinet && book.cabinet.toLowerCase().includes(query)) ||
+                (book.row && book.row.toLowerCase().includes(query))
             );
         }
         
@@ -296,16 +283,8 @@ class App {
         this.displayBooks(results);
         
         // 顯示搜尋條件的狀態提示
-        let searchStatusMsg = '';
-        if (category) {
-            searchStatusMsg += `類別「${category}」`;
-        }
         if (query) {
-            searchStatusMsg += (category ? '，關鍵字「' : '關鍵字「') + query + '」';
-        }
-        
-        if (searchStatusMsg) {
-            this.showMessage(`搜尋條件：${searchStatusMsg}，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
+            this.showMessage(`搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
         }
     }
     
@@ -314,7 +293,6 @@ class App {
      */
     resetSearch() {
         this.searchInput.value = '';
-        this.searchCategory.selectedIndex = 0;
         this.loadBooks();
     }
     
