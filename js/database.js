@@ -273,26 +273,38 @@ class Database {
             version: '1.0'
         };
         
-        // 將數據轉換為JSON字符串
-        const jsonData = JSON.stringify(syncData, null, 2);
-        
-        // 在實際應用中，這裡會使用GitHub API進行數據同步
-        // 例如使用GitHub Contents API更新倉庫中的數據文件
-        
-        // 模擬GitHub API請求
-        this.simulateGitHubApiRequest(jsonData)
-            .then(response => {
-                console.log('數據同步完成', response);
-                // 存儲最後同步時間
-                localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                // 觸發同步成功事件
-                this.triggerSyncEvent('success');
-            })
-            .catch(error => {
-                console.error('數據同步失敗', error);
-                // 觸發同步失敗事件
-                this.triggerSyncEvent('error', error);
-            });
+        // 檢查admin實例是否存在
+        if (typeof admin !== 'undefined' && admin.uploadToGitHub) {
+            // 使用admin.js中的uploadToGitHub函數
+            admin.uploadToGitHub(syncData)
+                .then(response => {
+                    console.log('數據同步完成', response);
+                    // 存儲最後同步時間
+                    localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                    // 觸發同步成功事件
+                    this.triggerSyncEvent('success');
+                })
+                .catch(error => {
+                    console.error('數據同步失敗', error);
+                    // 觸發同步失敗事件
+                    this.triggerSyncEvent('error', error);
+                });
+        } else {
+            // 如果admin實例不存在，使用模擬API請求
+            this.simulateGitHubApiRequest(JSON.stringify(syncData, null, 2))
+                .then(response => {
+                    console.log('數據同步完成（模擬）', response);
+                    // 存儲最後同步時間
+                    localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                    // 觸發同步成功事件
+                    this.triggerSyncEvent('success');
+                })
+                .catch(error => {
+                    console.error('數據同步失敗', error);
+                    // 觸發同步失敗事件
+                    this.triggerSyncEvent('error', error);
+                });
+        }
     }
     
     /**

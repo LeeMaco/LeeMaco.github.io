@@ -107,10 +107,10 @@ class App {
      */
     initEventListeners() {
         // 搜尋事件
-        this.searchBtn.addEventListener('click', () => this.searchBooks());
-        this.resetBtn.addEventListener('click', () => this.resetSearch());
+        this.searchBtn.addEventListener('click', this.searchBooks.bind(this));
+        this.resetBtn.addEventListener('click', this.resetSearch.bind(this));
         this.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.searchBooks();
+            if (e.key === 'Enter') this.searchBooks.bind(this)();
         });
         
         // 書籍表單事件
@@ -443,6 +443,7 @@ class App {
         }
         
         const filterDuplicates = this.filterDuplicates.checked;
+        const autoUploadGitHub = document.getElementById('autoUploadGitHub') && document.getElementById('autoUploadGitHub').checked;
         
         // 顯示處理中狀態
         this.showImportStatus('正在處理檔案...', 'info');
@@ -455,22 +456,39 @@ class App {
                     return;
                 }
                 
-                // 處理匯入的書籍
-                const result = db.importBooks(books, filterDuplicates);
-                
-                // 顯示匯入結果
-                this.showImportStatus(
-                    `成功匯入 ${result.imported} 筆資料${filterDuplicates ? `，過濾 ${result.filtered} 筆重複資料` : ''}`,
-                    'success'
-                );
-                
-                // 重新載入書籍和類別
-                this.loadBooks();
-                this.loadCategories();
+                // 檢查是否使用admin.js中的importFromExcel函數
+                if (typeof admin !== 'undefined' && admin.importFromExcel && autoUploadGitHub) {
+                    // 使用admin.js中的importFromExcel函數（包含GitHub上傳）
+                    return admin.importFromExcel(books, true)
+                        .then(result => {
+                            // 顯示匯入結果
+                            this.showImportStatus(
+                                `成功匯入 ${result.imported} 筆資料${filterDuplicates ? `，過濾 ${result.filtered} 筆重複資料` : ''}${autoUploadGitHub ? '，並已上傳到GitHub' : ''}`,
+                                'success'
+                            );
+                            
+                            // 重新載入書籍和類別
+                            this.loadBooks();
+                            this.loadCategories();
+                        });
+                } else {
+                    // 使用原有的db.importBooks函數
+                    const result = db.importBooks(books, filterDuplicates);
+                    
+                    // 顯示匯入結果
+                    this.showImportStatus(
+                        `成功匯入 ${result.imported} 筆資料${filterDuplicates ? `，過濾 ${result.filtered} 筆重複資料` : ''}`,
+                        'success'
+                    );
+                    
+                    // 重新載入書籍和類別
+                    this.loadBooks();
+                    this.loadCategories();
+                }
             })
             .catch(error => {
                 console.error('匯入錯誤:', error);
-                this.showImportStatus('匯入失敗，請檢查檔案格式', 'danger');
+                this.showImportStatus(`匯入失敗: ${error.message || '請檢查檔案格式'}`, 'danger');
             });
     }
     
