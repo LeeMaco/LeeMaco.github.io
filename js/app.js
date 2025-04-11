@@ -172,17 +172,24 @@ class App {
         
         // 更新結果計數
         this.resultCount.textContent = `${books.length} 筆資料`;
+        this.resultCount.className = books.length > 0 ? 'badge bg-primary' : 'badge bg-warning';
         
         // 檢查是否有結果
         if (books.length === 0) {
-            this.noResults.classList.remove('d-none');
+            // 顯示無結果提示
+            if (this.noResults) {
+                this.noResults.classList.remove('d-none');
+                this.noResults.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合條件的書籍資料</div>';
+            }
             this.booksTable.classList.add('d-none');
             return;
         }
         
         // 顯示表格，隱藏無結果提示
         this.booksTable.classList.remove('d-none');
-        this.noResults.classList.add('d-none');
+        if (this.noResults) {
+            this.noResults.classList.add('d-none');
+        }
         
         // 檢查是否為管理員
         const isAdmin = auth.isLoggedIn();
@@ -268,7 +275,7 @@ class App {
         
         let results = db.getAllBooks();
         
-        // 按類別篩選
+        // 按類別篩選（只有當選擇了特定類別時才過濾）
         if (category) {
             results = results.filter(book => book.category === category);
         }
@@ -285,7 +292,21 @@ class App {
             );
         }
         
+        // 顯示搜尋結果和狀態提示
         this.displayBooks(results);
+        
+        // 顯示搜尋條件的狀態提示
+        let searchStatusMsg = '';
+        if (category) {
+            searchStatusMsg += `類別「${category}」`;
+        }
+        if (query) {
+            searchStatusMsg += (category ? '，關鍵字「' : '關鍵字「') + query + '」';
+        }
+        
+        if (searchStatusMsg) {
+            this.showMessage(`搜尋條件：${searchStatusMsg}，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
+        }
     }
     
     /**
@@ -456,16 +477,39 @@ class App {
                     return;
                 }
                 
+                this.showImportStatus(`已從Excel讀取 ${books.length} 筆資料，正在匯入...`, 'info');
+                
                 // 檢查是否使用admin.js中的importFromExcel函數
                 if (typeof admin !== 'undefined' && admin.importFromExcel && autoUploadGitHub) {
                     // 使用admin.js中的importFromExcel函數（包含GitHub上傳）
+                    this.showImportStatus(`正在匯入資料並上傳到GitHub...`, 'info');
+                    
                     return admin.importFromExcel(books, true)
                         .then(result => {
                             // 顯示匯入結果
-                            this.showImportStatus(
-                                `成功匯入 ${result.imported} 筆資料${filterDuplicates ? `，過濾 ${result.filtered} 筆重複資料` : ''}${autoUploadGitHub ? '，並已上傳到GitHub' : ''}`,
-                                'success'
-                            );
+                            let statusMsg = `成功匯入 ${result.imported} 筆資料`;
+                            if (result.updated > 0) {
+                                statusMsg += `，更新 ${result.updated} 筆資料`;
+                            }
+                            if (filterDuplicates && result.filtered > 0) {
+                                statusMsg += `，過濾 ${result.filtered} 筆重複資料`;
+                            }
+                            if (autoUploadGitHub) {
+                                statusMsg += '，並已上傳到GitHub';
+                            }
+                            
+                            this.showImportStatus(statusMsg, 'success');
+                            this.showMessage(statusMsg, 'success');
+                            
+                            // 重新載入書籍和類別
+                            this.loadBooks();
+                            this.loadCategories();
+                        })
+                        .catch(error => {
+                            // 處理上傳錯誤，但仍然顯示本地匯入成功
+                            const errorMsg = `資料已匯入本地，但上傳到GitHub失敗: ${error.message}`;
+                            this.showImportStatus(errorMsg, 'warning');
+                            this.showMessage(errorMsg, 'warning');
                             
                             // 重新載入書籍和類別
                             this.loadBooks();
@@ -476,10 +520,16 @@ class App {
                     const result = db.importBooks(books, filterDuplicates);
                     
                     // 顯示匯入結果
-                    this.showImportStatus(
-                        `成功匯入 ${result.imported} 筆資料${filterDuplicates ? `，過濾 ${result.filtered} 筆重複資料` : ''}`,
-                        'success'
-                    );
+                    let statusMsg = `成功匯入 ${result.imported} 筆資料`;
+                    if (result.updated > 0) {
+                        statusMsg += `，更新 ${result.updated} 筆資料`;
+                    }
+                    if (filterDuplicates && result.filtered > 0) {
+                        statusMsg += `，過濾 ${result.filtered} 筆重複資料`;
+                    }
+                    
+                    this.showImportStatus(statusMsg, 'success');
+                    this.showMessage(statusMsg, 'success');
                     
                     // 重新載入書籍和類別
                     this.loadBooks();
@@ -488,19 +538,46 @@ class App {
             })
             .catch(error => {
                 console.error('匯入錯誤:', error);
-                this.showImportStatus(`匯入失敗: ${error.message || '請檢查檔案格式'}`, 'danger');
+                const errorMsg = `匯入失敗: ${error.message || '請檢查檔案格式'}`;
+                this.showImportStatus(errorMsg, 'danger');
+                this.showMessage(errorMsg, 'danger');
             });
     }
     
     /**
      * 顯示匯入狀態
      * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning)
+     * @param {string} type 類型 (success, danger, warning, info)
      */
     showImportStatus(message, type) {
-        this.importStatus.textContent = message;
+        if (!this.importStatus) return;
+        
+        // 根據類型選擇圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
+        
+        this.importStatus.innerHTML = icon + message;
         this.importStatus.className = `alert alert-${type}`;
         this.importStatus.classList.remove('d-none');
+        
+        // 如果是錯誤或警告，滾動到狀態消息位置
+        if (type === 'danger' || type === 'warning') {
+            this.importStatus.scrollIntoView({ behavior: 'smooth' });
+        }
     }
     
     /**
@@ -700,23 +777,67 @@ class App {
     /**
      * 顯示備份狀態
      * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning)
+     * @param {string} type 類型 (success, danger, warning, info)
      */
     showBackupStatus(message, type) {
-        this.backupStatus.textContent = message;
+        if (!this.backupStatus) return;
+        
+        // 根據類型選擇圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
+        
+        this.backupStatus.innerHTML = icon + message;
         this.backupStatus.className = `alert alert-${type}`;
         this.backupStatus.classList.remove('d-none');
+        
+        // 如果是錯誤或警告，滾動到狀態消息位置
+        if (type === 'danger' || type === 'warning') {
+            this.backupStatus.scrollIntoView({ behavior: 'smooth' });
+        }
     }
     
     /**
      * 顯示訊息
      * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning)
+     * @param {string} type 類型 (success, danger, warning, info)
+     * @param {number} delay 顯示時間（毫秒）
      */
-    showMessage(message, type) {
+    showMessage(message, type, delay = 5000) {
         // 創建Toast元素
         const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
         const toastId = 'toast-' + Date.now();
+        
+        // 根據類型選擇圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
         
         const toast = document.createElement('div');
         toast.className = `toast align-items-center text-white bg-${type} border-0`;
@@ -729,8 +850,8 @@ class App {
         toastContent.className = 'd-flex';
         
         const toastBody = document.createElement('div');
-        toastBody.className = 'toast-body';
-        toastBody.textContent = message;
+        toastBody.className = 'toast-body d-flex align-items-center';
+        toastBody.innerHTML = icon + message;
         
         const closeButton = document.createElement('button');
         closeButton.type = 'button';
@@ -744,13 +865,15 @@ class App {
         toastContainer.appendChild(toast);
         
         // 初始化並顯示Toast
-        const bsToast = new bootstrap.Toast(toast, { delay: 3000 });
+        const bsToast = new bootstrap.Toast(toast, { delay: delay });
         bsToast.show();
         
         // 自動移除
         toast.addEventListener('hidden.bs.toast', () => {
             toast.remove();
         });
+        
+        return toast;
     }
     
     /**

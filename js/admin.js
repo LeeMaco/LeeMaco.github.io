@@ -85,14 +85,37 @@ class Admin {
     /**
      * 顯示GitHub狀態訊息
      * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning)
+     * @param {string} type 類型 (success, danger, warning, info)
      */
     showGitHubStatus(message, type) {
         const githubStatus = document.getElementById('githubStatus');
         if (githubStatus) {
-            githubStatus.textContent = message;
+            // 根據類型選擇圖標
+            let icon = '';
+            switch(type) {
+                case 'success':
+                    icon = '<i class="fas fa-check-circle me-2"></i>';
+                    break;
+                case 'danger':
+                    icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                    break;
+                case 'warning':
+                    icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                    break;
+                case 'info':
+                default:
+                    icon = '<i class="fas fa-info-circle me-2"></i>';
+                    break;
+            }
+            
+            githubStatus.innerHTML = icon + message;
             githubStatus.className = `alert alert-${type}`;
             githubStatus.classList.remove('d-none');
+            
+            // 如果是錯誤或警告，滾動到狀態消息位置
+            if (type === 'danger' || type === 'warning') {
+                githubStatus.scrollIntoView({ behavior: 'smooth' });
+            }
         }
     }
     
@@ -103,14 +126,29 @@ class Admin {
      */
     uploadToGitHub(data) {
         return new Promise((resolve, reject) => {
+            // 創建或獲取進度條元素
+            const progressContainer = document.getElementById('githubProgressContainer') || this.createProgressContainer();
+            const progressBar = document.getElementById('githubProgressBar');
+            const progressStatus = document.getElementById('githubProgressStatus');
+            
+            // 顯示進度容器
+            progressContainer.classList.remove('d-none');
+            progressBar.style.width = '0%';
+            progressBar.setAttribute('aria-valuenow', '0');
+            progressStatus.textContent = '準備上傳...';
+            
             // 檢查設置是否完整
             if (!this.githubSettings.token || !this.githubSettings.repo) {
+                this.updateProgress(0, '錯誤：GitHub設置不完整', 'danger');
                 reject(new Error('GitHub設置不完整，請先配置GitHub設置'));
                 return;
             }
             
             // 準備API請求URL
             const apiUrl = `https://api.github.com/repos/${this.githubSettings.repo}/contents/${this.githubSettings.path}`;
+            
+            // 更新進度
+            this.updateProgress(10, '正在連接GitHub API...', 'info');
             
             // 首先獲取文件信息（如果存在）
             fetch(apiUrl, {
@@ -122,14 +160,18 @@ class Admin {
             .then(response => {
                 if (response.status === 404) {
                     // 文件不存在，創建新文件
+                    this.updateProgress(30, '準備創建新文件...', 'info');
                     return { sha: null };
                 } else if (!response.ok) {
-                    throw new Error(`GitHub API錯誤: ${response.status}`);
+                    this.updateProgress(30, `錯誤：GitHub API返回 ${response.status}`, 'danger');
+                    throw new Error(`GitHub API錯誤: ${response.status} - ${response.statusText}`);
                 }
+                this.updateProgress(30, '正在準備更新文件...', 'info');
                 return response.json();
             })
             .then(fileInfo => {
                 // 準備上傳數據
+                this.updateProgress(50, '正在編碼數據...', 'info');
                 const content = btoa(JSON.stringify(data, null, 2)); // Base64編碼
                 
                 // 準備請求體
@@ -144,6 +186,8 @@ class Admin {
                     requestBody.sha = fileInfo.sha;
                 }
                 
+                this.updateProgress(70, '正在上傳到GitHub...', 'info');
+                
                 // 發送PUT請求更新或創建文件
                 return fetch(apiUrl, {
                     method: 'PUT',
@@ -157,19 +201,100 @@ class Admin {
             })
             .then(response => {
                 if (!response.ok) {
-                    throw new Error(`上傳失敗: ${response.status}`);
+                    const errorMsg = `上傳失敗: ${response.status} - ${response.statusText}`;
+                    this.updateProgress(80, `錯誤：${errorMsg}`, 'danger');
+                    throw new Error(errorMsg);
                 }
+                this.updateProgress(90, '上傳成功，正在完成...', 'info');
                 return response.json();
             })
             .then(data => {
                 console.log('上傳成功:', data);
+                this.updateProgress(100, '上傳完成！', 'success');
+                
+                // 3秒後隱藏進度條
+                setTimeout(() => {
+                    progressContainer.classList.add('d-none');
+                }, 3000);
+                
                 resolve(data);
             })
             .catch(error => {
                 console.error('上傳錯誤:', error);
+                this.updateProgress(100, `錯誤：${error.message}`, 'danger');
                 reject(error);
             });
         });
+    }
+    
+    /**
+     * 創建進度條容器
+     * @returns {HTMLElement} 進度條容器
+     */
+    createProgressContainer() {
+        // 創建進度條容器
+        const container = document.createElement('div');
+        container.id = 'githubProgressContainer';
+        container.className = 'mt-3 d-none';
+        
+        // 創建進度狀態文本
+        const statusText = document.createElement('div');
+        statusText.id = 'githubProgressStatus';
+        statusText.className = 'mb-2';
+        statusText.textContent = '準備上傳...';
+        
+        // 創建進度條
+        const progressDiv = document.createElement('div');
+        progressDiv.className = 'progress';
+        
+        const progressBar = document.createElement('div');
+        progressBar.id = 'githubProgressBar';
+        progressBar.className = 'progress-bar';
+        progressBar.role = 'progressbar';
+        progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', '0');
+        progressBar.setAttribute('aria-valuemin', '0');
+        progressBar.setAttribute('aria-valuemax', '100');
+        
+        // 組裝元素
+        progressDiv.appendChild(progressBar);
+        container.appendChild(statusText);
+        container.appendChild(progressDiv);
+        
+        // 添加到GitHub設置模態框中
+        const modalBody = document.querySelector('#githubSettingsModal .modal-body');
+        if (modalBody) {
+            modalBody.appendChild(container);
+        } else {
+            // 如果找不到模態框，添加到body
+            document.body.appendChild(container);
+        }
+        
+        return container;
+    }
+    
+    /**
+     * 更新上傳進度
+     * @param {number} percent 進度百分比
+     * @param {string} message 狀態消息
+     * @param {string} type 類型 (info, success, danger)
+     */
+    updateProgress(percent, message, type = 'info') {
+        const progressBar = document.getElementById('githubProgressBar');
+        const progressStatus = document.getElementById('githubProgressStatus');
+        
+        if (progressBar && progressStatus) {
+            // 更新進度條
+            progressBar.style.width = `${percent}%`;
+            progressBar.setAttribute('aria-valuenow', percent);
+            
+            // 根據類型設置進度條顏色
+            progressBar.className = `progress-bar bg-${type}`;
+            
+            // 更新狀態文本
+            progressStatus.textContent = message;
+            progressStatus.className = `mb-2 text-${type}`;
+        }
     }
     
     /**

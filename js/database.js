@@ -45,10 +45,18 @@ class Database {
         const categories = new Set();
         
         books.forEach(book => {
+            // 確保所有類別都被添加，包括「未分類」
             if (book.category) {
                 categories.add(book.category);
+            } else {
+                categories.add('未分類');
             }
         });
+        
+        // 如果沒有書籍或沒有書籍有「未分類」類別，手動添加「未分類」類別
+        if (books.length === 0 || !categories.has('未分類')) {
+            categories.add('未分類');
+        }
         
         return Array.from(categories).sort();
     }
