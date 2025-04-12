@@ -276,6 +276,27 @@
                             </label>
                         </div>
                     </div>
+                    <div class="mb-3">
+                        <label class="form-label">備份方法</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backupMethod" id="emailjsMethod" value="emailjs">
+                            <label class="form-check-label" for="emailjsMethod">
+                                使用EmailJS (需要API密鑰)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backupMethod" id="mailtoMethod" value="mailto" checked>
+                            <label class="form-check-label" for="mailtoMethod">
+                                使用郵件客戶端 (無需API密鑰)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backupMethod" id="downloadMethod" value="download">
+                            <label class="form-check-label" for="downloadMethod">
+                                直接下載Excel檔案
+                            </label>
+                        </div>
+                    </div>
                     <div id="autoBackupOptions" class="mb-3 d-none">
                         <label for="backupFrequency" class="form-label">備份頻率</label>
                         <select class="form-select" id="backupFrequency">
@@ -344,7 +365,7 @@
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        請先在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板，以啟用郵件備份功能。
+                        EmailJS是一個可選的備份方式，需要在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板。如果您不想使用EmailJS，可以在備份設定中選擇「使用郵件客戶端」或「直接下載Excel檔案」方式。
                     </div>
                     <div class="mb-3">
                         <label for="emailjsUserID" class="form-label">User ID</label>
