@@ -721,7 +721,7 @@ class App {
             emailFieldContainer.classList.remove('d-none');
         }
         
-        // 如果選擇EmailJS方法，顯示EmailJS設定按鈕
+        // 如果選擇EmailJS方法，顯示EmailJS設定按鈕，否則隱藏
         const emailJSSettingsBtn = document.getElementById('openEmailJSSettingsBtn');
         if (emailJSSettingsBtn) {
             if (this.emailjsMethod.checked) {
@@ -729,6 +729,13 @@ class App {
             } else {
                 emailJSSettingsBtn.classList.add('d-none');
             }
+        }
+        
+        // 清除之前的錯誤提示
+        const backupStatus = document.getElementById('backupStatus');
+        if (backupStatus && backupStatus.classList.contains('alert-danger')) {
+            backupStatus.textContent = '';
+            backupStatus.classList.add('d-none');
         }
     }
     
@@ -893,7 +900,7 @@ class App {
             return;
         }
         
-        // 如果使用EmailJS方法，檢查EmailJS設定
+        // 只有當使用EmailJS方法時，才檢查EmailJS設定
         if (backupMethod === 'emailjs' && (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID)) {
             this.showBackupStatus('請先完成EmailJS設定 <button class="btn btn-sm btn-primary ms-2" id="openEmailJSSettingsBtn">設定EmailJS</button>', 'danger');
             
