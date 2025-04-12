@@ -18,6 +18,9 @@ class App {
         
         // 監聽GitHub同步事件
         this.listenForGitHubSyncEvents();
+        
+        // 初始化EmailJS設定
+        this.initEmailJSSettings();
     }
     
     /**
@@ -67,6 +70,11 @@ class App {
         this.manualBackupBtn = document.getElementById('manualBackupBtn');
         this.saveBackupSettingsBtn = document.getElementById('saveBackupSettingsBtn');
         this.backupStatus = document.getElementById('backupStatus');
+        
+        // EmailJS設定元素
+        this.emailjsUserID = document.getElementById('emailjsUserID');
+        this.emailjsServiceID = document.getElementById('emailjsServiceID');
+        this.emailjsTemplateID = document.getElementById('emailjsTemplateID');
         
         // 書籍詳情元素
         this.bookDetailsTitle = document.getElementById('bookDetailsTitle');
@@ -131,6 +139,9 @@ class App {
         
         // 載入備份設定
         this.loadBackupSettings();
+        
+        // 載入EmailJS設定
+        this.loadEmailJSSettings();
     }
     
     /**
@@ -638,7 +649,22 @@ class App {
                 this.manualBackup.checked = true;
                 this.autoBackupOptions.classList.add('d-none');
             }
-        }
+            
+            // 加載EmailJS配置
+            if (settings.emailjs) {
+                this.emailjsUserID.value = settings.emailjs.userId || '';
+                this.emailjsServiceID.value = settings.emailjs.serviceId || 'default_service';
+                this.emailjsTemplateID.value = settings.emailjs.templateId || 'template_backup';
+                
+                // 初始化EmailJS
+                if (typeof emailjs !== 'undefined' && settings.emailjs.userId) {
+                    emailjs.init(settings.emailjs.userId);
+                    console.log('EmailJS已從設定中初始化');
+                }
+                
+                // 更新EmailService配置
+                emailService.updateConfig(settings.emailjs);
+            }
     }
     
     /**
@@ -720,6 +746,28 @@ class App {
             settings.frequency = this.backupFrequency.value;
         }
         
+        // 添加EmailJS配置
+        const emailjsUserID = this.emailjsUserID.value.trim();
+        const emailjsServiceID = this.emailjsServiceID.value.trim();
+        const emailjsTemplateID = this.emailjsTemplateID.value.trim();
+        
+        if (emailjsUserID) {
+            settings.emailjs = {
+                userId: emailjsUserID,
+                serviceId: emailjsServiceID || 'default_service',
+                templateId: emailjsTemplateID || 'template_backup'
+            };
+            
+            // 初始化EmailJS
+            if (typeof emailjs !== 'undefined') {
+                emailjs.init(emailjsUserID);
+                console.log('EmailJS已初始化');
+            }
+            
+            // 更新EmailService配置
+            emailService.updateConfig(settings.emailjs);
+        }
+        
         // 儲存設定
         db.saveBackupSettings(settings);
         this.showBackupStatus('備份設定已儲存', 'success');
@@ -745,9 +793,15 @@ class App {
      */
     performBackup() {
         const settings = db.getBackupSettings();
+        const emailjsSettings = db.getEmailJSSettings();
         
         if (!settings || !settings.email) {
             this.showBackupStatus('請先設定備份Email', 'danger');
+            return;
+        }
+        
+        if (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID) {
+            this.showBackupStatus('請先完成EmailJS設定', 'danger');
             return;
         }
         
@@ -762,24 +816,36 @@ class App {
         // 顯示處理中狀態
         this.showBackupStatus('正在處理備份...', 'info');
         
-        // 使用數據處理器創建工作表
-        const workbook = dataProcessor.createExcelWorkbook(books);
-        
-        // 生成檔案名稱
-        const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
-        
-        // 匯出Excel檔案
-        XLSX.writeFile(workbook, fileName);
-        
-        // 使用郵件服務發送備份
-        emailService.sendBackupEmail(settings.email, books, fileName)
-            .then(() => {
-                this.showBackupStatus(`備份已完成，檔案已下載 (${fileName})。在實際環境中，備份將發送至 ${settings.email}`, 'success');
-            })
-            .catch(error => {
-                console.error('備份錯誤:', error);
-                this.showBackupStatus('備份過程中發生錯誤，請稍後再試', 'danger');
-            });
+        try {
+            // 使用數據處理器創建工作表
+            const workbook = dataProcessor.createExcelWorkbook(books);
+            
+            // 生成檔案名稱
+            const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
+            
+            // 匯出Excel檔案
+            XLSX.writeFile(workbook, fileName);
+            
+            // 更新狀態
+            this.showBackupStatus(`檔案已生成 (${fileName})，正在發送郵件...`, 'info');
+            
+            // 使用郵件服務發送備份
+            emailService.sendBackupEmail(settings.email, books, fileName, emailjsSettings)
+                .then((result) => {
+                    if (result) {
+                        this.showBackupStatus(`備份已完成，檔案已下載 (${fileName})。備份將發送至 ${settings.email}`, 'success');
+                    } else {
+                        this.showBackupStatus(`備份檔案已生成 (${fileName})，但郵件發送失敗。請檢查網絡連接或稍後再試。`, 'warning');
+                    }
+                })
+                .catch(error => {
+                    console.error('備份錯誤:', error);
+                    this.showBackupStatus(`備份檔案已生成 (${fileName})，但郵件發送失敗：${error.message}`, 'warning');
+                });
+        } catch (error) {
+            console.error('備份生成錯誤:', error);
+            this.showBackupStatus(`備份過程中發生錯誤：${error.message}`, 'danger');
+        }
     }
     
     /**
@@ -911,3 +977,56 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app.addBook();
     });
 });
+
+/**
+ * 初始化EmailJS設定
+ */
+App.prototype.initEmailJSSettings = function() {
+    // 檢查是否已有EmailJS設定
+    const settings = db.getEmailJSSettings();
+    if (settings) {
+        // 如果有設定，初始化EmailJS
+        emailService.init(settings.userID);
+    }
+};
+
+/**
+ * 載入EmailJS設定
+ */
+App.prototype.loadEmailJSSettings = function() {
+    const settings = db.getEmailJSSettings();
+    
+    if (settings) {
+        this.emailjsUserID.value = settings.userID || '';
+        this.emailjsServiceID.value = settings.serviceID || '';
+        this.emailjsTemplateID.value = settings.templateID || '';
+    }
+};
+
+/**
+ * 儲存EmailJS設定
+ */
+App.prototype.saveEmailJSSettings = function() {
+    const userID = this.emailjsUserID.value.trim();
+    const serviceID = this.emailjsServiceID.value.trim();
+    const templateID = this.emailjsTemplateID.value.trim();
+    
+    if (!userID || !serviceID || !templateID) {
+        this.showMessage('請填寫所有EmailJS設定欄位', 'warning');
+        return;
+    }
+    
+    const settings = {
+        userID: userID,
+        serviceID: serviceID,
+        templateID: templateID
+    };
+    
+    // 儲存設定
+    db.saveEmailJSSettings(settings);
+    
+    // 初始化EmailJS
+    emailService.init(userID);
+    
+    this.showMessage('EmailJS設定已儲存', 'success');
+}

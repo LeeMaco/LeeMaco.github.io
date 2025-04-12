@@ -262,6 +262,19 @@
                         <input type="email" class="form-control" id="backupEmail" placeholder="example@gmail.com">
                     </div>
                     <div class="mb-3">
+                        <label for="emailjsUserID" class="form-label">EmailJS用戶ID <small class="text-muted">(選填)</small></label>
+                        <input type="text" class="form-control" id="emailjsUserID" placeholder="user_xxxxxxxxxxxxxxxx">
+                        <div class="form-text">從EmailJS獲取，用於發送郵件。若不填寫，將使用模擬發送。</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsServiceID" class="form-label">EmailJS服務ID <small class="text-muted">(選填)</small></label>
+                        <input type="text" class="form-control" id="emailjsServiceID" placeholder="service_xxxxxxx">
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsTemplateID" class="form-label">EmailJS模板ID <small class="text-muted">(選填)</small></label>
+                        <input type="text" class="form-control" id="emailjsTemplateID" placeholder="template_xxxxxxx">
+                    </div>
+                    <div class="mb-3">
                         <label class="form-label">備份方式</label>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="backupType" id="manualBackup" value="manual" checked>
@@ -393,6 +406,7 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
     <script src="js/auth.js"></script>
     <script src="js/database.js"></script>
     <script src="js/dataProcessor.js"></script>
