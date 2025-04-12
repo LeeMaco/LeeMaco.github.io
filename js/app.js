@@ -18,9 +18,6 @@ class App {
         
         // 監聽GitHub同步事件
         this.listenForGitHubSyncEvents();
-        
-        // 初始化EmailJS設定
-        this.initEmailJSSettings();
     }
     
     /**
@@ -71,11 +68,6 @@ class App {
         this.saveBackupSettingsBtn = document.getElementById('saveBackupSettingsBtn');
         this.backupStatus = document.getElementById('backupStatus');
         
-        // EmailJS設定元素
-        this.emailjsUserID = document.getElementById('emailjsUserID');
-        this.emailjsServiceID = document.getElementById('emailjsServiceID');
-        this.emailjsTemplateID = document.getElementById('emailjsTemplateID');
-        
         // 書籍詳情元素
         this.bookDetailsTitle = document.getElementById('bookDetailsTitle');
         this.detailAuthor = document.getElementById('detailAuthor');
@@ -115,33 +107,89 @@ class App {
      */
     initEventListeners() {
         // 搜尋事件
-        this.searchBtn.addEventListener('click', this.searchBooks.bind(this));
-        this.resetBtn.addEventListener('click', this.resetSearch.bind(this));
-        this.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.searchBooks();
-        });
+        if (this.searchBtn) {
+            this.searchBtn.addEventListener('click', () => this.searchBooks());
+        }
+        if (this.resetBtn) {
+            this.resetBtn.addEventListener('click', () => this.resetSearch());
+        }
+        if (this.searchInput) {
+            this.searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') this.searchBooks();
+            });
+            // 添加輸入延遲搜尋功能
+            let searchTimeout;
+            this.searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (this.searchInput.value.trim().length >= 2) {
+                        this.searchBooks();
+                    }
+                }, 500); // 500毫秒延遲，避免頻繁搜尋
+            });
+        }
         
         // 書籍表單事件
+        this.bookForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveBook();
+        });
         this.saveBookBtn.addEventListener('click', () => this.saveBook());
         
         // 匯入/匯出事件
         this.confirmImportBtn.addEventListener('click', () => this.importBooks());
-        
-        // GitHub同步事件
-        document.addEventListener('githubSync', (event) => this.handleGitHubSyncEvent(event));
         this.exportBtn.addEventListener('click', () => this.exportBooks());
         
-        // 備份設定事件
-        this.manualBackup.addEventListener('change', () => this.toggleBackupOptions());
-        this.autoBackup.addEventListener('change', () => this.toggleBackupOptions());
-        this.manualBackupBtn.addEventListener('click', () => this.performBackup());
+        // 備份事件
+        this.autoBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
+        this.manualBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
         this.saveBackupSettingsBtn.addEventListener('click', () => this.saveBackupSettings());
+        this.manualBackupBtn.addEventListener('click', () => this.performBackup());
         
-        // 載入備份設定
-        this.loadBackupSettings();
+        // EmailJS設定事件
+        const saveEmailJSSettingsBtn = document.getElementById('saveEmailJSSettingsBtn');
+        if (saveEmailJSSettingsBtn) {
+            saveEmailJSSettingsBtn.addEventListener('click', () => this.saveEmailJSSettings());
+        }
         
-        // 載入EmailJS設定
-        this.loadEmailJSSettings();
+        const testEmailJSBtn = document.getElementById('testEmailJSBtn');
+        if (testEmailJSBtn) {
+            testEmailJSBtn.addEventListener('click', () => this.testEmailJSConnection());
+        }
+        
+        // 監聽模態框事件
+        document.getElementById('bookModal').addEventListener('show.bs.modal', (e) => {
+            const button = e.relatedTarget;
+            if (button && button.getAttribute('data-book-id')) {
+                this.loadBookForEdit(button.getAttribute('data-book-id'));
+            } else {
+                this.resetBookForm();
+            }
+        });
+        
+        // 監聽備份模態框事件
+        document.getElementById('backupModal').addEventListener('show.bs.modal', () => {
+            this.loadBackupSettings();
+        });
+        
+        // 監聽GitHub設置模態框事件
+        document.getElementById('githubSettingsModal').addEventListener('show.bs.modal', () => {
+            this.loadGitHubSettings();
+        });
+        
+        // 監聽EmailJS設置模態框事件
+        const emailJSSettingsModal = document.getElementById('emailJSSettingsModal');
+        if (emailJSSettingsModal) {
+            emailJSSettingsModal.addEventListener('show.bs.modal', () => {
+                this.loadEmailJSSettings();
+            });
+        }
+        
+        // 監聽刪除確認事件
+        this.confirmDeleteBtn.addEventListener('click', () => {
+            const bookId = this.confirmDeleteBtn.getAttribute('data-book-id');
+            if (bookId) this.deleteBook(bookId);
+        });
     }
     
     /**
@@ -276,6 +324,13 @@ class App {
             // 顯示搜尋中的狀態提示
             this.showMessage('正在搜尋...', 'info');
             
+            // 檢查搜尋輸入是否為空
+            if (query === '') {
+                this.showMessage('請輸入搜尋關鍵字', 'info');
+                this.loadBooks(); // 顯示所有書籍
+                return;
+            }
+            
             let results = db.getAllBooks();
             
             // 檢查數據庫是否返回有效數據
@@ -283,34 +338,44 @@ class App {
                 throw new Error('數據庫返回無效數據');
             }
             
-            // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
-            if (query) {
-                results = results.filter(book => {
-                    // 安全地檢查每個屬性是否存在且為字符串類型
-                    const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
-                    const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
-                    const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
-                    const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
-                    const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
-                    const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
-                    const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
-                    const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
-                    const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
-                    const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
-                    
-                    // 返回任一屬性匹配的結果
-                    return titleMatch || authorMatch || descriptionMatch || notesMatch || 
-                           publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
-                           cabinetMatch || rowMatch;
-                });
+            // 檢查數據庫是否為空
+            if (results.length === 0) {
+                this.showMessage('數據庫中沒有書籍資料', 'warning');
+                this.displayBooks([]);
+                return;
             }
+            
+            // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
+            results = results.filter(book => {
+                // 安全地檢查每個屬性是否存在且為字符串類型
+                const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
+                const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
+                const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
+                const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
+                const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
+                const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
+                const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
+                const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
+                const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
+                const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
+                
+                // 返回任一屬性匹配的結果
+                return titleMatch || authorMatch || descriptionMatch || notesMatch || 
+                       publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
+                       cabinetMatch || rowMatch;
+            });
             
             // 顯示搜尋結果和狀態提示
             this.displayBooks(results);
             
             // 顯示搜尋條件的狀態提示
-            if (query) {
-                this.showMessage(`搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
+            const resultMessage = `搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`;
+            this.showMessage(resultMessage, results.length > 0 ? 'info' : 'warning');
+            
+            // 如果沒有結果，在noResults區域顯示更友好的提示
+            if (results.length === 0 && this.noResults) {
+                this.noResults.classList.remove('d-none');
+                this.noResults.innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合「${query}」的書籍資料，請嘗試其他關鍵字</div>`;
             }
         } catch (error) {
             console.error('搜尋錯誤:', error);
@@ -649,22 +714,7 @@ class App {
                 this.manualBackup.checked = true;
                 this.autoBackupOptions.classList.add('d-none');
             }
-            
-            // 加載EmailJS配置
-            if (settings.emailjs) {
-                this.emailjsUserID.value = settings.emailjs.userId || '';
-                this.emailjsServiceID.value = settings.emailjs.serviceId || 'default_service';
-                this.emailjsTemplateID.value = settings.emailjs.templateId || 'template_backup';
-                
-                // 初始化EmailJS
-                if (typeof emailjs !== 'undefined' && settings.emailjs.userId) {
-                    emailjs.init(settings.emailjs.userId);
-                    console.log('EmailJS已從設定中初始化');
-                }
-                
-                // 更新EmailService配置
-                emailService.updateConfig(settings.emailjs);
-            }
+        }
     }
     
     /**
@@ -746,28 +796,6 @@ class App {
             settings.frequency = this.backupFrequency.value;
         }
         
-        // 添加EmailJS配置
-        const emailjsUserID = this.emailjsUserID.value.trim();
-        const emailjsServiceID = this.emailjsServiceID.value.trim();
-        const emailjsTemplateID = this.emailjsTemplateID.value.trim();
-        
-        if (emailjsUserID) {
-            settings.emailjs = {
-                userId: emailjsUserID,
-                serviceId: emailjsServiceID || 'default_service',
-                templateId: emailjsTemplateID || 'template_backup'
-            };
-            
-            // 初始化EmailJS
-            if (typeof emailjs !== 'undefined') {
-                emailjs.init(emailjsUserID);
-                console.log('EmailJS已初始化');
-            }
-            
-            // 更新EmailService配置
-            emailService.updateConfig(settings.emailjs);
-        }
-        
         // 儲存設定
         db.saveBackupSettings(settings);
         this.showBackupStatus('備份設定已儲存', 'success');
@@ -801,7 +829,21 @@ class App {
         }
         
         if (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID) {
-            this.showBackupStatus('請先完成EmailJS設定', 'danger');
+            this.showBackupStatus('請先完成EmailJS設定 <button class="btn btn-sm btn-primary ms-2" id="openEmailJSSettingsBtn">設定EmailJS</button>', 'danger');
+            
+            // 添加按鈕點擊事件
+            document.getElementById('openEmailJSSettingsBtn').addEventListener('click', () => {
+                // 關閉備份模態框
+                const backupModal = bootstrap.Modal.getInstance(document.getElementById('backupModal'));
+                backupModal.hide();
+                
+                // 打開EmailJS設定模態框
+                setTimeout(() => {
+                    const emailJSModal = new bootstrap.Modal(document.getElementById('emailJSSettingsModal'));
+                    emailJSModal.show();
+                }, 500);
+            });
+            
             return;
         }
         
@@ -824,27 +866,102 @@ class App {
             const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
             
             // 匯出Excel檔案
-            XLSX.writeFile(workbook, fileName);
+            try {
+                XLSX.writeFile(workbook, fileName);
+                this.showBackupStatus(`檔案已生成 (${fileName})，正在發送郵件...`, 'info');
+            } catch (fileError) {
+                console.error('檔案生成錯誤:', fileError);
+                this.showBackupStatus(`Excel檔案生成失敗：${fileError.message}，嘗試繼續發送郵件備份...`, 'warning');
+            }
             
-            // 更新狀態
-            this.showBackupStatus(`檔案已生成 (${fileName})，正在發送郵件...`, 'info');
+            // 顯示備份進度
+            const progressStatus = document.createElement('div');
+            progressStatus.className = 'progress mt-2';
+            progressStatus.innerHTML = `
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" style="width: 25%" 
+                     aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
+                    準備發送中...
+                </div>
+            `;
+            this.backupStatus.appendChild(progressStatus);
+            
+            // 更新進度條
+            const progressBar = progressStatus.querySelector('.progress-bar');
+            progressBar.style.width = '50%';
+            progressBar.textContent = '正在發送郵件...';
             
             // 使用郵件服務發送備份
             emailService.sendBackupEmail(settings.email, books, fileName, emailjsSettings)
                 .then((result) => {
-                    if (result) {
-                        this.showBackupStatus(`備份已完成，檔案已下載 (${fileName})。備份將發送至 ${settings.email}`, 'success');
-                    } else {
-                        this.showBackupStatus(`備份檔案已生成 (${fileName})，但郵件發送失敗。請檢查網絡連接或稍後再試。`, 'warning');
-                    }
+                    // 更新進度條
+                    progressBar.style.width = '100%';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-success');
+                    progressBar.textContent = '備份完成！';
+                    
+                    // 顯示詳細信息
+                    const details = result.details || {};
+                    const recordCount = details.recordCount || books.length;
+                    const sizeKB = details.sizeKB || '未知';
+                    
+                    // 顯示成功信息
+                    this.showBackupStatus(`
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-check-circle text-success me-2 fs-4"></i>
+                            <div>
+                                <strong>備份成功！</strong><br>
+                                檔案已下載 (${fileName})<br>
+                                備份已發送至 ${settings.email}<br>
+                                共 ${recordCount} 筆記錄，大小約 ${sizeKB}KB
+                                <div class="text-muted small">備份時間: ${new Date().toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `, 'success');
+                    
+                    // 顯示全局通知
+                    this.showMessage('備份已成功完成並發送至您的郵箱', 'success');
                 })
                 .catch(error => {
                     console.error('備份錯誤:', error);
-                    this.showBackupStatus(`備份檔案已生成 (${fileName})，但郵件發送失敗：${error.message}`, 'warning');
+                    
+                    // 更新進度條
+                    progressBar.style.width = '100%';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-danger');
+                    progressBar.textContent = '發送失敗';
+                    
+                    // 顯示錯誤信息
+                    this.showBackupStatus(`
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>部分備份成功</strong><br>
+                            Excel檔案已生成 (${fileName})，但郵件發送失敗：<br>
+                            ${error.message}<br>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-primary retry-backup-btn">
+                                    <i class="fas fa-redo me-1"></i> 重試發送
+                                </button>
+                            </div>
+                        </div>
+                    `, 'warning');
+                    
+                    // 添加重試按鈕事件
+                    const retryBtn = this.backupStatus.querySelector('.retry-backup-btn');
+                    if (retryBtn) {
+                        retryBtn.addEventListener('click', () => this.performBackup());
+                    }
                 });
         } catch (error) {
             console.error('備份生成錯誤:', error);
-            this.showBackupStatus(`備份過程中發生錯誤：${error.message}`, 'danger');
+            this.showBackupStatus(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>備份失敗</strong><br>
+                    備份過程中發生錯誤：${error.message}<br>
+                    <div class="text-muted small mt-1">錯誤類型: ${error.name || '未知'}</div>
+                </div>
+            `, 'danger');
         }
     }
     
@@ -881,6 +998,117 @@ class App {
         // 如果是錯誤或警告，滾動到狀態消息位置
         if (type === 'danger' || type === 'warning') {
             this.backupStatus.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+    
+    /**
+     * 顯示EmailJS設定狀態
+     * @param {string} message 訊息
+     * @param {string} type 類型 (success, danger, warning, info)
+     */
+    showEmailJSStatus(message, type) {
+        const emailjsStatus = document.getElementById('emailjsStatus');
+        if (!emailjsStatus) return;
+        
+        // 根據類型選擇圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
+        
+        emailjsStatus.innerHTML = icon + message;
+        emailjsStatus.className = `alert alert-${type}`;
+        emailjsStatus.classList.remove('d-none');
+    }
+    
+    /**
+     * 加載EmailJS設定
+     */
+    loadEmailJSSettings() {
+        const settings = db.getEmailJSSettings();
+        if (!settings) return;
+        
+        // 填充表單
+        document.getElementById('emailjsUserID').value = settings.userID || '';
+        document.getElementById('emailjsServiceID').value = settings.serviceID || '';
+        document.getElementById('emailjsTemplateID').value = settings.templateID || '';
+    }
+    
+    /**
+     * 保存EmailJS設定
+     */
+    saveEmailJSSettings() {
+        const userID = document.getElementById('emailjsUserID').value.trim();
+        const serviceID = document.getElementById('emailjsServiceID').value.trim();
+        const templateID = document.getElementById('emailjsTemplateID').value.trim();
+        
+        if (!userID || !serviceID || !templateID) {
+            this.showEmailJSStatus('請填寫所有必要欄位', 'danger');
+            return;
+        }
+        
+        // 構建設定對象
+        const settings = {
+            userID: userID,
+            serviceID: serviceID,
+            templateID: templateID
+        };
+        
+        // 儲存設定
+        db.saveEmailJSSettings(settings);
+        this.showEmailJSStatus('EmailJS設定已儲存', 'success');
+    }
+    
+    /**
+     * 測試EmailJS連接
+     */
+    testEmailJSConnection() {
+        const settings = db.getEmailJSSettings();
+        
+        if (!settings || !settings.userID || !settings.serviceID || !settings.templateID) {
+            this.showEmailJSStatus('請先保存完整的EmailJS設定', 'danger');
+            return;
+        }
+        
+        this.showEmailJSStatus('正在測試連接...', 'info');
+        
+        try {
+            // 初始化EmailJS
+            emailjs.init(settings.userID);
+            
+            // 準備測試參數
+            const templateParams = {
+                to_email: 'test@example.com',
+                from_name: '書籍查詢管理系統',
+                message: '這是一個測試訊息，請忽略',
+                file_name: '測試檔案.xlsx',
+                data_json: JSON.stringify({test: 'data'})
+            };
+            
+            // 使用EmailJS發送測試郵件
+            emailjs.send(settings.serviceID, settings.templateID, templateParams)
+                .then(() => {
+                    this.showEmailJSStatus('連接測試成功！EmailJS設定正確', 'success');
+                })
+                .catch((error) => {
+                    console.error('EmailJS測試失敗:', error);
+                    this.showEmailJSStatus(`連接測試失敗：${error.text || error.message}`, 'danger');
+                });
+        } catch (error) {
+            console.error('EmailJS初始化失敗:', error);
+            this.showEmailJSStatus(`連接測試失敗：${error.message}`, 'danger');
         }
     }
     
@@ -977,56 +1205,3 @@ document.addEventListener('DOMContentLoaded', () => {
         window.app.addBook();
     });
 });
-
-/**
- * 初始化EmailJS設定
- */
-App.prototype.initEmailJSSettings = function() {
-    // 檢查是否已有EmailJS設定
-    const settings = db.getEmailJSSettings();
-    if (settings) {
-        // 如果有設定，初始化EmailJS
-        emailService.init(settings.userID);
-    }
-};
-
-/**
- * 載入EmailJS設定
- */
-App.prototype.loadEmailJSSettings = function() {
-    const settings = db.getEmailJSSettings();
-    
-    if (settings) {
-        this.emailjsUserID.value = settings.userID || '';
-        this.emailjsServiceID.value = settings.serviceID || '';
-        this.emailjsTemplateID.value = settings.templateID || '';
-    }
-};
-
-/**
- * 儲存EmailJS設定
- */
-App.prototype.saveEmailJSSettings = function() {
-    const userID = this.emailjsUserID.value.trim();
-    const serviceID = this.emailjsServiceID.value.trim();
-    const templateID = this.emailjsTemplateID.value.trim();
-    
-    if (!userID || !serviceID || !templateID) {
-        this.showMessage('請填寫所有EmailJS設定欄位', 'warning');
-        return;
-    }
-    
-    const settings = {
-        userID: userID,
-        serviceID: serviceID,
-        templateID: templateID
-    };
-    
-    // 儲存設定
-    db.saveEmailJSSettings(settings);
-    
-    // 初始化EmailJS
-    emailService.init(userID);
-    
-    this.showMessage('EmailJS設定已儲存', 'success');
-}

@@ -26,6 +26,15 @@ class Database {
                 frequency: 'daily'
             }));
         }
+        
+        // 檢查是否已有EmailJS設定
+        if (!localStorage.getItem('emailJSSettings')) {
+            localStorage.setItem('emailJSSettings', JSON.stringify({
+                userID: '',
+                serviceID: '',
+                templateID: ''
+            }));
+        }
     }
     
     /**
@@ -257,6 +266,22 @@ class Database {
      */
     saveBackupSettings(settings) {
         localStorage.setItem('backupSettings', JSON.stringify(settings));
+    }
+    
+    /**
+     * 獲取EmailJS設定
+     * @returns {Object} EmailJS設定
+     */
+    getEmailJSSettings() {
+        return JSON.parse(localStorage.getItem('emailJSSettings')) || null;
+    }
+    
+    /**
+     * 保存EmailJS設定
+     * @param {Object} settings EmailJS設定
+     */
+    saveEmailJSSettings(settings) {
+        localStorage.setItem('emailJSSettings', JSON.stringify(settings));
     }
     
     /**

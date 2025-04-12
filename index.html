@@ -262,19 +262,6 @@
                         <input type="email" class="form-control" id="backupEmail" placeholder="example@gmail.com">
                     </div>
                     <div class="mb-3">
-                        <label for="emailjsUserID" class="form-label">EmailJS用戶ID <small class="text-muted">(選填)</small></label>
-                        <input type="text" class="form-control" id="emailjsUserID" placeholder="user_xxxxxxxxxxxxxxxx">
-                        <div class="form-text">從EmailJS獲取，用於發送郵件。若不填寫，將使用模擬發送。</div>
-                    </div>
-                    <div class="mb-3">
-                        <label for="emailjsServiceID" class="form-label">EmailJS服務ID <small class="text-muted">(選填)</small></label>
-                        <input type="text" class="form-control" id="emailjsServiceID" placeholder="service_xxxxxxx">
-                    </div>
-                    <div class="mb-3">
-                        <label for="emailjsTemplateID" class="form-label">EmailJS模板ID <small class="text-muted">(選填)</small></label>
-                        <input type="text" class="form-control" id="emailjsTemplateID" placeholder="template_xxxxxxx">
-                    </div>
-                    <div class="mb-3">
                         <label class="form-label">備份方式</label>
                         <div class="form-check">
                             <input class="form-check-input" type="radio" name="backupType" id="manualBackup" value="manual" checked>
@@ -301,6 +288,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-info" id="openEmailJSSettingsBtn" data-bs-toggle="modal" data-bs-target="#emailJSSettingsModal">EmailJS設定</button>
                     <button type="button" class="btn btn-success" id="manualBackupBtn">立即備份</button>
                     <button type="button" class="btn btn-primary" id="saveBackupSettingsBtn">儲存設定</button>
                 </div>
@@ -340,6 +328,45 @@
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="saveGitHubSettingsBtn">儲存設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- EmailJS設定彈窗 -->
+    <div class="modal fade" id="emailJSSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">EmailJS設定</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        請先在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板，以啟用郵件備份功能。
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsUserID" class="form-label">User ID</label>
+                        <input type="text" class="form-control" id="emailjsUserID" placeholder="user_xxxxxxxxxxxxxxxxxx">
+                        <div class="form-text">在EmailJS帳號設定中獲取</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsServiceID" class="form-label">Service ID</label>
+                        <input type="text" class="form-control" id="emailjsServiceID" placeholder="service_xxxxxxxxxx">
+                        <div class="form-text">在EmailJS服務設定中獲取</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsTemplateID" class="form-label">Template ID</label>
+                        <input type="text" class="form-control" id="emailjsTemplateID" placeholder="template_xxxxxxxxxx">
+                        <div class="form-text">在EmailJS模板設定中獲取</div>
+                    </div>
+                    <div id="emailjsStatus" class="alert d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveEmailJSSettingsBtn">儲存設定</button>
+                    <button type="button" class="btn btn-success" id="testEmailJSBtn">測試連接</button>
                 </div>
             </div>
         </div>

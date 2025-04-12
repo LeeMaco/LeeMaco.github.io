@@ -137,6 +137,13 @@ class Admin {
             progressBar.setAttribute('aria-valuenow', '0');
             progressStatus.textContent = '準備上傳...';
             
+            // 檢查數據是否為空
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                this.updateProgress(0, '錯誤：沒有數據可上傳', 'danger');
+                reject(new Error('沒有數據可上傳，請確保有書籍數據'));
+                return;
+            }
+            
             // 檢查設置是否完整
             if (!this.githubSettings.token || !this.githubSettings.repo) {
                 this.updateProgress(0, '錯誤：GitHub設置不完整', 'danger');
@@ -144,26 +151,53 @@ class Admin {
                 return;
             }
             
+            // 檢查token格式
+            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(this.githubSettings.token)) {
+                this.updateProgress(0, '錯誤：GitHub令牌格式不正確', 'danger');
+                reject(new Error('GitHub令牌格式不正確，請確保使用有效的個人訪問令牌'));
+                return;
+            }
+            
             // 準備API請求URL
             const apiUrl = `https://api.github.com/repos/${this.githubSettings.repo}/contents/${this.githubSettings.path}`;
             
+            // 顯示上傳信息
+            const recordCount = Array.isArray(data.books) ? data.books.length : 0;
+            const dataSize = JSON.stringify(data).length / 1024;
+            this.updateProgress(5, `準備上傳 ${recordCount} 筆記錄 (約 ${dataSize.toFixed(1)}KB)`, 'info');
+            
             // 更新進度
             this.updateProgress(10, '正在連接GitHub API...', 'info');
+            
+            // 添加網絡超時處理
+            const timeoutId = setTimeout(() => {
+                this.updateProgress(10, '連接超時，請檢查網絡連接', 'warning');
+            }, 10000); // 10秒超時
             
             // 首先獲取文件信息（如果存在）
             fetch(apiUrl, {
                 headers: {
                     'Authorization': `token ${this.githubSettings.token}`,
                     'Accept': 'application/vnd.github.v3+json'
-                }
+                },
+                signal: AbortSignal.timeout(30000) // 30秒超時
             })
             .then(response => {
+                // 清除超時計時器
+                clearTimeout(timeoutId);
+                
                 if (response.status === 404) {
                     // 文件不存在，創建新文件
                     this.updateProgress(30, '準備創建新文件...', 'info');
                     return { sha: null };
+                } else if (response.status === 401) {
+                    this.updateProgress(30, '錯誤：GitHub授權失敗，請檢查您的訪問令牌', 'danger');
+                    throw new Error('GitHub授權失敗，請檢查您的個人訪問令牌是否有效');
+                } else if (response.status === 403) {
+                    this.updateProgress(30, '錯誤：權限不足，請確保令牌有足夠權限', 'danger');
+                    throw new Error('權限不足，請確保您的令牌有足夠的權限操作此倉庫');
                 } else if (!response.ok) {
-                    this.updateProgress(30, `錯誤：GitHub API返回 ${response.status}`, 'danger');
+                    this.updateProgress(30, `錯誤：GitHub API返回 ${response.status} - ${response.statusText}`, 'danger');
                     throw new Error(`GitHub API錯誤: ${response.status} - ${response.statusText}`);
                 }
                 this.updateProgress(30, '正在準備更新文件...', 'info');
@@ -172,32 +206,55 @@ class Admin {
             .then(fileInfo => {
                 // 準備上傳數據
                 this.updateProgress(50, '正在編碼數據...', 'info');
-                const content = btoa(JSON.stringify(data, null, 2)); // Base64編碼
                 
-                // 準備請求體
-                const requestBody = {
-                    message: '更新書籍數據',
-                    content: content,
-                    branch: this.githubSettings.branch
-                };
-                
-                // 如果文件已存在，添加SHA
-                if (fileInfo.sha) {
-                    requestBody.sha = fileInfo.sha;
+                try {
+                    // 計算數據大小
+                    const jsonData = JSON.stringify(data, null, 2);
+                    const dataSizeKB = Math.round(jsonData.length / 1024);
+                    
+                    // 顯示數據大小信息
+                    this.updateProgress(55, `數據大小: ${dataSizeKB}KB，正在進行Base64編碼...`, 'info');
+                    
+                    // 檢查數據大小
+                    if (dataSizeKB > 1000) { // 如果大於1MB
+                        this.updateProgress(55, `警告：數據較大 (${dataSizeKB}KB)，上傳可能需要較長時間`, 'warning');
+                    }
+                    
+                    // Base64編碼
+                    const content = btoa(jsonData);
+                    
+                    // 準備請求體
+                    const requestBody = {
+                        message: `更新書籍數據 (${new Date().toLocaleString()})`,
+                        content: content,
+                        branch: this.githubSettings.branch
+                    };
+                    
+                    // 如果文件已存在，添加SHA
+                    if (fileInfo.sha) {
+                        requestBody.sha = fileInfo.sha;
+                        this.updateProgress(60, '檔案已存在，準備更新...', 'info');
+                    } else {
+                        this.updateProgress(60, '準備創建新檔案...', 'info');
+                    }
+                    
+                    this.updateProgress(70, '正在上傳到GitHub...', 'info');
+                    
+                    // 發送PUT請求更新或創建文件
+                    return fetch(apiUrl, {
+                        method: 'PUT',
+                        headers: {
+                            'Authorization': `token ${this.githubSettings.token}`,
+                            'Content-Type': 'application/json',
+                            'Accept': 'application/vnd.github.v3+json'
+                        },
+                        body: JSON.stringify(requestBody),
+                        signal: AbortSignal.timeout(60000) // 60秒超時
+                    });
+                } catch (encodingError) {
+                    this.updateProgress(55, `編碼錯誤：${encodingError.message}`, 'danger');
+                    throw new Error(`數據編碼失敗：${encodingError.message}`);
                 }
-                
-                this.updateProgress(70, '正在上傳到GitHub...', 'info');
-                
-                // 發送PUT請求更新或創建文件
-                return fetch(apiUrl, {
-                    method: 'PUT',
-                    headers: {
-                        'Authorization': `token ${this.githubSettings.token}`,
-                        'Content-Type': 'application/json',
-                        'Accept': 'application/vnd.github.v3+json'
-                    },
-                    body: JSON.stringify(requestBody)
-                });
             })
             .then(response => {
                 if (!response.ok) {
@@ -213,6 +270,10 @@ class Admin {
                         detailedMsg = '找不到資源：請檢查倉庫名稱和路徑是否正確';
                     } else if (response.status === 422) {
                         detailedMsg = '請求無效：可能是提交訊息或內容格式有問題';
+                    } else if (response.status === 409) {
+                        detailedMsg = '衝突：遠程倉庫已被修改，請先同步最新版本';
+                    } else if (response.status === 429) {
+                        detailedMsg = '請求過多：已超過GitHub API速率限制，請稍後再試';
                     }
                     
                     this.updateProgress(80, `錯誤：${detailedMsg}`, 'danger');

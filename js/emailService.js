@@ -3,132 +3,126 @@
  */
 
 class EmailService {
-    constructor() {
-        // EmailJS服務ID和模板ID
-        this.serviceId = 'default_service';
-        this.templateId = 'template_backup';
-        this.userId = ''; // 這個ID需要從EmailJS獲取
-        
-        // 檢查EmailJS是否已載入
-        this.emailJSLoaded = typeof emailjs !== 'undefined';
-        
-        // 如果EmailJS未載入，嘗試載入
-        if (!this.emailJSLoaded) {
-            this.loadEmailJS();
-        }
-        
-        // 嘗試從localStorage加載配置
-        this.loadConfigFromStorage();
-    }
-    
-    /**
-     * 從localStorage加載配置
-     */
-    loadConfigFromStorage() {
-        try {
-            const settings = JSON.parse(localStorage.getItem('backupSettings'));
-            if (settings && settings.emailjs) {
-                this.updateConfig(settings.emailjs);
-            }
-        } catch (error) {
-            console.warn('無法從localStorage加載EmailJS配置:', error);
-        }
-    }
-    
-    /**
-     * 更新EmailJS配置
-     * @param {Object} config EmailJS配置
-     */
-    updateConfig(config) {
-        if (config) {
-            this.userId = config.userId || this.userId;
-            this.serviceId = config.serviceId || this.serviceId;
-            this.templateId = config.templateId || this.templateId;
-            
-            // 如果EmailJS已載入且有userId，則初始化
-            if (this.emailJSLoaded && this.userId) {
-                emailjs.init(this.userId);
-                console.log('EmailJS配置已更新');
-            }
-        }
-    }
-    
-    /**
-     * 載入EmailJS庫
-     */
-    loadEmailJS() {
-        const script = document.createElement('script');
-        script.src = 'https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js';
-        script.async = true;
-        script.onload = () => {
-            this.emailJSLoaded = true;
-            console.log('EmailJS已載入');
-            // 初始化EmailJS
-            emailjs.init(this.userId);
-        };
-        document.head.appendChild(script);
-    }
     /**
      * 發送備份郵件
      * @param {string} email 接收者郵箱
      * @param {Object} data 備份數據
      * @param {string} fileName 檔案名稱
-     * @returns {Promise<boolean>} 是否成功
+     * @param {Object} emailjsSettings EmailJS設定
+     * @returns {Promise<{success: boolean, message: string}>} 結果對象，包含成功狀態和消息
      */
-    sendBackupEmail(email, data, fileName) {
+    sendBackupEmail(email, data, fileName, emailjsSettings) {
         return new Promise((resolve, reject) => {
+            // 檢查EmailJS設定是否完整
+            if (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID) {
+                console.error('EmailJS設定不完整');
+                reject(new Error('EmailJS設定不完整，請先完成設定'));
+                return;
+            }
+            
+            // 檢查email格式
+            if (!this.validateEmail(email)) {
+                reject(new Error('無效的Email地址格式'));
+                return;
+            }
+            
+            // 檢查數據是否為空
+            if (!data || (Array.isArray(data) && data.length === 0)) {
+                reject(new Error('沒有數據可備份'));
+                return;
+            }
+            
             console.log(`準備發送備份郵件到 ${email}，檔案名稱：${fileName}`);
             
             // 創建備份數據的JSON字符串
             const jsonData = JSON.stringify(data, null, 2);
             
+            // 檢查JSON數據大小
+            const dataSizeKB = Math.round((jsonData.length * 2) / 1024);
+            if (dataSizeKB > 500) { // 如果數據大於500KB
+                console.warn(`備份數據較大 (${dataSizeKB}KB)，可能影響發送速度`);
+            }
+            
             // 檢查data是否為數組，如果不是，則獲取對象的鍵數量
             const recordCount = Array.isArray(data) ? data.length : Object.keys(data).length;
-            console.log(`備份數據已準備：${recordCount} 筆記錄`);
+            console.log(`備份數據已準備：${recordCount} 筆記錄，大小約 ${dataSizeKB}KB`);
             
-            // 將備份數據存儲在localStorage中，作為備份
             try {
-                localStorage.setItem('lastBackupData', jsonData);
-                localStorage.setItem('lastBackupTime', new Date().toISOString());
-                localStorage.setItem('lastBackupEmail', email);
+                // 初始化EmailJS
+                emailjs.init(emailjsSettings.userID);
+                
+                // 準備郵件參數
+                const templateParams = {
+                    to_email: email,
+                    from_name: '書籍查詢管理系統',
+                    message: `備份數據已附加，共 ${recordCount} 筆記錄，檔案大小約 ${dataSizeKB}KB`,
+                    file_name: fileName,
+                    data_json: jsonData
+                };
+                
+                // 使用EmailJS發送郵件
+                emailjs.send(emailjsSettings.serviceID, emailjsSettings.templateID, templateParams)
+                    .then((response) => {
+                        console.log('郵件發送成功:', response);
+                        // 將備份數據存儲在localStorage中
+                        localStorage.setItem('lastBackupData', jsonData);
+                        localStorage.setItem('lastBackupTime', new Date().toISOString());
+                        localStorage.setItem('lastBackupEmail', email);
+                        localStorage.setItem('lastBackupSize', dataSizeKB.toString());
+                        localStorage.setItem('lastBackupRecords', recordCount.toString());
+                        
+                        resolve({
+                            success: true,
+                            message: `備份郵件已成功發送至 ${email}`,
+                            details: {
+                                recordCount: recordCount,
+                                sizeKB: dataSizeKB,
+                                timestamp: new Date().toISOString()
+                            }
+                        });
+                    })
+                    .catch((error) => {
+                        console.error('郵件發送失敗:', error);
+                        let errorMessage = '郵件發送失敗';
+                        let retryable = true;
+                        
+                        // 提供更詳細的錯誤信息
+                        if (error.text) {
+                            errorMessage += `: ${error.text}`;
+                        } else if (error.message) {
+                            errorMessage += `: ${error.message}`;
+                        }
+                        
+                        // 根據常見錯誤代碼提供更友好的錯誤信息
+                        if (error.status === 401 || error.status === 403) {
+                            errorMessage = 'EmailJS授權失敗，請檢查您的API密鑰';
+                            retryable = false; // 授權問題不適合重試
+                        } else if (error.status === 429) {
+                            errorMessage = 'EmailJS請求過多，請稍後再試';
+                            retryable = true;
+                        } else if (error.status >= 500) {
+                            errorMessage = 'EmailJS服務器錯誤，請稍後再試';
+                            retryable = true;
+                        } else if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                            errorMessage = '網絡連接失敗，請檢查您的網絡連接';
+                            retryable = true;
+                        } else if (error.message && error.message.includes('timeout')) {
+                            errorMessage = '請求超時，請稍後再試';
+                            retryable = true;
+                        }
+                        
+                        // 將重試信息添加到錯誤對象中
+                        const enhancedError = new Error(errorMessage);
+                        enhancedError.retryable = retryable;
+                        enhancedError.originalError = error;
+                        
+                        reject(enhancedError);
+                    });
             } catch (error) {
-                console.warn('無法將備份數據保存到localStorage:', error);
+                console.error('備份過程中發生錯誤:', error);
+                reject(new Error(`備份過程中發生錯誤: ${error.message}`));
             }
-            
-            // 檢查EmailJS是否已載入
-            if (!this.emailJSLoaded || typeof emailjs === 'undefined') {
-                console.log('EmailJS未載入，使用模擬發送');
-                // 模擬發送過程
-                setTimeout(() => {
-                    console.log('模擬郵件發送完成');
-                    resolve(true);
-                }, 1500);
-                return;
-            }
-            
-            // 準備郵件參數
-            const templateParams = {
-                to_email: email,
-                from_name: '書籍查詢管理系統',
-                message: `備份檔案已生成：${fileName}，包含 ${recordCount} 筆記錄。`,
-                file_name: fileName,
-                backup_time: new Date().toLocaleString(),
-                data_preview: jsonData.substring(0, 500) + (jsonData.length > 500 ? '...' : '')
-            };
-            
-            // 使用EmailJS發送郵件
-            emailjs.send(this.serviceId, this.templateId, templateParams)
-                .then((response) => {
-                    console.log('郵件發送成功:', response.status, response.text);
-                    resolve(true);
-                })
-                .catch((error) => {
-                    console.error('郵件發送失敗:', error);
-                    // 即使郵件發送失敗，我們仍然返回true，因為備份數據已經保存
-                    // 這樣用戶體驗會更好，同時在控制台中記錄了錯誤
-                    resolve(true);
-                });
-        })
+        });
     }
     
     /**
