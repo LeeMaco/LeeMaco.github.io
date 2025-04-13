@@ -733,18 +733,47 @@ class App {
         
         // 創建通知元素
         const toast = document.createElement('div');
-        toast.className = `toast align-items-center ${status === 'success' ? 'text-bg-success' : 'text-bg-danger'}`;
+        
+        // 根據狀態設置樣式
+        let bgClass = 'text-bg-info';
+        let icon = '<i class="fas fa-info-circle me-2"></i>';
+        
+        if (status === 'success') {
+            bgClass = 'text-bg-success';
+            icon = '<i class="fas fa-check-circle me-2"></i>';
+        } else if (status === 'error') {
+            bgClass = 'text-bg-danger';
+            icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+        } else if (status === 'warning') {
+            bgClass = 'text-bg-warning';
+            icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+        }
+        
+        toast.className = `toast align-items-center ${bgClass}`;
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
         toast.setAttribute('aria-atomic', 'true');
         
+        // 格式化時間戳
+        const formattedTime = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
+        
         // 設置通知內容
+        let message = '';
+        if (status === 'success') {
+            message = '數據已成功同步到GitHub';
+        } else if (status === 'error') {
+            message = `同步失敗: ${error ? error.message : '未知錯誤'}`;
+        } else if (status === 'progress') {
+            message = '正在同步數據到GitHub...';
+        } else {
+            message = '同步狀態更新';
+        }
+        
         toast.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
-                    ${status === 'success' 
-                        ? '數據已成功同步到GitHub' 
-                        : `同步失敗: ${error ? error.message : '未知錯誤'}`}
+                    ${icon}${message}
+                    ${formattedTime ? `<div class="small text-muted mt-1">${formattedTime}</div>` : ''}
                 </div>
                 <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
@@ -754,7 +783,7 @@ class App {
         this.syncStatus.appendChild(toast);
         
         // 顯示通知
-        const bsToast = new bootstrap.Toast(toast);
+        const bsToast = new bootstrap.Toast(toast, { delay: status === 'success' ? 5000 : 8000 });
         bsToast.show();
         
         // 自動移除通知
@@ -765,7 +794,14 @@ class App {
         // 如果同步成功，重新載入書籍列表
         if (status === 'success') {
             this.loadBooks();
+            
+            // 顯示全局成功消息
+            this.showMessage('數據已成功同步到GitHub', 'success');
+        } else if (status === 'error') {
+            // 顯示全局錯誤消息
+            this.showMessage('GitHub同步失敗，請檢查設置或網絡連接', 'danger');
         }
+    }
     }
     
     /**
