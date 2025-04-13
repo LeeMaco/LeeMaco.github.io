@@ -133,15 +133,9 @@ class Admin {
                 return;
             }
             
-            // 驗證個人訪問令牌格式
-            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(githubToken.value.trim())) {
-                this.showGitHubStatus('個人訪問令牌格式不正確，應以 ghp_ 開頭並包含36個字符', 'danger');
-                return;
-            }
-            
-            // 驗證個人訪問令牌格式
-            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(githubToken.value.trim())) {
-                this.showGitHubStatus('個人訪問令牌格式不正確，應以 ghp_ 開頭並包含36個字符', 'danger');
+            // 驗證個人訪問令牌格式 (支持傳統ghp_格式和新的github_pat_格式)
+            if (!/^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$/.test(githubToken.value.trim())) {
+                this.showGitHubStatus('個人訪問令牌格式不正確，應以 ghp_ 開頭並包含36個字符，或以 github_pat_ 開頭並包含82個字符', 'danger');
                 return;
             }
         } else if (authMethod === 'oauth') {
@@ -404,8 +398,8 @@ class Admin {
                 return;
             }
             
-            // 檢查令牌格式
-            if (this.githubSettings.authMethod === 'pat' && !/^ghp_[a-zA-Z0-9]{36}$/.test(this.githubSettings.token)) {
+            // 檢查令牌格式 (支持傳統ghp_格式和新的github_pat_格式)
+            if (this.githubSettings.authMethod === 'pat' && !/^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$/.test(this.githubSettings.token)) {
                 this.updateProgress(0, '錯誤：GitHub令牌格式不正確', 'danger');
                 reject(new Error('GitHub令牌格式不正確，請確保使用有效的個人訪問令牌'));
                 return;
