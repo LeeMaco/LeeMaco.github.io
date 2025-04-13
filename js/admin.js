@@ -9,6 +9,9 @@ class Admin {
         
         // 初始化事件監聽器
         this.initEventListeners();
+        
+        // 檢查URL中是否有OAuth回調碼
+        this.checkOAuthCallback();
     }
     
     /**
@@ -21,8 +24,34 @@ class Admin {
             token: '',
             repo: '',
             branch: 'main',
-            path: 'books-data.json'
+            path: 'books-data.json',
+            // OAuth相關設置
+            clientId: '',
+            accessToken: '',
+            tokenType: '',
+            scope: '',
+            expiresAt: null,
+            authMethod: 'pat' // 'pat' 或 'oauth'
         };
+        
+        // 檢查OAuth令牌是否過期
+        this.checkTokenExpiration();
+    }
+    
+    /**
+     * 檢查OAuth令牌是否過期
+     */
+    checkTokenExpiration() {
+        // 如果使用OAuth且令牌已過期，清除令牌
+        if (this.githubSettings.authMethod === 'oauth' && 
+            this.githubSettings.expiresAt && 
+            new Date() > new Date(this.githubSettings.expiresAt)) {
+            
+            console.log('OAuth令牌已過期，需要重新授權');
+            this.githubSettings.accessToken = '';
+            this.githubSettings.expiresAt = null;
+            localStorage.setItem('githubSettings', JSON.stringify(this.githubSettings));
+        }
     }
     
     /**
@@ -36,6 +65,10 @@ class Admin {
         const githubRepo = document.getElementById('githubRepo');
         const githubBranch = document.getElementById('githubBranch');
         const githubPath = document.getElementById('githubPath');
+        const githubClientId = document.getElementById('githubClientId');
+        const githubAuthMethodPat = document.getElementById('githubAuthMethodPat');
+        const githubAuthMethodOAuth = document.getElementById('githubAuthMethodOAuth');
+        const authorizeGitHubBtn = document.getElementById('authorizeGitHubBtn');
         
         // 如果元素存在，添加事件監聽器
         if (saveGitHubSettingsBtn) {
@@ -44,10 +77,34 @@ class Admin {
             if (githubRepo) githubRepo.value = this.githubSettings.repo || '';
             if (githubBranch) githubBranch.value = this.githubSettings.branch || 'main';
             if (githubPath) githubPath.value = this.githubSettings.path || 'books-data.json';
+            if (githubClientId) githubClientId.value = this.githubSettings.clientId || '';
+            
+            // 設置授權方式選項
+            if (githubAuthMethodPat && githubAuthMethodOAuth) {
+                if (this.githubSettings.authMethod === 'oauth') {
+                    githubAuthMethodOAuth.checked = true;
+                } else {
+                    githubAuthMethodPat.checked = true;
+                }
+                
+                // 根據授權方式顯示/隱藏相關欄位
+                this.toggleAuthMethodFields();
+                
+                // 添加授權方式切換事件
+                githubAuthMethodPat.addEventListener('change', () => this.toggleAuthMethodFields());
+                githubAuthMethodOAuth.addEventListener('change', () => this.toggleAuthMethodFields());
+            }
             
             // 保存設置按鈕事件
             saveGitHubSettingsBtn.addEventListener('click', () => {
                 this.saveGitHubSettings();
+            });
+        }
+        
+        // 如果授權按鈕存在，添加事件監聽器
+        if (authorizeGitHubBtn) {
+            authorizeGitHubBtn.addEventListener('click', () => {
+                this.authorizeWithGitHub();
             });
         }
         
@@ -60,6 +117,68 @@ class Admin {
     }
     
     /**
+     * 切換授權方式相關欄位的顯示/隱藏
+     */
+    toggleAuthMethodFields() {
+        const authMethodPat = document.getElementById('githubAuthMethodPat');
+        const tokenField = document.getElementById('githubTokenField');
+        const clientIdField = document.getElementById('githubClientIdField');
+        const authorizeBtn = document.getElementById('authorizeGitHubBtn');
+        const authStatusField = document.getElementById('githubAuthStatusField');
+        
+        if (authMethodPat && tokenField && clientIdField && authorizeBtn) {
+            if (authMethodPat.checked) {
+                // PAT模式
+                tokenField.classList.remove('d-none');
+                clientIdField.classList.add('d-none');
+                authorizeBtn.classList.add('d-none');
+                if (authStatusField) authStatusField.classList.add('d-none');
+            } else {
+                // OAuth模式
+                tokenField.classList.add('d-none');
+                clientIdField.classList.remove('d-none');
+                authorizeBtn.classList.remove('d-none');
+                if (authStatusField) authStatusField.classList.remove('d-none');
+                
+                // 顯示當前授權狀態
+                this.updateOAuthStatus();
+            }
+        }
+    }
+    
+    /**
+     * 更新OAuth授權狀態顯示
+     */
+    updateOAuthStatus() {
+        const authStatusField = document.getElementById('githubAuthStatusField');
+        if (!authStatusField) return;
+        
+        if (this.githubSettings.accessToken && this.githubSettings.authMethod === 'oauth') {
+            // 已授權
+            let expiryInfo = '';
+            if (this.githubSettings.expiresAt) {
+                const expiryDate = new Date(this.githubSettings.expiresAt);
+                expiryInfo = `，有效期至 ${expiryDate.toLocaleString()}`;
+            }
+            
+            authStatusField.innerHTML = `
+                <div class="alert alert-success">
+                    <i class="fas fa-check-circle me-2"></i>
+                    已成功授權${expiryInfo}
+                </div>
+            `;
+        } else {
+            // 未授權
+            authStatusField.innerHTML = `
+                <div class="alert alert-warning">
+                    <i class="fas fa-exclamation-triangle me-2"></i>
+                    尚未授權，請點擊「授權GitHub」按鈕
+                </div>
+            `;
+        }
+    }
+    
+    /**
      * 保存GitHub設置
      */
     saveGitHubSettings() {
@@ -67,20 +186,41 @@ class Admin {
         const githubRepo = document.getElementById('githubRepo');
         const githubBranch = document.getElementById('githubBranch');
         const githubPath = document.getElementById('githubPath');
+        const githubClientId = document.getElementById('githubClientId');
+        const githubAuthMethodOAuth = document.getElementById('githubAuthMethodOAuth');
         const githubStatus = document.getElementById('githubStatus');
         
+        // 獲取選擇的授權方式
+        const authMethod = githubAuthMethodOAuth && githubAuthMethodOAuth.checked ? 'oauth' : 'pat';
+        
         // 驗證必填欄位
-        if (!githubToken.value || !githubRepo.value) {
+        if (authMethod === 'pat' && (!githubToken.value || !githubRepo.value)) {
             this.showGitHubStatus('請填寫必填欄位：個人訪問令牌和倉庫名稱', 'danger');
+            return;
+        } else if (authMethod === 'oauth' && (!githubClientId.value || !githubRepo.value)) {
+            this.showGitHubStatus('請填寫必填欄位：Client ID和倉庫名稱', 'danger');
             return;
         }
         
+        // 保留現有的OAuth令牌信息
+        const currentAccessToken = this.githubSettings.accessToken || '';
+        const currentTokenType = this.githubSettings.tokenType || '';
+        const currentScope = this.githubSettings.scope || '';
+        const currentExpiresAt = this.githubSettings.expiresAt || null;
+        
         // 更新設置
         this.githubSettings = {
-            token: githubToken.value.trim(),
+            token: githubToken ? githubToken.value.trim() : '',
             repo: githubRepo.value.trim(),
             branch: githubBranch.value.trim() || 'main',
-            path: githubPath.value.trim() || 'books-data.json'
+            path: githubPath.value.trim() || 'books-data.json',
+            clientId: githubClientId ? githubClientId.value.trim() : '',
+            authMethod: authMethod,
+            // 保留OAuth相關信息
+            accessToken: currentAccessToken,
+            tokenType: currentTokenType,
+            scope: currentScope,
+            expiresAt: currentExpiresAt
         };
         
         // 保存到localStorage
@@ -88,6 +228,160 @@ class Admin {
         
         // 顯示成功訊息
         this.showGitHubStatus('GitHub設置已保存', 'success');
+        
+        // 如果是OAuth模式，更新授權狀態顯示
+        if (authMethod === 'oauth') {
+            this.updateOAuthStatus();
+        }
+    }
+    
+    /**
+     * 使用GitHub OAuth進行授權
+     */
+    authorizeWithGitHub() {
+        // 檢查Client ID是否已設置
+        if (!this.githubSettings.clientId) {
+            this.showGitHubStatus('請先設置GitHub Client ID', 'danger');
+            return;
+        }
+        
+        // 生成隨機狀態值，用於防止CSRF攻擊
+        const state = this.generateRandomState();
+        localStorage.setItem('githubOAuthState', state);
+        
+        // 設置重定向URL（當前頁面URL）
+        const redirectUri = encodeURIComponent(window.location.href.split('?')[0]);
+        
+        // 設置所需權限範圍
+        const scope = encodeURIComponent('repo');
+        
+        // 構建授權URL
+        const authUrl = `https://github.com/login/oauth/authorize?client_id=${this.githubSettings.clientId}&redirect_uri=${redirectUri}&scope=${scope}&state=${state}`;
+        
+        // 顯示授權中訊息
+        this.showGitHubStatus('正在跳轉至GitHub授權頁面...', 'info');
+        
+        // 跳轉到GitHub授權頁面
+        window.location.href = authUrl;
+    }
+    
+    /**
+     * 生成隨機狀態值
+     * @returns {string} 隨機字符串
+     */
+    generateRandomState() {
+        const array = new Uint8Array(24);
+        window.crypto.getRandomValues(array);
+        return Array.from(array, byte => byte.toString(16).padStart(2, '0')).join('');
+    }
+    
+    /**
+     * 檢查URL中是否有OAuth回調碼
+     */
+    checkOAuthCallback() {
+        // 獲取URL參數
+        const urlParams = new URLSearchParams(window.location.search);
+        const code = urlParams.get('code');
+        const state = urlParams.get('state');
+        
+        // 如果URL中有code和state參數，處理OAuth回調
+        if (code && state) {
+            // 驗證state參數，防止CSRF攻擊
+            const savedState = localStorage.getItem('githubOAuthState');
+            if (state !== savedState) {
+                console.error('OAuth state不匹配，可能是CSRF攻擊');
+                this.showGitHubStatus('授權失敗：安全驗證不通過', 'danger');
+                return;
+            }
+            
+            // 清除已使用的state
+            localStorage.removeItem('githubOAuthState');
+            
+            // 顯示正在處理授權的訊息
+            this.showGitHubStatus('正在處理GitHub授權...', 'info');
+            
+            // 使用授權碼獲取訪問令牌
+            this.getAccessToken(code);
+            
+            // 清除URL中的參數，避免刷新頁面時重複處理
+            const url = window.location.href.split('?')[0];
+            window.history.replaceState({}, document.title, url);
+        }
+    }
+    
+    /**
+     * 使用授權碼獲取訪問令牌
+     * @param {string} code 授權碼
+     */
+    getAccessToken(code) {
+        // 由於GitHub OAuth需要Client Secret，而前端無法安全存儲該信息
+        // 這裡使用代理服務器來處理令牌交換，避免暴露Client Secret
+        // 實際應用中，應該使用自己的後端服務來處理
+        const proxyUrl = 'https://cors-anywhere.herokuapp.com/https://github.com/login/oauth/access_token';
+        
+        // 準備請求數據
+        const data = {
+            client_id: this.githubSettings.clientId,
+            // client_secret應該在後端處理，這裡僅為示例
+            // 實際應用中，應該將code發送到自己的後端，由後端安全地處理令牌交換
+            code: code,
+            redirect_uri: window.location.href.split('?')[0]
+        };
+        
+        // 發送請求獲取訪問令牌
+        fetch(proxyUrl, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            },
+            body: JSON.stringify(data)
+        })
+        .then(response => {
+            if (!response.ok) {
+                throw new Error(`獲取訪問令牌失敗: ${response.status} ${response.statusText}`);
+            }
+            return response.json();
+        })
+        .then(data => {
+            if (data.error) {
+                throw new Error(`GitHub API錯誤: ${data.error_description || data.error}`);
+            }
+            
+            // 保存訪問令牌信息
+            this.githubSettings.accessToken = data.access_token;
+            this.githubSettings.tokenType = data.token_type;
+            this.githubSettings.scope = data.scope;
+            
+            // 設置令牌過期時間（GitHub令牌通常有效期為8小時）
+            const expiresIn = data.expires_in || 28800; // 默認8小時
+            const expiresAt = new Date();
+            expiresAt.setSeconds(expiresAt.getSeconds() + expiresIn);
+            this.githubSettings.expiresAt = expiresAt.toISOString();
+            
+            // 確保授權方式設為OAuth
+            this.githubSettings.authMethod = 'oauth';
+            
+            // 保存設置
+            localStorage.setItem('githubSettings', JSON.stringify(this.githubSettings));
+            
+            // 顯示授權成功訊息
+            this.showGitHubStatus('GitHub授權成功！', 'success');
+            
+            // 更新授權狀態顯示
+            this.updateOAuthStatus();
+            
+            // 如果GitHub設置模態框是開啟的，更新UI
+            const githubAuthMethodOAuth = document.getElementById('githubAuthMethodOAuth');
+            if (githubAuthMethodOAuth) {
+                githubAuthMethodOAuth.checked = true;
+                this.toggleAuthMethodFields();
+            }
+        })
+        .catch(error => {
+            console.error('獲取訪問令牌錯誤:', error);
+            this.showGitHubStatus(`授權失敗: ${error.message}`, 'danger');
+        });
     }
     
     /**
@@ -153,16 +447,30 @@ class Admin {
             }
             
             // 檢查設置是否完整
-            if (!this.githubSettings.token || !this.githubSettings.repo) {
+            if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
                 this.updateProgress(0, '錯誤：GitHub設置不完整', 'danger');
                 reject(new Error('GitHub設置不完整，請先配置GitHub設置'));
                 return;
+            } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
+                this.updateProgress(0, '錯誤：GitHub OAuth授權不完整', 'danger');
+                reject(new Error('GitHub OAuth授權不完整，請先完成GitHub授權'));
+                return;
             }
             
-            // 檢查token格式
-            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(this.githubSettings.token)) {
+            // 檢查令牌格式
+            if (this.githubSettings.authMethod === 'pat' && !/^ghp_[a-zA-Z0-9]{36}$/.test(this.githubSettings.token)) {
                 this.updateProgress(0, '錯誤：GitHub令牌格式不正確', 'danger');
                 reject(new Error('GitHub令牌格式不正確，請確保使用有效的個人訪問令牌'));
+                return;
+            }
+            
+            // 檢查OAuth令牌是否過期
+            if (this.githubSettings.authMethod === 'oauth' && 
+                this.githubSettings.expiresAt && 
+                new Date() > new Date(this.githubSettings.expiresAt)) {
+                
+                this.updateProgress(0, '錯誤：GitHub OAuth令牌已過期', 'danger');
+                reject(new Error('GitHub OAuth令牌已過期，請重新授權'));
                 return;
             }
             
@@ -182,10 +490,18 @@ class Admin {
                 this.updateProgress(10, '連接超時，請檢查網絡連接', 'warning');
             }, 10000); // 10秒超時
             
+            // 準備授權頭
+            let authHeader;
+            if (this.githubSettings.authMethod === 'oauth') {
+                authHeader = `${this.githubSettings.tokenType || 'Bearer'} ${this.githubSettings.accessToken}`;
+            } else {
+                authHeader = `token ${this.githubSettings.token}`;
+            }
+            
             // 首先獲取文件信息（如果存在）
             fetch(apiUrl, {
                 headers: {
-                    'Authorization': `token ${this.githubSettings.token}`,
+                    'Authorization': authHeader,
                     'Accept': 'application/vnd.github.v3+json'
                 },
                 signal: AbortSignal.timeout(30000) // 30秒超時
@@ -248,11 +564,19 @@ class Admin {
                     
                     this.updateProgress(70, '正在上傳到GitHub...', 'info');
                     
+                    // 準備授權頭
+                    let authHeader;
+                    if (this.githubSettings.authMethod === 'oauth') {
+                        authHeader = `${this.githubSettings.tokenType || 'Bearer'} ${this.githubSettings.accessToken}`;
+                    } else {
+                        authHeader = `token ${this.githubSettings.token}`;
+                    }
+                    
                     // 發送PUT請求更新或創建文件
                     return fetch(apiUrl, {
                         method: 'PUT',
                         headers: {
-                            'Authorization': `token ${this.githubSettings.token}`,
+                            'Authorization': authHeader,
                             'Content-Type': 'application/json',
                             'Accept': 'application/vnd.github.v3+json'
                         },
@@ -500,8 +824,20 @@ class Admin {
         this.showGitHubStatus('正在準備同步數據到GitHub...', 'info');
         
         // 檢查設置是否完整
-        if (!this.githubSettings.token || !this.githubSettings.repo) {
+        if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
             this.showGitHubStatus('GitHub設置不完整，請先配置GitHub設置', 'danger');
+            return;
+        } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
+            this.showGitHubStatus('GitHub OAuth授權不完整，請先完成GitHub授權', 'danger');
+            return;
+        }
+        
+        // 檢查OAuth令牌是否過期
+        if (this.githubSettings.authMethod === 'oauth' && 
+            this.githubSettings.expiresAt && 
+            new Date() > new Date(this.githubSettings.expiresAt)) {
+            
+            this.showGitHubStatus('GitHub OAuth令牌已過期，請重新授權', 'danger');
             return;
         }
         

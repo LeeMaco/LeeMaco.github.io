@@ -327,27 +327,60 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
+                        <label class="form-label">授權方式</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="githubAuthMethod" id="githubAuthMethodPat" value="pat" checked>
+                            <label class="form-check-label" for="githubAuthMethodPat">
+                                使用個人訪問令牌 (PAT)
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="githubAuthMethod" id="githubAuthMethodOAuth" value="oauth">
+                            <label class="form-check-label" for="githubAuthMethodOAuth">
+                                使用OAuth授權 (推薦)
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div id="githubTokenField" class="mb-3">
                         <label for="githubToken" class="form-label">個人訪問令牌 (PAT)</label>
                         <input type="password" class="form-control" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
                         <div class="form-text">用於授權訪問您的GitHub倉庫</div>
                     </div>
+                    
+                    <div id="githubClientIdField" class="mb-3 d-none">
+                        <label for="githubClientId" class="form-label">Client ID</label>
+                        <input type="text" class="form-control" id="githubClientId" placeholder="1234567890abcdef1234">
+                        <div class="form-text">在GitHub開發者設置中創建OAuth App後獲取</div>
+                    </div>
+                    
+                    <div id="githubAuthStatusField" class="mb-3 d-none">
+                        <!-- 授權狀態將在這裡動態顯示 -->
+                    </div>
+                    
                     <div class="mb-3">
                         <label for="githubRepo" class="form-label">倉庫名稱</label>
                         <input type="text" class="form-control" id="githubRepo" placeholder="username/repository">
                         <div class="form-text">格式：用戶名/倉庫名</div>
                     </div>
+                    
                     <div class="mb-3">
                         <label for="githubBranch" class="form-label">分支名稱</label>
                         <input type="text" class="form-control" id="githubBranch" placeholder="main" value="main">
                     </div>
+                    
                     <div class="mb-3">
                         <label for="githubPath" class="form-label">檔案路徑</label>
                         <input type="text" class="form-control" id="githubPath" placeholder="books-data.json" value="books-data.json">
                     </div>
+                    
                     <div id="githubStatus" class="alert d-none"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-success d-none" id="authorizeGitHubBtn">
+                        <i class="fab fa-github me-2"></i>授權GitHub
+                    </button>
                     <button type="button" class="btn btn-primary" id="saveGitHubSettingsBtn">儲存設定</button>
                 </div>
             </div>
