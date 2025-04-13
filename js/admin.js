@@ -18,14 +18,10 @@ class Admin {
         // 從localStorage獲取GitHub設置
         const settings = localStorage.getItem('githubSettings');
         this.githubSettings = settings ? JSON.parse(settings) : {
-            authMethod: 'pat', // 'pat' 或 'oauth'
-            token: '',         // 個人訪問令牌 (PAT)
-            accessToken: '',   // OAuth訪問令牌
-            tokenType: '',     // OAuth令牌類型
-            expiresAt: null,   // OAuth令牌過期時間
-            repo: '',          // 倉庫名稱 (格式: 用戶名/倉庫名)
-            branch: 'main',    // 分支名稱
-            path: 'books-data.json' // 檔案路徑
+            token: '',
+            repo: '',
+            branch: 'main',
+            path: 'books-data.json'
         };
     }
     
@@ -35,129 +31,22 @@ class Admin {
     initEventListeners() {
         // 獲取元素引用
         const saveGitHubSettingsBtn = document.getElementById('saveGitHubSettingsBtn');
-        const syncGitHubBtn = document.getElementById('syncGitHubBtn');
         const githubToken = document.getElementById('githubToken');
         const githubRepo = document.getElementById('githubRepo');
         const githubBranch = document.getElementById('githubBranch');
         const githubPath = document.getElementById('githubPath');
-        const patAuth = document.getElementById('patAuth');
-        const oauthAuth = document.getElementById('oauthAuth');
-        const patAuthSection = document.getElementById('patAuthSection');
-        const oauthAuthSection = document.getElementById('oauthAuthSection');
-        const authorizeGitHubBtn = document.getElementById('authorizeGitHubBtn');
-        const testGitHubConnectionBtn = document.getElementById('testGitHubConnectionBtn');
         
-        // 載入現有設置
-        if (githubToken) githubToken.value = this.githubSettings.token || '';
-        if (githubRepo) githubRepo.value = this.githubSettings.repo || '';
-        if (githubBranch) githubBranch.value = this.githubSettings.branch || 'main';
-        if (githubPath) githubPath.value = this.githubSettings.path || 'books-data.json';
-        
-        // 設置認證方式選項
-        if (patAuth && oauthAuth) {
-            if (this.githubSettings.authMethod === 'oauth') {
-                oauthAuth.checked = true;
-                if (patAuthSection) patAuthSection.classList.add('d-none');
-                if (oauthAuthSection) oauthAuthSection.classList.remove('d-none');
-            } else {
-                patAuth.checked = true;
-                if (patAuthSection) patAuthSection.classList.remove('d-none');
-                if (oauthAuthSection) oauthAuthSection.classList.add('d-none');
-            }
-            
-            // 認證方式切換事件
-            patAuth.addEventListener('change', () => {
-                if (patAuth.checked) {
-                    if (patAuthSection) patAuthSection.classList.remove('d-none');
-                    if (oauthAuthSection) oauthAuthSection.classList.add('d-none');
-                }
-            });
-            
-            oauthAuth.addEventListener('change', () => {
-                if (oauthAuth.checked) {
-                    if (patAuthSection) patAuthSection.classList.add('d-none');
-                    if (oauthAuthSection) oauthAuthSection.classList.remove('d-none');
-                }
-            });
-        }
-        
-        // 授權GitHub按鈕事件
-        if (authorizeGitHubBtn) {
-            authorizeGitHubBtn.addEventListener('click', () => {
-                this.authorizeGitHub();
-            });
-        }
-        
-        // 保存設置按鈕事件 - 直接綁定事件，不需要檢查saveGitHubSettingsBtn是否存在
+        // 如果元素存在，添加事件監聽器
         if (saveGitHubSettingsBtn) {
+            // 載入現有設置
+            if (githubToken) githubToken.value = this.githubSettings.token || '';
+            if (githubRepo) githubRepo.value = this.githubSettings.repo || '';
+            if (githubBranch) githubBranch.value = this.githubSettings.branch || 'main';
+            if (githubPath) githubPath.value = this.githubSettings.path || 'books-data.json';
+            
+            // 保存設置按鈕事件
             saveGitHubSettingsBtn.addEventListener('click', () => {
                 this.saveGitHubSettings();
-            });
-        } else {
-            console.error('找不到儲存設定按鈕元素');
-            // 嘗試在DOM加載完成後再次綁定
-            document.addEventListener('DOMContentLoaded', () => {
-                const btn = document.getElementById('saveGitHubSettingsBtn');
-                if (btn) {
-                    btn.addEventListener('click', () => {
-                        this.saveGitHubSettings();
-                    });
-                }
-            });
-        }
-        
-        // 測試連接按鈕事件
-        if (testGitHubConnectionBtn) {
-            testGitHubConnectionBtn.addEventListener('click', () => {
-                this.testGitHubConnection();
-            });
-        } else {
-            console.error('找不到測試連接按鈕元素');
-            // 嘗試在DOM加載完成後再次綁定
-            document.addEventListener('DOMContentLoaded', () => {
-                const btn = document.getElementById('testGitHubConnectionBtn');
-                if (btn) {
-                    btn.addEventListener('click', () => {
-                        this.testGitHubConnection();
-                    });
-                }
-            });
-        }
-        
-        // 如果同步按鈕存在，添加事件監聽器
-        if (syncGitHubBtn) {
-            syncGitHubBtn.addEventListener('click', () => {
-                this.manualSyncToGitHub();
-            });
-        }
-        
-        // 監聽GitHub設置模態框顯示事件，確保在模態框顯示時綁定按鈕事件
-        const githubSettingsModal = document.getElementById('githubSettingsModal');
-        if (githubSettingsModal) {
-            githubSettingsModal.addEventListener('shown.bs.modal', () => {
-                // 重新獲取按鈕引用並綁定事件
-                const saveBtn = document.getElementById('saveGitHubSettingsBtn');
-                const testBtn = document.getElementById('testGitHubConnectionBtn');
-                
-                if (saveBtn) {
-                    // 移除可能存在的舊事件監聽器
-                    saveBtn.replaceWith(saveBtn.cloneNode(true));
-                    // 獲取新的引用並綁定事件
-                    const newSaveBtn = document.getElementById('saveGitHubSettingsBtn');
-                    newSaveBtn.addEventListener('click', () => {
-                        this.saveGitHubSettings();
-                    });
-                }
-                
-                if (testBtn) {
-                    // 移除可能存在的舊事件監聽器
-                    testBtn.replaceWith(testBtn.cloneNode(true));
-                    // 獲取新的引用並綁定事件
-                    const newTestBtn = document.getElementById('testGitHubConnectionBtn');
-                    newTestBtn.addEventListener('click', () => {
-                        this.testGitHubConnection();
-                    });
-                }
             });
         }
     }
@@ -171,78 +60,19 @@ class Admin {
         const githubBranch = document.getElementById('githubBranch');
         const githubPath = document.getElementById('githubPath');
         const githubStatus = document.getElementById('githubStatus');
-        const patAuth = document.getElementById('patAuth');
-        const oauthAuth = document.getElementById('oauthAuth');
-        
-        // 獲取選擇的認證方式
-        const authMethod = (patAuth && patAuth.checked) ? 'pat' : 'oauth';
         
         // 驗證必填欄位
-        if (authMethod === 'pat') {
-            if (!githubToken.value || !githubRepo.value) {
-                this.showGitHubStatus('請填寫必填欄位：個人訪問令牌和倉庫名稱', 'danger');
-                return;
-            }
-            
-            // 驗證個人訪問令牌格式 (支持傳統ghp_格式和新的github_pat_格式)
-            if (!/^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$/.test(githubToken.value.trim())) {
-                this.showGitHubStatus('個人訪問令牌格式不正確，應以 ghp_ 開頭並包含36個字符，或以 github_pat_ 開頭並包含82個字符', 'danger');
-                return;
-            }
-        } else if (authMethod === 'oauth') {
-            if (!this.githubSettings.accessToken || !githubRepo.value) {
-                this.showGitHubStatus('請先完成GitHub OAuth授權並填寫倉庫名稱', 'danger');
-                return;
-            }
-        }
-        
-        // 驗證倉庫名稱格式
-        if (!/^[\w.-]+\/[\w.-]+$/.test(githubRepo.value.trim())) {
-            this.showGitHubStatus('倉庫名稱格式不正確，應為 用戶名/倉庫名 格式', 'danger');
-            return;
-        }
-        
-        // 驗證分支名稱
-        if (githubBranch.value.trim() && !/^[\w.-]+$/.test(githubBranch.value.trim())) {
-            this.showGitHubStatus('分支名稱格式不正確，不應包含空格或特殊字符', 'danger');
-            return;
-        }
-        
-        // 驗證檔案路徑
-        if (!githubPath.value.trim()) {
-            this.showGitHubStatus('檔案路徑不能為空', 'danger');
-            return;
-        }
-        
-        // 驗證倉庫名稱格式
-        if (!/^[\w.-]+\/[\w.-]+$/.test(githubRepo.value.trim())) {
-            this.showGitHubStatus('倉庫名稱格式不正確，應為 用戶名/倉庫名 格式', 'danger');
-            return;
-        }
-        
-        // 驗證分支名稱
-        if (githubBranch.value.trim() && !/^[\w.-]+$/.test(githubBranch.value.trim())) {
-            this.showGitHubStatus('分支名稱格式不正確，不應包含空格或特殊字符', 'danger');
-            return;
-        }
-        
-        // 驗證檔案路徑
-        if (!githubPath.value.trim()) {
-            this.showGitHubStatus('檔案路徑不能為空', 'danger');
+        if (!githubToken.value || !githubRepo.value) {
+            this.showGitHubStatus('請填寫必填欄位：個人訪問令牌和倉庫名稱', 'danger');
             return;
         }
         
         // 更新設置
         this.githubSettings = {
-            authMethod: authMethod,
-            token: authMethod === 'pat' ? githubToken.value.trim() : '',
+            token: githubToken.value.trim(),
             repo: githubRepo.value.trim(),
             branch: githubBranch.value.trim() || 'main',
-            path: githubPath.value.trim() || 'books-data.json',
-            // 保留OAuth相關設置
-            accessToken: authMethod === 'oauth' ? this.githubSettings.accessToken || '' : '',
-            tokenType: authMethod === 'oauth' ? this.githubSettings.tokenType || '' : '',
-            expiresAt: authMethod === 'oauth' ? this.githubSettings.expiresAt || null : null
+            path: githubPath.value.trim() || 'books-data.json'
         };
         
         // 保存到localStorage
@@ -250,130 +80,6 @@ class Admin {
         
         // 顯示成功訊息
         this.showGitHubStatus('GitHub設置已保存', 'success');
-        
-        // 詢問用戶是否要測試連接
-        if (confirm('設置已保存。是否要測試GitHub連接？')) {
-            this.testGitHubConnection();
-        }
-    }
-    
-    /**
-     * 測試GitHub連接
-     * 嘗試使用當前設置連接到GitHub API
-     */
-    testGitHubConnection() {
-        // 顯示測試狀態
-        this.showGitHubStatus('正在測試GitHub連接...', 'info');
-        
-        // 檢查設置是否完整
-        if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
-            this.showGitHubStatus('GitHub設置不完整，請先完成設置', 'danger');
-            return;
-        } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
-            this.showGitHubStatus('GitHub OAuth授權不完整，請先完成授權', 'danger');
-            return;
-        }
-        
-        // 準備API請求URL (使用倉庫API端點進行測試)
-        const apiUrl = `https://api.github.com/repos/${this.githubSettings.repo}`;
-        
-        // 準備授權頭
-        let authHeader;
-        if (this.githubSettings.authMethod === 'oauth') {
-            authHeader = `${this.githubSettings.tokenType || 'Bearer'} ${this.githubSettings.accessToken}`;
-        } else {
-            authHeader = `token ${this.githubSettings.token}`;
-        }
-        
-        // 創建或獲取進度條元素
-        const progressContainer = document.getElementById('githubProgressContainer') || this.createProgressContainer();
-        const progressBar = document.getElementById('githubProgressBar');
-        const progressStatus = document.getElementById('githubProgressStatus');
-        
-        // 顯示進度容器
-        progressContainer.classList.remove('d-none');
-        progressBar.style.width = '0%';
-        progressBar.setAttribute('aria-valuenow', '0');
-        progressStatus.textContent = '正在連接GitHub API...';
-        
-        // 更新進度
-        this.updateProgress(30, '正在連接GitHub API...', 'info');
-        
-        // 發送GET請求測試連接
-        fetch(apiUrl, {
-            headers: {
-                'Authorization': authHeader,
-                'Accept': 'application/vnd.github.v3+json'
-            },
-            signal: AbortSignal.timeout(30000) // 30秒超時
-        })
-        .then(response => {
-            if (response.status === 401) {
-                this.updateProgress(100, '授權失敗：請檢查您的訪問令牌是否有效', 'danger');
-                this.showGitHubStatus('授權失敗：請檢查您的訪問令牌是否有效', 'danger');
-                throw new Error('GitHub授權失敗');
-            } else if (response.status === 403) {
-                this.updateProgress(100, '權限不足：請確保令牌有足夠權限', 'danger');
-                this.showGitHubStatus('權限不足：請確保令牌有足夠權限', 'danger');
-                throw new Error('GitHub權限不足');
-            } else if (response.status === 404) {
-                this.updateProgress(100, '找不到倉庫：請檢查倉庫名稱是否正確', 'danger');
-                this.showGitHubStatus('找不到倉庫：請檢查倉庫名稱是否正確', 'danger');
-                throw new Error('GitHub倉庫不存在');
-            } else if (!response.ok) {
-                this.updateProgress(100, `API錯誤：${response.status} - ${response.statusText}`, 'danger');
-                this.showGitHubStatus(`API錯誤：${response.status} - ${response.statusText}`, 'danger');
-                throw new Error(`GitHub API錯誤: ${response.status}`);
-            }
-            
-            this.updateProgress(60, '連接成功，正在獲取倉庫信息...', 'info');
-            return response.json();
-        })
-        .then(repoInfo => {
-            // 測試分支是否存在
-            const branchApiUrl = `https://api.github.com/repos/${this.githubSettings.repo}/branches/${this.githubSettings.branch}`;
-            
-            this.updateProgress(80, '正在檢查分支是否存在...', 'info');
-            
-            return fetch(branchApiUrl, {
-                headers: {
-                    'Authorization': authHeader,
-                    'Accept': 'application/vnd.github.v3+json'
-                }
-            });
-        })
-        .then(response => {
-            if (response.status === 404) {
-                this.updateProgress(100, `分支 '${this.githubSettings.branch}' 不存在，但可以在首次同步時創建`, 'warning');
-                this.showGitHubStatus(`分支 '${this.githubSettings.branch}' 不存在，但可以在首次同步時創建`, 'warning');
-                return null;
-            } else if (!response.ok) {
-                this.updateProgress(100, `檢查分支時出錯：${response.status} - ${response.statusText}`, 'danger');
-                this.showGitHubStatus(`檢查分支時出錯：${response.status} - ${response.statusText}`, 'danger');
-                throw new Error(`檢查分支錯誤: ${response.status}`);
-            }
-            
-            this.updateProgress(100, '連接測試完成，所有設置正確！', 'success');
-            this.showGitHubStatus(`連接測試成功！倉庫 '${this.githubSettings.repo}' 和分支 '${this.githubSettings.branch}' 均可訪問。`, 'success');
-            return response.json();
-        })
-        .catch(error => {
-            console.error('GitHub連接測試錯誤:', error);
-            
-            // 如果尚未顯示特定錯誤，顯示通用錯誤
-            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                this.updateProgress(100, '網絡連接失敗，請檢查您的網絡連接', 'danger');
-                this.showGitHubStatus('網絡連接失敗，請檢查您的網絡連接', 'danger');
-            } else if (error.name === 'AbortError') {
-                this.updateProgress(100, '請求超時，請稍後再試', 'danger');
-                this.showGitHubStatus('請求超時，請稍後再試', 'danger');
-            } else if (!document.getElementById('githubStatus').classList.contains('alert-danger') && 
-                       !document.getElementById('githubStatus').classList.contains('alert-warning')) {
-                // 只有在沒有顯示其他錯誤時才顯示通用錯誤
-                this.updateProgress(100, `連接測試失敗：${error.message}`, 'danger');
-                this.showGitHubStatus(`連接測試失敗：${error.message}`, 'danger');
-            }
-        });
     }
     
     /**
@@ -439,30 +145,16 @@ class Admin {
             }
             
             // 檢查設置是否完整
-            if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
+            if (!this.githubSettings.token || !this.githubSettings.repo) {
                 this.updateProgress(0, '錯誤：GitHub設置不完整', 'danger');
                 reject(new Error('GitHub設置不完整，請先配置GitHub設置'));
                 return;
-            } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
-                this.updateProgress(0, '錯誤：GitHub OAuth授權不完整', 'danger');
-                reject(new Error('GitHub OAuth授權不完整，請先完成GitHub授權'));
-                return;
             }
             
-            // 檢查令牌格式 (支持傳統ghp_格式和新的github_pat_格式)
-            if (this.githubSettings.authMethod === 'pat' && !/^(ghp_[a-zA-Z0-9]{36}|github_pat_[a-zA-Z0-9_]{82})$/.test(this.githubSettings.token)) {
+            // 檢查token格式
+            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(this.githubSettings.token) && !/^github_pat_[a-zA-Z0-9]{82}$/.test(this.githubSettings.token)) {
                 this.updateProgress(0, '錯誤：GitHub令牌格式不正確', 'danger');
                 reject(new Error('GitHub令牌格式不正確，請確保使用有效的個人訪問令牌'));
-                return;
-            }
-            
-            // 檢查OAuth令牌是否過期
-            if (this.githubSettings.authMethod === 'oauth' && 
-                this.githubSettings.expiresAt && 
-                new Date() > new Date(this.githubSettings.expiresAt)) {
-                
-                this.updateProgress(0, '錯誤：GitHub OAuth令牌已過期', 'danger');
-                reject(new Error('GitHub OAuth令牌已過期，請重新授權'));
                 return;
             }
             
@@ -482,18 +174,10 @@ class Admin {
                 this.updateProgress(10, '連接超時，請檢查網絡連接', 'warning');
             }, 10000); // 10秒超時
             
-            // 準備授權頭
-            let authHeader;
-            if (this.githubSettings.authMethod === 'oauth') {
-                authHeader = `${this.githubSettings.tokenType || 'Bearer'} ${this.githubSettings.accessToken}`;
-            } else {
-                authHeader = `token ${this.githubSettings.token}`;
-            }
-            
             // 首先獲取文件信息（如果存在）
             fetch(apiUrl, {
                 headers: {
-                    'Authorization': authHeader,
+                    'Authorization': `token ${this.githubSettings.token}`,
                     'Accept': 'application/vnd.github.v3+json'
                 },
                 signal: AbortSignal.timeout(30000) // 30秒超時
@@ -556,19 +240,11 @@ class Admin {
                     
                     this.updateProgress(70, '正在上傳到GitHub...', 'info');
                     
-                    // 準備授權頭
-                    let authHeader;
-                    if (this.githubSettings.authMethod === 'oauth') {
-                        authHeader = `${this.githubSettings.tokenType || 'Bearer'} ${this.githubSettings.accessToken}`;
-                    } else {
-                        authHeader = `token ${this.githubSettings.token}`;
-                    }
-                    
                     // 發送PUT請求更新或創建文件
                     return fetch(apiUrl, {
                         method: 'PUT',
                         headers: {
-                            'Authorization': authHeader,
+                            'Authorization': `token ${this.githubSettings.token}`,
                             'Content-Type': 'application/json',
                             'Accept': 'application/vnd.github.v3+json'
                         },
@@ -623,16 +299,6 @@ class Admin {
                     progressContainer.classList.add('d-none');
                 }, 3000);
                 
-                // 確保將數據保存到localStorage，這樣即使頁面刷新也能保持同步狀態
-                localStorage.setItem('lastGitHubSyncData', JSON.stringify({
-                    timestamp: new Date().toISOString(),
-                    sha: data.content.sha,
-                    url: data.content.html_url
-                }));
-                
-                // 觸發同步成功事件
-                this.triggerSyncEvent('success', data);
-                
                 resolve(data);
             })
             .catch(error => {
@@ -649,9 +315,6 @@ class Admin {
                 }
                 
                 this.updateProgress(100, `錯誤：${userFriendlyMessage}`, 'danger');
-                
-                // 觸發同步失敗事件
-                this.triggerSyncEvent('error', error);
                 
                 // 顯示重試按鈕
                 const progressContainer = document.getElementById('githubProgressContainer');
@@ -806,200 +469,6 @@ class Admin {
         // 分發事件
         document.dispatchEvent(event);
     }
-    
-    /**
-     * 手動同步數據到GitHub
-     * 用戶可以通過UI按鈕觸發此功能
-     */
-    manualSyncToGitHub() {
-        // 顯示同步開始訊息
-        this.showGitHubStatus('正在準備同步數據到GitHub...', 'info');
-        
-        // 檢查設置是否完整
-        if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
-            this.showGitHubStatus('GitHub設置不完整，請先配置GitHub設置', 'danger');
-            return;
-        } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
-            this.showGitHubStatus('GitHub OAuth授權不完整，請先完成GitHub授權', 'danger');
-            return;
-        }
-        
-        // 獲取所有書籍數據
-        const books = db.getAllBooks();
-        
-        // 檢查是否有數據
-        if (!books || books.length === 0) {
-            this.showGitHubStatus('沒有書籍數據可同步', 'warning');
-            return;
-        }
-        
-        // 創建要上傳的數據對象
-        const syncData = {
-            books: books,
-            lastSync: new Date().toISOString(),
-            version: '1.0'
-        };
-        
-        // 上傳到GitHub
-        this.uploadToGitHub(syncData)
-            .then(data => {
-                console.log('手動同步成功:', data);
-                this.showGitHubStatus(`同步成功！共同步了 ${books.length} 筆書籍記錄`, 'success');
-                
-                // 更新最後同步時間
-                localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                
-                // 觸發同步成功事件
-                this.triggerSyncEvent('success', data);
-            })
-            .catch(error => {
-                console.error('手動同步失敗:', error);
-                this.showGitHubStatus(`同步失敗: ${error.message}`, 'danger');
-                
-                // 觸發同步失敗事件
-                this.triggerSyncEvent('error', error);
-            });
-    }
-}
-
-/**
-     * 授權GitHub
-     * 使用OAuth流程獲取GitHub訪問令牌
-     */
-    authorizeGitHub() {
-        // 顯示授權狀態
-        const oauthStatus = document.getElementById('oauthStatus');
-        if (oauthStatus) {
-            oauthStatus.textContent = '正在準備GitHub授權...';
-            oauthStatus.className = 'alert alert-info';
-            oauthStatus.classList.remove('d-none');
-        }
-    
-    // 設置OAuth應用程序參數
-    // 注意：實際應用中，應該使用後端服務來處理OAuth流程，以保護client_secret
-    const clientId = 'YOUR_GITHUB_CLIENT_ID'; // 替換為您的GitHub OAuth應用程序ID
-    const redirectUri = window.location.origin + window.location.pathname;
-    const scope = 'repo'; // 請求倉庫訪問權限
-    
-    // 生成隨機狀態參數，用於防止CSRF攻擊
-    const state = Math.random().toString(36).substring(2, 15);
-    localStorage.setItem('githubOAuthState', state);
-    
-    // 構建授權URL
-    const authUrl = `https://github.com/login/oauth/authorize?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&scope=${scope}&state=${state}`;
-    
-    // 在新窗口中打開授權頁面
-    const authWindow = window.open(authUrl, 'githubAuth', 'width=800,height=600');
-    
-    // 檢查授權窗口是否被阻止
-    if (!authWindow || authWindow.closed || typeof authWindow.closed === 'undefined') {
-        if (oauthStatus) {
-            oauthStatus.textContent = '彈出窗口被阻止，請允許彈出窗口並重試';
-            oauthStatus.className = 'alert alert-warning';
-        }
-        return;
-    }
-    
-    // 更新狀態
-    if (oauthStatus) {
-        oauthStatus.textContent = '請在彈出窗口中完成GitHub授權...';
-    }
-    
-    // 設置消息監聽器，接收授權碼
-    const messageListener = (event) => {
-        // 驗證消息來源
-        if (event.origin !== window.location.origin) return;
-        
-        // 處理授權回調
-        if (event.data && event.data.type === 'github-oauth-callback') {
-            // 移除消息監聽器
-            window.removeEventListener('message', messageListener);
-            
-            const { code, state: returnedState, error } = event.data;
-            
-            // 驗證狀態參數
-            const savedState = localStorage.getItem('githubOAuthState');
-            if (returnedState !== savedState) {
-                if (oauthStatus) {
-                    oauthStatus.textContent = '授權失敗：狀態驗證錯誤';
-                    oauthStatus.className = 'alert alert-danger';
-                }
-                return;
-            }
-            
-            // 檢查是否有錯誤
-            if (error) {
-                if (oauthStatus) {
-                    oauthStatus.textContent = `授權失敗：${error}`;
-                    oauthStatus.className = 'alert alert-danger';
-                }
-                return;
-            }
-            
-            // 使用授權碼獲取訪問令牌
-            if (oauthStatus) {
-                oauthStatus.textContent = '正在獲取訪問令牌...';
-            }
-            
-            // 在實際應用中，應該使用後端服務來交換訪問令牌
-            // 這裡使用模擬的方式獲取令牌
-            this.exchangeCodeForToken(code)
-                .then(tokenData => {
-                    // 保存訪問令牌
-                    this.githubSettings.authMethod = 'oauth';
-                    this.githubSettings.accessToken = tokenData.access_token;
-                    this.githubSettings.tokenType = tokenData.token_type;
-                    
-                    // 設置過期時間（如果有）
-                    if (tokenData.expires_in) {
-                        const expiresAt = new Date();
-                        expiresAt.setSeconds(expiresAt.getSeconds() + tokenData.expires_in);
-                        this.githubSettings.expiresAt = expiresAt.toISOString();
-                    }
-                    
-                    // 保存設置
-                    localStorage.setItem('githubSettings', JSON.stringify(this.githubSettings));
-                    
-                    // 更新UI
-                    if (oauthStatus) {
-                        oauthStatus.textContent = '授權成功！您現在可以使用GitHub API';
-                        oauthStatus.className = 'alert alert-success';
-                    }
-                })
-                .catch(error => {
-                    console.error('獲取訪問令牌失敗:', error);
-                    if (oauthStatus) {
-                        oauthStatus.textContent = `獲取訪問令牌失敗: ${error.message}`;
-                        oauthStatus.className = 'alert alert-danger';
-                    }
-                });
-        }
-    };
-    
-    // 添加消息監聽器
-    window.addEventListener('message', messageListener);
-}
-
-/**
- * 交換授權碼獲取訪問令牌
- * @param {string} code 授權碼
- * @returns {Promise} 包含訪問令牌的Promise
- */
-exchangeCodeForToken(code) {
-    // 注意：在實際應用中，應該使用後端服務來交換訪問令牌，以保護client_secret
-    // 這裡使用模擬的方式獲取令牌
-    return new Promise((resolve, reject) => {
-        // 模擬API請求延遲
-        setTimeout(() => {
-            // 模擬成功響應
-            resolve({
-                access_token: 'simulated_access_token_' + Math.random().toString(36).substring(2),
-                token_type: 'bearer',
-                scope: 'repo',
-                expires_in: 3600 // 1小時過期
-            });
-        }, 1000);
-    });
 }
 
 // 初始化管理員實例

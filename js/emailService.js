@@ -1,10 +1,10 @@
 /**
- * 郵件服務模組 - 處理備份功能
+ * 郵件服務模組 - 處理Gmail備份功能
  */
 
 class EmailService {
     /**
-     * 發送備份郵件 (使用EmailJS)
+     * 發送備份郵件
      * @param {string} email 接收者郵箱
      * @param {Object} data 備份數據
      * @param {string} fileName 檔案名稱
@@ -121,149 +121,6 @@ class EmailService {
             } catch (error) {
                 console.error('備份過程中發生錯誤:', error);
                 reject(new Error(`備份過程中發生錯誤: ${error.message}`));
-            }
-        });
-    }
-    
-    /**
-     * 使用mailto協議發送備份郵件（不需要EmailJS）
-     * @param {string} email 接收者郵箱
-     * @param {Object} data 備份數據
-     * @param {string} fileName 檔案名稱
-     * @returns {Promise<{success: boolean, message: string}>} 結果對象，包含成功狀態和消息
-     */
-    sendBackupEmailViaMailto(email, data, fileName) {
-        return new Promise((resolve, reject) => {
-            try {
-                // 檢查email格式
-                if (!this.validateEmail(email)) {
-                    reject(new Error('無效的Email地址格式'));
-                    return;
-                }
-                
-                // 檢查數據是否為空
-                if (!data || (Array.isArray(data) && data.length === 0)) {
-                    reject(new Error('沒有數據可備份'));
-                    return;
-                }
-                
-                // 創建備份數據的JSON字符串
-                const jsonData = JSON.stringify(data, null, 2);
-                
-                // 檢查JSON數據大小
-                const dataSizeKB = Math.round((jsonData.length * 2) / 1024);
-                const recordCount = Array.isArray(data) ? data.length : Object.keys(data).length;
-                
-                // 創建郵件主題和內容
-                const subject = encodeURIComponent(`書籍查詢管理系統 - 數據備份 (${new Date().toLocaleDateString()})`);
-                const body = encodeURIComponent(
-                    `這是您的書籍查詢管理系統數據備份。\n\n` +
-                    `備份時間: ${new Date().toLocaleString()}\n` +
-                    `記錄數量: ${recordCount} 筆\n` +
-                    `數據大小: 約 ${dataSizeKB}KB\n\n` +
-                    `--- 備份數據 (JSON格式) ---\n\n${jsonData}`
-                );
-                
-                // 創建mailto鏈接
-                const mailtoLink = `mailto:${email}?subject=${subject}&body=${body}`;
-                
-                // 打開郵件客戶端
-                window.location.href = mailtoLink;
-                
-                // 將備份數據存儲在localStorage中
-                localStorage.setItem('lastBackupData', jsonData);
-                localStorage.setItem('lastBackupTime', new Date().toISOString());
-                localStorage.setItem('lastBackupEmail', email);
-                localStorage.setItem('lastBackupSize', dataSizeKB.toString());
-                localStorage.setItem('lastBackupRecords', recordCount.toString());
-                
-                resolve({
-                    success: true,
-                    message: `已打開郵件客戶端，請在彈出的郵件窗口中發送郵件`,
-                    details: {
-                        recordCount: recordCount,
-                        sizeKB: dataSizeKB,
-                        timestamp: new Date().toISOString(),
-                        method: 'mailto'
-                    }
-                });
-            } catch (error) {
-                console.error('準備mailto郵件時發生錯誤:', error);
-                reject(new Error(`準備郵件時發生錯誤: ${error.message}`));
-            }
-        });
-    }
-    
-    /**
-     * 生成並下載Excel備份文件（不需要EmailJS）
-     * @param {Object} data 備份數據
-     * @param {string} fileName 檔案名稱（可選，默認為自動生成）
-     * @returns {Promise<{success: boolean, message: string}>} 結果對象，包含成功狀態和消息
-     */
-    downloadBackupFile(data, fileName) {
-        return new Promise((resolve, reject) => {
-            try {
-                // 檢查數據是否為空
-                if (!data || (Array.isArray(data) && data.length === 0)) {
-                    reject(new Error('沒有數據可備份'));
-                    return;
-                }
-                
-                // 如果沒有提供文件名，則生成一個
-                if (!fileName) {
-                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').substring(0, 19);
-                    fileName = `書籍資料_備份_${timestamp}.xlsx`;
-                }
-                
-                // 使用數據處理器創建工作表
-                const workbook = dataProcessor.createExcelWorkbook(data);
-                
-                // 將工作表轉換為二進制數據
-                const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-                
-                // 創建Blob對象
-                const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                
-                // 創建下載鏈接
-                const url = URL.createObjectURL(blob);
-                const link = document.createElement('a');
-                link.href = url;
-                link.download = fileName;
-                
-                // 添加到文檔並觸發點擊
-                document.body.appendChild(link);
-                link.click();
-                
-                // 清理
-                setTimeout(() => {
-                    document.body.removeChild(link);
-                    URL.revokeObjectURL(url);
-                }, 100);
-                
-                // 記錄備份信息
-                const jsonData = JSON.stringify(data, null, 2);
-                const dataSizeKB = Math.round((jsonData.length * 2) / 1024);
-                const recordCount = Array.isArray(data) ? data.length : Object.keys(data).length;
-                
-                localStorage.setItem('lastBackupData', jsonData);
-                localStorage.setItem('lastBackupTime', new Date().toISOString());
-                localStorage.setItem('lastBackupSize', dataSizeKB.toString());
-                localStorage.setItem('lastBackupRecords', recordCount.toString());
-                
-                resolve({
-                    success: true,
-                    message: `備份文件 ${fileName} 已下載`,
-                    details: {
-                        fileName: fileName,
-                        recordCount: recordCount,
-                        sizeKB: dataSizeKB,
-                        timestamp: new Date().toISOString(),
-                        method: 'download'
-                    }
-                });
-            } catch (error) {
-                console.error('生成備份文件時發生錯誤:', error);
-                reject(new Error(`生成備份文件時發生錯誤: ${error.message}`));
             }
         });
     }

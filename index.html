@@ -276,27 +276,6 @@
                             </label>
                         </div>
                     </div>
-                    <div class="mb-3">
-                        <label class="form-label">備份方法</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="backupMethod" id="emailjsMethod" value="emailjs">
-                            <label class="form-check-label" for="emailjsMethod">
-                                使用EmailJS (需要API密鑰)
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="backupMethod" id="mailtoMethod" value="mailto" checked>
-                            <label class="form-check-label" for="mailtoMethod">
-                                使用郵件客戶端 (無需API密鑰)
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="backupMethod" id="downloadMethod" value="download">
-                            <label class="form-check-label" for="downloadMethod">
-                                直接下載Excel檔案
-                            </label>
-                        </div>
-                    </div>
                     <div id="autoBackupOptions" class="mb-3 d-none">
                         <label for="backupFrequency" class="form-label">備份頻率</label>
                         <select class="form-select" id="backupFrequency">
@@ -327,35 +306,9 @@
                 </div>
                 <div class="modal-body">
                     <div class="mb-3">
-                        <label class="form-label">認證方式</label>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="githubAuthMethod" id="patAuth" value="pat" checked>
-                            <label class="form-check-label" for="patAuth">
-                                個人訪問令牌 (PAT)
-                            </label>
-                        </div>
-                        <div class="form-check">
-                            <input class="form-check-input" type="radio" name="githubAuthMethod" id="oauthAuth" value="oauth">
-                            <label class="form-check-label" for="oauthAuth">
-                                OAuth認證 (更安全)
-                            </label>
-                        </div>
-                    </div>
-                    <div id="patAuthSection">
-                        <div class="mb-3">
-                            <label for="githubToken" class="form-label">個人訪問令牌 (PAT)</label>
-                            <input type="password" class="form-control" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
-                            <div class="form-text">用於授權訪問您的GitHub倉庫</div>
-                        </div>
-                    </div>
-                    <div id="oauthAuthSection" class="d-none">
-                        <div class="mb-3">
-                            <p class="text-info"><i class="fas fa-info-circle me-2"></i>OAuth認證需要先進行GitHub授權</p>
-                            <button type="button" class="btn btn-primary" id="authorizeGitHubBtn">
-                                <i class="fab fa-github me-2"></i>授權GitHub
-                            </button>
-                        </div>
-                        <div id="oauthStatus" class="alert alert-info d-none"></div>
+                        <label for="githubToken" class="form-label">個人訪問令牌 (PAT)</label>
+                        <input type="password" class="form-control" id="githubToken" placeholder="ghp_xxxxxxxxxxxx 或 github_pat_xxxxxxxxxxxx">
+                        <div class="form-text">用於授權訪問您的GitHub倉庫，支持傳統格式(ghp_)和新格式(github_pat_)</div>
                     </div>
                     <div class="mb-3">
                         <label for="githubRepo" class="form-label">倉庫名稱</label>
@@ -374,7 +327,6 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
-                    <button type="button" class="btn btn-info" id="testGitHubConnectionBtn">測試連接</button>
                     <button type="button" class="btn btn-primary" id="saveGitHubSettingsBtn">儲存設定</button>
                 </div>
             </div>
@@ -392,7 +344,7 @@
                 <div class="modal-body">
                     <div class="alert alert-info">
                         <i class="fas fa-info-circle me-2"></i>
-                        EmailJS是一個可選的備份方式，需要在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板。如果您不想使用EmailJS，可以在備份設定中選擇「使用郵件客戶端」或「直接下載Excel檔案」方式。
+                        請先在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板，以啟用郵件備份功能。
                     </div>
                     <div class="mb-3">
                         <label for="emailjsUserID" class="form-label">User ID</label>

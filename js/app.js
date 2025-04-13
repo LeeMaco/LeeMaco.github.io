@@ -51,11 +51,6 @@ class App {
         this.bookNotes = document.getElementById('bookNotes');
         this.saveBookBtn = document.getElementById('saveBookBtn');
         
-        // 備份方法元素
-        this.emailjsMethod = document.getElementById('emailjsMethod');
-        this.mailtoMethod = document.getElementById('mailtoMethod');
-        this.downloadMethod = document.getElementById('downloadMethod');
-        
         // 匯入/匯出元素
         this.importFile = document.getElementById('importFile');
         this.filterDuplicates = document.getElementById('filterDuplicates');
@@ -150,11 +145,6 @@ class App {
         this.manualBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
         this.saveBackupSettingsBtn.addEventListener('click', () => this.saveBackupSettings());
         this.manualBackupBtn.addEventListener('click', () => this.performBackup());
-        
-        // 備份方法事件
-        this.emailjsMethod.addEventListener('change', () => this.toggleBackupMethodOptions());
-        this.mailtoMethod.addEventListener('change', () => this.toggleBackupMethodOptions());
-        this.downloadMethod.addEventListener('change', () => this.toggleBackupMethodOptions());
         
         // EmailJS設定事件
         const saveEmailJSSettingsBtn = document.getElementById('saveEmailJSSettingsBtn');
@@ -699,43 +689,11 @@ class App {
     /**
      * 切換備份選項
      */
-    toggleAutoBackupOptions() {
+    toggleBackupOptions() {
         if (this.autoBackup.checked) {
             this.autoBackupOptions.classList.remove('d-none');
         } else {
             this.autoBackupOptions.classList.add('d-none');
-        }
-    }
-    
-    /**
-     * 切換備份方法選項
-     */
-    toggleBackupMethodOptions() {
-        const emailFieldContainer = this.backupEmail.closest('.mb-3');
-        
-        if (this.downloadMethod.checked) {
-            // 如果選擇直接下載，隱藏Email輸入框
-            emailFieldContainer.classList.add('d-none');
-        } else {
-            // 如果選擇其他方法，顯示Email輸入框
-            emailFieldContainer.classList.remove('d-none');
-        }
-        
-        // 如果選擇EmailJS方法，顯示EmailJS設定按鈕，否則隱藏
-        const emailJSSettingsBtn = document.getElementById('openEmailJSSettingsBtn');
-        if (emailJSSettingsBtn) {
-            if (this.emailjsMethod.checked) {
-                emailJSSettingsBtn.classList.remove('d-none');
-            } else {
-                emailJSSettingsBtn.classList.add('d-none');
-            }
-        }
-        
-        // 清除之前的錯誤提示
-        const backupStatus = document.getElementById('backupStatus');
-        if (backupStatus && backupStatus.classList.contains('alert-danger')) {
-            backupStatus.textContent = '';
-            backupStatus.classList.add('d-none');
         }
     }
     
@@ -756,18 +714,6 @@ class App {
                 this.manualBackup.checked = true;
                 this.autoBackupOptions.classList.add('d-none');
             }
-            
-            // 載入備份方法設定
-            if (settings.method === 'emailjs') {
-                this.emailjsMethod.checked = true;
-            } else if (settings.method === 'download') {
-                this.downloadMethod.checked = true;
-            } else {
-                this.mailtoMethod.checked = true; // 默認使用mailto方法
-            }
-            
-            // 根據備份方法設定UI狀態
-            this.toggleBackupMethodOptions();
         }
     }
     
@@ -827,37 +773,22 @@ class App {
      */
     saveBackupSettings() {
         const email = this.backupEmail.value.trim();
-        let requireEmail = true;
         
-        // 如果選擇了直接下載方式，則不需要Email
-        if (this.downloadMethod.checked) {
-            requireEmail = false;
-        }
-        
-        if (requireEmail && !email) {
+        if (!email) {
             this.showBackupStatus('請輸入Email地址', 'danger');
             return;
         }
         
-        // 如果需要Email，則驗證格式
-        if (requireEmail && !emailService.validateEmail(email)) {
+        // 使用郵件服務驗證Email格式
+        if (!emailService.validateEmail(email)) {
             this.showBackupStatus('請輸入有效的Email地址', 'danger');
             return;
-        }
-        
-        // 獲取備份方法
-        let method = 'mailto'; // 默認方法
-        if (this.emailjsMethod.checked) {
-            method = 'emailjs';
-        } else if (this.downloadMethod.checked) {
-            method = 'download';
         }
         
         // 構建設定對象
         const settings = {
             email: email,
-            type: this.autoBackup.checked ? 'auto' : 'manual',
-            method: method
+            type: this.autoBackup.checked ? 'auto' : 'manual'
         };
         
         // 如果是自動備份，添加頻率
@@ -891,17 +822,13 @@ class App {
     performBackup() {
         const settings = db.getBackupSettings();
         const emailjsSettings = db.getEmailJSSettings();
-        const backupMethod = settings?.method || 'mailto';
         
-        // 檢查是否需要Email地址
-        const needsEmail = backupMethod !== 'download';
-        if (needsEmail && (!settings || !settings.email)) {
+        if (!settings || !settings.email) {
             this.showBackupStatus('請先設定備份Email', 'danger');
             return;
         }
         
-        // 只有當使用EmailJS方法時，才檢查EmailJS設定
-        if (backupMethod === 'emailjs' && (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID)) {
+        if (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID) {
             this.showBackupStatus('請先完成EmailJS設定 <button class="btn btn-sm btn-primary ms-2" id="openEmailJSSettingsBtn">設定EmailJS</button>', 'danger');
             
             // 添加按鈕點擊事件
@@ -932,166 +859,11 @@ class App {
         this.showBackupStatus('正在處理備份...', 'info');
         
         try {
-            // 生成檔案名稱
-            const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
-            
-            // 根據備份方法執行不同的備份操作
-            switch (backupMethod) {
-                case 'download':
-                    // 直接下載Excel檔案
-                    this.performDownloadBackup(books, fileName);
-                    break;
-                    
-                case 'mailto':
-                    // 使用mailto協議發送備份
-                    this.performMailtoBackup(books, fileName, settings.email);
-                    break;
-                    
-                case 'emailjs':
-                default:
-                    // 使用EmailJS發送備份
-                    this.performEmailJSBackup(books, fileName, settings.email, emailjsSettings);
-                    break;
-            }
-        } catch (error) {
-            console.error('備份生成錯誤:', error);
-            this.showBackupStatus(`
-                <div class="alert alert-danger">
-                    <i class="fas fa-times-circle me-2"></i>
-                    <strong>備份失敗</strong><br>
-                    備份過程中發生錯誤：${error.message}<br>
-                </div>
-            `, 'danger');
-        }
-    }
-    
-    /**
-     * 執行直接下載備份
-     * @param {Array} books 書籍數據
-     * @param {string} fileName 檔案名稱
-     */
-    performDownloadBackup(books, fileName) {
-        // 顯示處理中狀態
-        this.showBackupStatus('正在生成Excel檔案...', 'info');
-        
-        // 使用郵件服務下載備份文件
-        emailService.downloadBackupFile(books, fileName)
-            .then((result) => {
-                // 顯示詳細信息
-                const details = result.details || {};
-                const recordCount = details.recordCount || books.length;
-                const sizeKB = details.sizeKB || '未知';
-                
-                // 顯示成功信息
-                this.showBackupStatus(`
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-check-circle text-success me-2 fs-4"></i>
-                        <div>
-                            <strong>備份成功！</strong><br>
-                            檔案已下載 (${fileName})<br>
-                            共 ${recordCount} 筆記錄，大小約 ${sizeKB}KB
-                            <div class="text-muted small">備份時間: ${new Date().toLocaleString()}</div>
-                        </div>
-                    </div>
-                `, 'success');
-                
-                // 顯示全局通知
-                this.showMessage('備份已成功完成並下載', 'success');
-            })
-            .catch(error => {
-                console.error('備份錯誤:', error);
-                this.showBackupStatus(`
-                    <div class="alert alert-danger">
-                        <i class="fas fa-times-circle me-2"></i>
-                        <strong>備份失敗</strong><br>
-                        生成備份文件時發生錯誤：${error.message}<br>
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-primary retry-backup-btn">
-                                <i class="fas fa-redo me-1"></i> 重試
-                            </button>
-                        </div>
-                    </div>
-                `, 'danger');
-                
-                // 添加重試按鈕事件
-                const retryBtn = this.backupStatus.querySelector('.retry-backup-btn');
-                if (retryBtn) {
-                    retryBtn.addEventListener('click', () => this.performBackup());
-                }
-            });
-    }
-    
-    /**
-     * 執行mailto協議備份
-     * @param {Array} books 書籍數據
-     * @param {string} fileName 檔案名稱
-     * @param {string} email 郵箱地址
-     */
-    performMailtoBackup(books, fileName, email) {
-        // 顯示處理中狀態
-        this.showBackupStatus('正在準備郵件...', 'info');
-        
-        // 使用郵件服務通過mailto發送備份
-        emailService.sendBackupEmailViaMailto(email, books, fileName)
-            .then((result) => {
-                // 顯示詳細信息
-                const details = result.details || {};
-                const recordCount = details.recordCount || books.length;
-                const sizeKB = details.sizeKB || '未知';
-                
-                // 顯示成功信息
-                this.showBackupStatus(`
-                    <div class="d-flex align-items-center">
-                        <i class="fas fa-check-circle text-success me-2 fs-4"></i>
-                        <div>
-                            <strong>郵件客戶端已打開！</strong><br>
-                            請在彈出的郵件窗口中發送郵件至 ${email}<br>
-                            共 ${recordCount} 筆記錄，大小約 ${sizeKB}KB
-                            <div class="text-muted small">備份時間: ${new Date().toLocaleString()}</div>
-                        </div>
-                    </div>
-                `, 'success');
-                
-                // 顯示全局通知
-                this.showMessage('郵件客戶端已打開，請發送郵件完成備份', 'success');
-            })
-            .catch(error => {
-                console.error('備份錯誤:', error);
-                this.showBackupStatus(`
-                    <div class="alert alert-danger">
-                        <i class="fas fa-times-circle me-2"></i>
-                        <strong>備份失敗</strong><br>
-                        準備郵件時發生錯誤：${error.message}<br>
-                        <div class="mt-2">
-                            <button class="btn btn-sm btn-outline-primary retry-backup-btn">
-                                <i class="fas fa-redo me-1"></i> 重試
-                            </button>
-                        </div>
-                    </div>
-                `, 'danger');
-                
-                // 添加重試按鈕事件
-                const retryBtn = this.backupStatus.querySelector('.retry-backup-btn');
-                if (retryBtn) {
-                    retryBtn.addEventListener('click', () => this.performBackup());
-                }
-            });
-    }
-    
-    /**
-     * 執行EmailJS備份
-     * @param {Array} books 書籍數據
-     * @param {string} fileName 檔案名稱
-     * @param {string} email 郵箱地址
-     * @param {Object} emailjsSettings EmailJS設定
-     */
-    performEmailJSBackup(books, fileName, email, emailjsSettings) {
-        // 顯示處理中狀態
-        this.showBackupStatus('正在處理備份...', 'info');
-        
-        try {
             // 使用數據處理器創建工作表
             const workbook = dataProcessor.createExcelWorkbook(books);
+            
+            // 生成檔案名稱
+            const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
             
             // 匯出Excel檔案
             try {
@@ -1120,7 +892,7 @@ class App {
             progressBar.textContent = '正在發送郵件...';
             
             // 使用郵件服務發送備份
-            emailService.sendBackupEmail(email, books, fileName, emailjsSettings)
+            emailService.sendBackupEmail(settings.email, books, fileName, emailjsSettings)
                 .then((result) => {
                     // 更新進度條
                     progressBar.style.width = '100%';
@@ -1140,7 +912,7 @@ class App {
                             <div>
                                 <strong>備份成功！</strong><br>
                                 檔案已下載 (${fileName})<br>
-                                備份已發送至 ${email}<br>
+                                備份已發送至 ${settings.email}<br>
                                 共 ${recordCount} 筆記錄，大小約 ${sizeKB}KB
                                 <div class="text-muted small">備份時間: ${new Date().toLocaleString()}</div>
                             </div>
@@ -1184,7 +956,7 @@ class App {
             console.error('備份生成錯誤:', error);
             this.showBackupStatus(`
                 <div class="alert alert-danger">
-                    <i class="fas fa-times-circle me-2"></i>
+                    <i class="fas fa-exclamation-circle me-2"></i>
                     <strong>備份失敗</strong><br>
                     備份過程中發生錯誤：${error.message}<br>
                     <div class="text-muted small mt-1">錯誤類型: ${error.name || '未知'}</div>
