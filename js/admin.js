@@ -389,8 +389,6 @@ class Admin {
     }
     
     /**
-    
-    /**
      * 創建進度條容器
      * @returns {HTMLElement} 進度條容器
      */
@@ -398,26 +396,13 @@ class Admin {
         // 創建進度條容器
         const container = document.createElement('div');
         container.id = 'githubProgressContainer';
-        container.className = 'github-upload-status status-info mt-3 d-none';
-        
-        // 創建標題區域
-        const statusHeader = document.createElement('div');
-        statusHeader.className = 'status-header';
-        
-        const statusTitle = document.createElement('h6');
-        statusTitle.className = 'status-title';
-        statusTitle.innerHTML = '<i class="fas fa-cloud-upload-alt me-2"></i>GitHub 同步狀態';
-        statusHeader.appendChild(statusTitle);
-        
-        // 創建內容區域
-        const statusBody = document.createElement('div');
-        statusBody.className = 'status-body';
+        container.className = 'mt-3 d-none';
         
         // 創建進度狀態文本
         const statusText = document.createElement('div');
         statusText.id = 'githubProgressStatus';
-        statusText.className = 'status-message';
-        statusText.innerHTML = '<span class="spinner"></span>準備上傳...';
+        statusText.className = 'mb-2';
+        statusText.textContent = '準備上傳...';
         
         // 創建進度條
         const progressDiv = document.createElement('div');
@@ -425,26 +410,17 @@ class Admin {
         
         const progressBar = document.createElement('div');
         progressBar.id = 'githubProgressBar';
-        progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+        progressBar.className = 'progress-bar';
         progressBar.role = 'progressbar';
         progressBar.style.width = '0%';
         progressBar.setAttribute('aria-valuenow', '0');
         progressBar.setAttribute('aria-valuemin', '0');
         progressBar.setAttribute('aria-valuemax', '100');
         
-        // 創建詳細信息區域
-        const statusDetails = document.createElement('div');
-        statusDetails.id = 'githubProgressDetails';
-        statusDetails.className = 'status-details';
-        
         // 組裝元素
         progressDiv.appendChild(progressBar);
-        statusBody.appendChild(statusText);
-        statusBody.appendChild(progressDiv);
-        statusBody.appendChild(statusDetails);
-        
-        container.appendChild(statusHeader);
-        container.appendChild(statusBody);
+        container.appendChild(statusText);
+        container.appendChild(progressDiv);
         
         // 添加到GitHub設置模態框中
         const modalBody = document.querySelector('#githubSettingsModal .modal-body');
@@ -463,56 +439,38 @@ class Admin {
      * @param {number} percent 進度百分比
      * @param {string} message 狀態消息
      * @param {string} type 類型 (info, success, danger, warning)
-     * @param {string} details 詳細信息（可選）
+     * @param {string} detailMessage 詳細說明訊息
      */
-    updateProgress(percent, message, type = 'info', details = '') {
-        const progressContainer = document.getElementById('githubProgressContainer');
+    updateProgress(percent, message, type = 'info', detailMessage = '') {
         const progressBar = document.getElementById('githubProgressBar');
         const progressStatus = document.getElementById('githubProgressStatus');
-        const progressDetails = document.getElementById('githubProgressDetails');
+        const progressContainer = document.getElementById('githubProgressContainer');
         
-        if (!progressContainer || !progressBar || !progressStatus) return;
-        
-        // 更新容器狀態樣式
-        progressContainer.className = progressContainer.className.replace(/status-\w+/g, '');
-        progressContainer.classList.add(`status-${type}`, 'github-upload-status', 'mt-3');
-        
-        // 更新進度條
-        progressBar.style.width = `${percent}%`;
-        progressBar.setAttribute('aria-valuenow', percent);
-        
-        // 根據類型設置進度條樣式
-        progressBar.className = 'progress-bar';
-        
-        if (percent < 100 && type !== 'danger') {
-            progressBar.classList.add('progress-bar-striped', 'progress-bar-animated');
-        }
-        
-        // 根據類型設置進度條顏色
-        progressBar.classList.add(`bg-${type}`);
-        
-        // 更新狀態文本和圖標
-        let icon = '';
-        if (type === 'success') {
-            icon = '<i class="fas fa-check-circle me-2"></i>';
-        } else if (type === 'danger') {
-            icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-        } else if (type === 'warning') {
-            icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
-        } else {
-            icon = percent < 100 ? '<span class="spinner"></span>' : '<i class="fas fa-info-circle me-2"></i>';
-        }
-        
-        progressStatus.innerHTML = icon + message;
-        progressStatus.className = 'status-message';
-        
-        // 更新詳細信息
-        if (progressDetails) {
-            if (details) {
-                progressDetails.innerHTML = details;
-                progressDetails.classList.remove('d-none');
-            } else {
-                progressDetails.classList.add('d-none');
+        if (progressBar && progressStatus) {
+            // 更新進度條
+            progressBar.style.width = `${percent}%`;
+            progressBar.setAttribute('aria-valuenow', percent);
+            
+            // 根據類型設置進度條顏色
+            progressBar.className = `progress-bar progress-bar-striped progress-bar-animated bg-${type}`;
+            
+            // 更新狀態文本和詳細訊息
+            progressStatus.innerHTML = `<strong>${message}</strong>`;
+            progressStatus.className = `mb-2 text-${type}`;
+            
+            // 如果有詳細訊息，添加到狀態下方
+            if (detailMessage) {
+                // 檢查是否已存在狀態詳情元素
+                let statusBody = progressContainer.querySelector('.status-body');
+                if (!statusBody) {
+                    statusBody = document.createElement('div');
+                    statusBody.className = 'status-body small mt-2 p-2 rounded';
+                    progressContainer.appendChild(statusBody);
+                }
+                
+                // 設置詳細訊息和樣式
+                statusBody.innerHTML = detailMessage;
+                statusBody.className = `status-body small mt-2 p-2 rounded bg-${type === 'info' ? 'light' : type === 'success' ? 'light' : 'light'} text-${type}`;
             }
         }
     }

@@ -731,51 +731,55 @@ class App {
     handleGitHubSyncEvent(event) {
         const { status, timestamp, error } = event.detail;
         
-        // 創建通知元素
-        const toast = document.createElement('div');
-        
-        // 根據狀態設置樣式
-        let bgClass = 'text-bg-info';
-        let icon = '<i class="fas fa-info-circle me-2"></i>';
+        // 選擇通知類型和圖標
+        let toastClass = '';
+        let icon = '';
+        let message = '';
+        let detailMessage = '';
         
         if (status === 'success') {
-            bgClass = 'text-bg-success';
+            toastClass = 'text-bg-success';
             icon = '<i class="fas fa-check-circle me-2"></i>';
-        } else if (status === 'error') {
-            bgClass = 'text-bg-danger';
+            message = '數據已成功同步到GitHub';
+            detailMessage = `同步時間: ${new Date(timestamp).toLocaleString()}`;
+        } else {
+            toastClass = 'text-bg-danger';
             icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-        } else if (status === 'warning') {
-            bgClass = 'text-bg-warning';
-            icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+            message = '同步失敗';
+            
+            // 提供更詳細的錯誤信息
+            if (error) {
+                if (error.message.includes('網絡連接失敗')) {
+                    detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
+                } else if (error.message.includes('授權失敗')) {
+                    detailMessage = '請檢查您的GitHub訪問令牌是否有效';
+                } else if (error.message.includes('權限不足')) {
+                    detailMessage = '請確保您的令牌有足夠的權限操作此倉庫';
+                } else if (error.message.includes('請求超時')) {
+                    detailMessage = '連接GitHub服務器超時，請稍後再試';
+                } else {
+                    detailMessage = error.message || '未知錯誤';
+                }
+            } else {
+                detailMessage = '發生未知錯誤，請稍後再試';
+            }
         }
         
-        toast.className = `toast align-items-center ${bgClass}`;
+        // 創建通知元素
+        const toast = document.createElement('div');
+        toast.className = `toast align-items-center ${toastClass} border-0`;
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
         toast.setAttribute('aria-atomic', 'true');
         
-        // 格式化時間戳
-        const formattedTime = timestamp ? new Date(timestamp).toLocaleTimeString() : '';
-        
         // 設置通知內容
-        let message = '';
-        if (status === 'success') {
-            message = '數據已成功同步到GitHub';
-        } else if (status === 'error') {
-            message = `同步失敗: ${error ? error.message : '未知錯誤'}`;
-        } else if (status === 'progress') {
-            message = '正在同步數據到GitHub...';
-        } else {
-            message = '同步狀態更新';
-        }
-        
         toast.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
                     ${icon}${message}
-                    ${formattedTime ? `<div class="small text-muted mt-1">${formattedTime}</div>` : ''}
+                    ${detailMessage ? `<div class="small mt-1">${detailMessage}</div>` : ''}
                 </div>
-                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
         `;
         
@@ -783,7 +787,7 @@ class App {
         this.syncStatus.appendChild(toast);
         
         // 顯示通知
-        const bsToast = new bootstrap.Toast(toast, { delay: status === 'success' ? 5000 : 8000 });
+        const bsToast = new bootstrap.Toast(toast, { delay: 6000 }); // 延長顯示時間
         bsToast.show();
         
         // 自動移除通知
@@ -794,14 +798,32 @@ class App {
         // 如果同步成功，重新載入書籍列表
         if (status === 'success') {
             this.loadBooks();
-            
-            // 顯示全局成功消息
-            this.showMessage('數據已成功同步到GitHub', 'success');
-        } else if (status === 'error') {
-            // 顯示全局錯誤消息
-            this.showMessage('GitHub同步失敗，請檢查設置或網絡連接', 'danger');
         }
-    }
+        
+        // 如果同步失敗，顯示重試按鈕
+        if (status === 'error' && error) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
+            retryBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>重試同步';
+            retryBtn.onclick = () => {
+                // 移除當前通知
+                bsToast.hide();
+                // 顯示新的進度通知
+                this.showMessage('正在重新嘗試同步...', 'info');
+                // 觸發重新同步
+                setTimeout(() => {
+                    const books = db.getAllBooks();
+                    admin.uploadToGitHub({ books: books })
+                        .catch(err => console.error('重試同步失敗:', err));
+                }, 1000);
+            };
+            
+            // 將重試按鈕添加到通知中
+            const toastBody = toast.querySelector('.toast-body');
+            if (toastBody && !toastBody.querySelector('.btn-warning')) {
+                toastBody.appendChild(retryBtn);
+            }
+        }
     }
     
     /**
