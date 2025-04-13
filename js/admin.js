@@ -299,6 +299,9 @@ class Admin {
                     progressContainer.classList.add('d-none');
                 }, 3000);
                 
+                // 觸發同步成功事件
+                this.triggerSyncEvent('success');
+                
                 resolve(data);
             })
             .catch(error => {
@@ -315,6 +318,9 @@ class Admin {
                 }
                 
                 this.updateProgress(100, `錯誤：${userFriendlyMessage}`, 'danger');
+                
+                // 觸發同步失敗事件
+                this.triggerSyncEvent('error', error);
                 
                 // 顯示重試按鈕
                 const progressContainer = document.getElementById('githubProgressContainer');
