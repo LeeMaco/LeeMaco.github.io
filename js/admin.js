@@ -45,6 +45,7 @@ class Admin {
         const patAuthSection = document.getElementById('patAuthSection');
         const oauthAuthSection = document.getElementById('oauthAuthSection');
         const authorizeGitHubBtn = document.getElementById('authorizeGitHubBtn');
+        const testGitHubConnectionBtn = document.getElementById('testGitHubConnectionBtn');
         
         // 如果元素存在，添加事件監聽器
         if (saveGitHubSettingsBtn) {
@@ -93,6 +94,13 @@ class Admin {
             saveGitHubSettingsBtn.addEventListener('click', () => {
                 this.saveGitHubSettings();
             });
+            
+            // 測試連接按鈕事件
+            if (testGitHubConnectionBtn) {
+                testGitHubConnectionBtn.addEventListener('click', () => {
+                    this.testGitHubConnection();
+                });
+            }
         }
         
         // 如果同步按鈕存在，添加事件監聽器
@@ -124,11 +132,59 @@ class Admin {
                 this.showGitHubStatus('請填寫必填欄位：個人訪問令牌和倉庫名稱', 'danger');
                 return;
             }
+            
+            // 驗證個人訪問令牌格式
+            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(githubToken.value.trim())) {
+                this.showGitHubStatus('個人訪問令牌格式不正確，應以 ghp_ 開頭並包含36個字符', 'danger');
+                return;
+            }
+            
+            // 驗證個人訪問令牌格式
+            if (!/^ghp_[a-zA-Z0-9]{36}$/.test(githubToken.value.trim())) {
+                this.showGitHubStatus('個人訪問令牌格式不正確，應以 ghp_ 開頭並包含36個字符', 'danger');
+                return;
+            }
         } else if (authMethod === 'oauth') {
             if (!this.githubSettings.accessToken || !githubRepo.value) {
                 this.showGitHubStatus('請先完成GitHub OAuth授權並填寫倉庫名稱', 'danger');
                 return;
             }
+        }
+        
+        // 驗證倉庫名稱格式
+        if (!/^[\w.-]+\/[\w.-]+$/.test(githubRepo.value.trim())) {
+            this.showGitHubStatus('倉庫名稱格式不正確，應為 用戶名/倉庫名 格式', 'danger');
+            return;
+        }
+        
+        // 驗證分支名稱
+        if (githubBranch.value.trim() && !/^[\w.-]+$/.test(githubBranch.value.trim())) {
+            this.showGitHubStatus('分支名稱格式不正確，不應包含空格或特殊字符', 'danger');
+            return;
+        }
+        
+        // 驗證檔案路徑
+        if (!githubPath.value.trim()) {
+            this.showGitHubStatus('檔案路徑不能為空', 'danger');
+            return;
+        }
+        
+        // 驗證倉庫名稱格式
+        if (!/^[\w.-]+\/[\w.-]+$/.test(githubRepo.value.trim())) {
+            this.showGitHubStatus('倉庫名稱格式不正確，應為 用戶名/倉庫名 格式', 'danger');
+            return;
+        }
+        
+        // 驗證分支名稱
+        if (githubBranch.value.trim() && !/^[\w.-]+$/.test(githubBranch.value.trim())) {
+            this.showGitHubStatus('分支名稱格式不正確，不應包含空格或特殊字符', 'danger');
+            return;
+        }
+        
+        // 驗證檔案路徑
+        if (!githubPath.value.trim()) {
+            this.showGitHubStatus('檔案路徑不能為空', 'danger');
+            return;
         }
         
         // 更新設置
@@ -149,6 +205,130 @@ class Admin {
         
         // 顯示成功訊息
         this.showGitHubStatus('GitHub設置已保存', 'success');
+        
+        // 詢問用戶是否要測試連接
+        if (confirm('設置已保存。是否要測試GitHub連接？')) {
+            this.testGitHubConnection();
+        }
+    }
+    
+    /**
+     * 測試GitHub連接
+     * 嘗試使用當前設置連接到GitHub API
+     */
+    testGitHubConnection() {
+        // 顯示測試狀態
+        this.showGitHubStatus('正在測試GitHub連接...', 'info');
+        
+        // 檢查設置是否完整
+        if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
+            this.showGitHubStatus('GitHub設置不完整，請先完成設置', 'danger');
+            return;
+        } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
+            this.showGitHubStatus('GitHub OAuth授權不完整，請先完成授權', 'danger');
+            return;
+        }
+        
+        // 準備API請求URL (使用倉庫API端點進行測試)
+        const apiUrl = `https://api.github.com/repos/${this.githubSettings.repo}`;
+        
+        // 準備授權頭
+        let authHeader;
+        if (this.githubSettings.authMethod === 'oauth') {
+            authHeader = `${this.githubSettings.tokenType || 'Bearer'} ${this.githubSettings.accessToken}`;
+        } else {
+            authHeader = `token ${this.githubSettings.token}`;
+        }
+        
+        // 創建或獲取進度條元素
+        const progressContainer = document.getElementById('githubProgressContainer') || this.createProgressContainer();
+        const progressBar = document.getElementById('githubProgressBar');
+        const progressStatus = document.getElementById('githubProgressStatus');
+        
+        // 顯示進度容器
+        progressContainer.classList.remove('d-none');
+        progressBar.style.width = '0%';
+        progressBar.setAttribute('aria-valuenow', '0');
+        progressStatus.textContent = '正在連接GitHub API...';
+        
+        // 更新進度
+        this.updateProgress(30, '正在連接GitHub API...', 'info');
+        
+        // 發送GET請求測試連接
+        fetch(apiUrl, {
+            headers: {
+                'Authorization': authHeader,
+                'Accept': 'application/vnd.github.v3+json'
+            },
+            signal: AbortSignal.timeout(30000) // 30秒超時
+        })
+        .then(response => {
+            if (response.status === 401) {
+                this.updateProgress(100, '授權失敗：請檢查您的訪問令牌是否有效', 'danger');
+                this.showGitHubStatus('授權失敗：請檢查您的訪問令牌是否有效', 'danger');
+                throw new Error('GitHub授權失敗');
+            } else if (response.status === 403) {
+                this.updateProgress(100, '權限不足：請確保令牌有足夠權限', 'danger');
+                this.showGitHubStatus('權限不足：請確保令牌有足夠權限', 'danger');
+                throw new Error('GitHub權限不足');
+            } else if (response.status === 404) {
+                this.updateProgress(100, '找不到倉庫：請檢查倉庫名稱是否正確', 'danger');
+                this.showGitHubStatus('找不到倉庫：請檢查倉庫名稱是否正確', 'danger');
+                throw new Error('GitHub倉庫不存在');
+            } else if (!response.ok) {
+                this.updateProgress(100, `API錯誤：${response.status} - ${response.statusText}`, 'danger');
+                this.showGitHubStatus(`API錯誤：${response.status} - ${response.statusText}`, 'danger');
+                throw new Error(`GitHub API錯誤: ${response.status}`);
+            }
+            
+            this.updateProgress(60, '連接成功，正在獲取倉庫信息...', 'info');
+            return response.json();
+        })
+        .then(repoInfo => {
+            // 測試分支是否存在
+            const branchApiUrl = `https://api.github.com/repos/${this.githubSettings.repo}/branches/${this.githubSettings.branch}`;
+            
+            this.updateProgress(80, '正在檢查分支是否存在...', 'info');
+            
+            return fetch(branchApiUrl, {
+                headers: {
+                    'Authorization': authHeader,
+                    'Accept': 'application/vnd.github.v3+json'
+                }
+            });
+        })
+        .then(response => {
+            if (response.status === 404) {
+                this.updateProgress(100, `分支 '${this.githubSettings.branch}' 不存在，但可以在首次同步時創建`, 'warning');
+                this.showGitHubStatus(`分支 '${this.githubSettings.branch}' 不存在，但可以在首次同步時創建`, 'warning');
+                return null;
+            } else if (!response.ok) {
+                this.updateProgress(100, `檢查分支時出錯：${response.status} - ${response.statusText}`, 'danger');
+                this.showGitHubStatus(`檢查分支時出錯：${response.status} - ${response.statusText}`, 'danger');
+                throw new Error(`檢查分支錯誤: ${response.status}`);
+            }
+            
+            this.updateProgress(100, '連接測試完成，所有設置正確！', 'success');
+            this.showGitHubStatus(`連接測試成功！倉庫 '${this.githubSettings.repo}' 和分支 '${this.githubSettings.branch}' 均可訪問。`, 'success');
+            return response.json();
+        })
+        .catch(error => {
+            console.error('GitHub連接測試錯誤:', error);
+            
+            // 如果尚未顯示特定錯誤，顯示通用錯誤
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                this.updateProgress(100, '網絡連接失敗，請檢查您的網絡連接', 'danger');
+                this.showGitHubStatus('網絡連接失敗，請檢查您的網絡連接', 'danger');
+            } else if (error.name === 'AbortError') {
+                this.updateProgress(100, '請求超時，請稍後再試', 'danger');
+                this.showGitHubStatus('請求超時，請稍後再試', 'danger');
+            } else if (!document.getElementById('githubStatus').classList.contains('alert-danger') && 
+                       !document.getElementById('githubStatus').classList.contains('alert-warning')) {
+                // 只有在沒有顯示其他錯誤時才顯示通用錯誤
+                this.updateProgress(100, `連接測試失敗：${error.message}`, 'danger');
+                this.showGitHubStatus(`連接測試失敗：${error.message}`, 'danger');
+            }
+        });
     }
     
     /**
@@ -591,8 +771,11 @@ class Admin {
         this.showGitHubStatus('正在準備同步數據到GitHub...', 'info');
         
         // 檢查設置是否完整
-        if (!this.githubSettings.token || !this.githubSettings.repo) {
+        if (this.githubSettings.authMethod === 'pat' && (!this.githubSettings.token || !this.githubSettings.repo)) {
             this.showGitHubStatus('GitHub設置不完整，請先配置GitHub設置', 'danger');
+            return;
+        } else if (this.githubSettings.authMethod === 'oauth' && (!this.githubSettings.accessToken || !this.githubSettings.repo)) {
+            this.showGitHubStatus('GitHub OAuth授權不完整，請先完成GitHub授權', 'danger');
             return;
         }
         
@@ -635,17 +818,17 @@ class Admin {
 }
 
 /**
- * 授權GitHub
- * 使用OAuth流程獲取GitHub訪問令牌
- */
-authorizeGitHub() {
-    // 顯示授權狀態
-    const oauthStatus = document.getElementById('oauthStatus');
-    if (oauthStatus) {
-        oauthStatus.textContent = '正在準備GitHub授權...';
-        oauthStatus.className = 'alert alert-info';
-        oauthStatus.classList.remove('d-none');
-    }
+     * 授權GitHub
+     * 使用OAuth流程獲取GitHub訪問令牌
+     */
+    authorizeGitHub() {
+        // 顯示授權狀態
+        const oauthStatus = document.getElementById('oauthStatus');
+        if (oauthStatus) {
+            oauthStatus.textContent = '正在準備GitHub授權...';
+            oauthStatus.className = 'alert alert-info';
+            oauthStatus.classList.remove('d-none');
+        }
     
     // 設置OAuth應用程序參數
     // 注意：實際應用中，應該使用後端服務來處理OAuth流程，以保護client_secret
