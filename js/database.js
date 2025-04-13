@@ -334,12 +334,27 @@ class Database {
                 return resolve({status: 'skipped', reason: 'admin_not_loaded'});
             }
             
-            if (!admin.githubSettings || !admin.githubSettings.token || !admin.githubSettings.repo) {
+            // 檢查GitHub設置是否完整，支持PAT和OAuth兩種認證方式
+            if (!admin.githubSettings || 
+                (!admin.githubSettings.repo) || 
+                (admin.githubSettings.authMethod === 'pat' && !admin.githubSettings.token) || 
+                (admin.githubSettings.authMethod === 'oauth' && !admin.githubSettings.accessToken)) {
                 console.log('GitHub設置不完整，跳過同步');
                 if (showNotification) {
                     this.showSyncNotification('GitHub設置不完整，請先配置GitHub設置', 'warning');
                 }
                 return resolve({status: 'skipped', reason: 'incomplete_settings'});
+            }
+            
+            // 檢查OAuth令牌是否過期
+            if (admin.githubSettings.authMethod === 'oauth' && 
+                admin.githubSettings.expiresAt && 
+                new Date() > new Date(admin.githubSettings.expiresAt)) {
+                console.log('GitHub OAuth令牌已過期，跳過同步');
+                if (showNotification) {
+                    this.showSyncNotification('GitHub OAuth令牌已過期，請重新授權', 'warning');
+                }
+                return resolve({status: 'skipped', reason: 'token_expired'});
             }
             
             console.log('同步數據到GitHub...');
@@ -363,14 +378,21 @@ class Database {
                 admin.uploadToGitHub(syncData)
                     .then(response => {
                         console.log('數據同步完成', response);
-                        // 存儲最後同步時間
-                        localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                        // 存儲最後同步時間和同步信息
+                        const syncInfo = {
+                            timestamp: new Date().toISOString(),
+                            recordCount: books.length,
+                            sha: response.content?.sha || null,
+                            url: response.content?.html_url || null
+                        };
+                        localStorage.setItem('lastGitHubSync', JSON.stringify(syncInfo));
+                        
                         // 觸發同步成功事件
-                        this.triggerSyncEvent('success');
+                        this.triggerSyncEvent('success', syncInfo);
                         if (showNotification) {
-                            this.showSyncNotification('數據已成功同步到GitHub', 'success');
+                            this.showSyncNotification(`數據已成功同步到GitHub (${books.length} 筆記錄)`, 'success');
                         }
-                        resolve({status: 'success', response});
+                        resolve({status: 'success', response, syncInfo});
                     })
                     .catch(error => {
                         console.error('數據同步失敗', error);
@@ -390,7 +412,11 @@ class Database {
                     .then(response => {
                         console.log('數據同步完成（模擬）', response);
                         // 存儲最後同步時間
-                        localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                        localStorage.setItem('lastGitHubSync', JSON.stringify({
+                            timestamp: new Date().toISOString(),
+                            recordCount: books.length,
+                            simulated: true
+                        }));
                         // 觸發同步成功事件
                         this.triggerSyncEvent('success');
                         if (showNotification) {
