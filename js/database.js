@@ -83,9 +83,10 @@ class Database {
     /**
      * 添加書籍
      * @param {Object} book 書籍對象
+     * @param {boolean} skipSync 是否跳過同步到GitHub
      * @returns {Object} 添加後的書籍對象
      */
-    addBook(book) {
+    addBook(book, skipSync = false) {
         const books = this.getAllBooks();
         
         // 生成唯一ID
@@ -101,8 +102,14 @@ class Database {
         // 保存到LocalStorage
         localStorage.setItem('books', JSON.stringify(books));
         
-        // 同步到GitHub (如果已登入)
-        this.syncToGitHub();
+        // 同步到GitHub (如果已登入且未設置跳過同步)
+        if (!skipSync) {
+            this.syncToGitHub(true).catch(error => {
+                console.error('添加書籍後同步到GitHub失敗:', error);
+                // 顯示同步失敗通知
+                this.showSyncNotification(`添加書籍後同步失敗: ${error.message}`, 'warning');
+            });
+        }
         
         return book;
     }
@@ -110,9 +117,10 @@ class Database {
     /**
      * 更新書籍
      * @param {Object} updatedBook 更新後的書籍對象
+     * @param {boolean} skipSync 是否跳過同步到GitHub
      * @returns {Object|null} 更新後的書籍對象或null
      */
-    updateBook(updatedBook) {
+    updateBook(updatedBook, skipSync = false) {
         const books = this.getAllBooks();
         const index = books.findIndex(book => book.id === updatedBook.id);
         
@@ -132,8 +140,14 @@ class Database {
         // 保存到LocalStorage
         localStorage.setItem('books', JSON.stringify(books));
         
-        // 同步到GitHub (如果已登入)
-        this.syncToGitHub();
+        // 同步到GitHub (如果已登入且未設置跳過同步)
+        if (!skipSync) {
+            this.syncToGitHub(true).catch(error => {
+                console.error('更新書籍後同步到GitHub失敗:', error);
+                // 顯示同步失敗通知
+                this.showSyncNotification(`更新書籍後同步失敗: ${error.message}`, 'warning');
+            });
+        }
         
         return updatedBook;
     }
@@ -141,9 +155,10 @@ class Database {
     /**
      * 刪除書籍
      * @param {string} id 書籍ID
+     * @param {boolean} skipSync 是否跳過同步到GitHub
      * @returns {boolean} 是否成功刪除
      */
-    deleteBook(id) {
+    deleteBook(id, skipSync = false) {
         const books = this.getAllBooks();
         const filteredBooks = books.filter(book => book.id !== id);
         
@@ -154,8 +169,14 @@ class Database {
         // 保存到LocalStorage
         localStorage.setItem('books', JSON.stringify(filteredBooks));
         
-        // 同步到GitHub (如果已登入)
-        this.syncToGitHub();
+        // 同步到GitHub (如果已登入且未設置跳過同步)
+        if (!skipSync) {
+            this.syncToGitHub(true).catch(error => {
+                console.error('刪除書籍後同步到GitHub失敗:', error);
+                // 顯示同步失敗通知
+                this.showSyncNotification(`刪除書籍後同步失敗: ${error.message}`, 'warning');
+            });
+        }
         
         return true;
     }
@@ -190,15 +211,25 @@ class Database {
                 updatedBook.createdAt = existingBooks[existingIndex].createdAt;
                 updatedBook.updatedAt = new Date().toISOString();
                 
-                // 更新書籍
-                this.updateBook(updatedBook);
+                // 更新書籍 (跳過同步，稍後批量同步)
+                this.updateBook(updatedBook, true);
                 updatedCount++;
             } else {
-                // 添加新書籍
-                this.addBook(importBook);
+                // 添加新書籍 (跳過同步，稍後批量同步)
+                this.addBook(importBook, true);
                 importedCount++;
             }
         });
+        
+        // 如果有新增或更新的書籍，進行一次GitHub同步
+        if (importedCount > 0 || updatedCount > 0) {
+            // 使用Promise處理同步，但不等待完成
+            this.syncToGitHub(true).catch(error => {
+                console.error('匯入書籍後同步到GitHub失敗:', error);
+                // 顯示同步失敗通知
+                this.showSyncNotification(`匯入書籍後同步失敗: ${error.message}`, 'warning');
+            });
+        }
         
         return {
             imported: importedCount,
@@ -286,58 +317,100 @@ class Database {
     
     /**
      * 同步數據到GitHub
-     * 使用GitHub API進行數據同步
+     * @param {boolean} showNotification 是否顯示通知
+     * @returns {Promise} 同步結果的Promise
      */
-    syncToGitHub() {
-        // 檢查是否已登入
-        if (!auth || !auth.isLoggedIn()) {
-            return;
-        }
-        
-        console.log('同步數據到GitHub...');
-        
-        // 獲取所有書籍數據
-        const books = this.getAllBooks();
-        
-        // 創建要上傳的數據對象
-        const syncData = {
-            books: books,
-            lastSync: new Date().toISOString(),
-            version: '1.0'
-        };
-        
-        // 檢查admin實例是否存在
-        if (typeof admin !== 'undefined' && admin.uploadToGitHub) {
-            // 使用admin.js中的uploadToGitHub函數
-            admin.uploadToGitHub(syncData)
-                .then(response => {
-                    console.log('數據同步完成', response);
-                    // 存儲最後同步時間
-                    localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                    // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
-                })
-                .catch(error => {
-                    console.error('數據同步失敗', error);
-                    // 觸發同步失敗事件
-                    this.triggerSyncEvent('error', error);
-                });
-        } else {
-            // 如果admin實例不存在，使用模擬API請求
-            this.simulateGitHubApiRequest(JSON.stringify(syncData, null, 2))
-                .then(response => {
-                    console.log('數據同步完成（模擬）', response);
-                    // 存儲最後同步時間
-                    localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                    // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
-                })
-                .catch(error => {
-                    console.error('數據同步失敗', error);
-                    // 觸發同步失敗事件
-                    this.triggerSyncEvent('error', error);
-                });
-        }
+    syncToGitHub(showNotification = false) {
+        return new Promise((resolve, reject) => {
+            // 檢查是否已登入
+            if (!auth || !auth.isLoggedIn()) {
+                console.log('用戶未登入，跳過GitHub同步');
+                return resolve({status: 'skipped', reason: 'not_logged_in'});
+            }
+            
+            // 檢查GitHub設置是否完整
+            if (typeof admin === 'undefined') {
+                console.log('Admin模組未載入，跳過GitHub同步');
+                return resolve({status: 'skipped', reason: 'admin_not_loaded'});
+            }
+            
+            if (!admin.githubSettings || !admin.githubSettings.token || !admin.githubSettings.repo) {
+                console.log('GitHub設置不完整，跳過同步');
+                if (showNotification) {
+                    this.showSyncNotification('GitHub設置不完整，請先配置GitHub設置', 'warning');
+                }
+                return resolve({status: 'skipped', reason: 'incomplete_settings'});
+            }
+            
+            console.log('同步數據到GitHub...');
+            if (showNotification) {
+                this.showSyncNotification('正在同步數據到GitHub...', 'info');
+            }
+            
+            // 獲取所有書籍數據
+            const books = this.getAllBooks();
+            
+            // 創建要上傳的數據對象
+            const syncData = {
+                books: books,
+                lastSync: new Date().toISOString(),
+                version: '1.0'
+            };
+            
+            // 檢查admin實例是否存在且uploadToGitHub方法可用
+            if (admin.uploadToGitHub) {
+                // 使用admin.js中的uploadToGitHub函數
+                admin.uploadToGitHub(syncData)
+                    .then(response => {
+                        console.log('數據同步完成', response);
+                        // 存儲最後同步時間
+                        localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                        // 觸發同步成功事件
+                        this.triggerSyncEvent('success');
+                        if (showNotification) {
+                            this.showSyncNotification('數據已成功同步到GitHub', 'success');
+                        }
+                        resolve({status: 'success', response});
+                    })
+                    .catch(error => {
+                        console.error('數據同步失敗', error);
+                        // 在控制台顯示詳細錯誤信息，幫助調試
+                        console.error('同步錯誤詳情:', error.stack || error);
+                        // 觸發同步失敗事件
+                        this.triggerSyncEvent('error', error);
+                        if (showNotification) {
+                            this.showSyncNotification(`同步失敗: ${error.message}`, 'danger');
+                        }
+                        reject(error);
+                    });
+            } else {
+                // 如果uploadToGitHub方法不可用，使用模擬API請求
+                console.log('使用模擬API請求進行同步');
+                this.simulateGitHubApiRequest(JSON.stringify(syncData, null, 2))
+                    .then(response => {
+                        console.log('數據同步完成（模擬）', response);
+                        // 存儲最後同步時間
+                        localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                        // 觸發同步成功事件
+                        this.triggerSyncEvent('success');
+                        if (showNotification) {
+                            this.showSyncNotification('數據已成功同步到GitHub (模擬)', 'success');
+                        }
+                        resolve({status: 'success', response, simulated: true});
+                    })
+                    .catch(error => {
+                        console.error('數據同步失敗', error);
+                        // 在控制台顯示詳細錯誤信息，幫助調試
+                        console.error('同步錯誤詳情:', error.stack || error);
+                        // 觸發同步失敗事件
+                        this.triggerSyncEvent('error', error);
+                        if (showNotification) {
+                            this.showSyncNotification(`同步失敗: ${error.message}`, 'danger');
+                        }
+                        reject(error);
+                    });
+            }
+        });
     }
     
     /**
@@ -380,6 +453,68 @@ class Database {
         
         // 分發事件
         document.dispatchEvent(event);
+    }
+    
+    /**
+     * 顯示同步通知
+     * @param {string} message 通知訊息
+     * @param {string} type 通知類型 (success, warning, danger, info)
+     */
+    showSyncNotification(message, type = 'info') {
+        // 檢查是否有通知容器
+        let notificationContainer = document.getElementById('syncNotificationContainer');
+        
+        // 如果沒有，創建一個
+        if (!notificationContainer) {
+            notificationContainer = document.createElement('div');
+            notificationContainer.id = 'syncNotificationContainer';
+            notificationContainer.style.position = 'fixed';
+            notificationContainer.style.bottom = '20px';
+            notificationContainer.style.right = '20px';
+            notificationContainer.style.zIndex = '9999';
+            document.body.appendChild(notificationContainer);
+        }
+        
+        // 創建通知元素
+        const notification = document.createElement('div');
+        notification.className = `alert alert-${type} alert-dismissible fade show`;
+        notification.role = 'alert';
+        
+        // 添加圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
+        
+        // 設置通知內容
+        notification.innerHTML = `
+            ${icon}
+            <strong>GitHub同步:</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="關閉"></button>
+        `;
+        
+        // 添加到容器
+        notificationContainer.appendChild(notification);
+        
+        // 設置自動消失
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                notification.remove();
+            }, 300);
+        }, 5000);
     }
 }
 

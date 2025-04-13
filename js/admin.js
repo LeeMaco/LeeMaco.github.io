@@ -31,6 +31,7 @@ class Admin {
     initEventListeners() {
         // 獲取元素引用
         const saveGitHubSettingsBtn = document.getElementById('saveGitHubSettingsBtn');
+        const syncGitHubBtn = document.getElementById('syncGitHubBtn');
         const githubToken = document.getElementById('githubToken');
         const githubRepo = document.getElementById('githubRepo');
         const githubBranch = document.getElementById('githubBranch');
@@ -47,6 +48,13 @@ class Admin {
             // 保存設置按鈕事件
             saveGitHubSettingsBtn.addEventListener('click', () => {
                 this.saveGitHubSettings();
+            });
+        }
+        
+        // 如果同步按鈕存在，添加事件監聽器
+        if (syncGitHubBtn) {
+            syncGitHubBtn.addEventListener('click', () => {
+                this.manualSyncToGitHub();
             });
         }
     }
@@ -299,8 +307,15 @@ class Admin {
                     progressContainer.classList.add('d-none');
                 }, 3000);
                 
+                // 確保將數據保存到localStorage，這樣即使頁面刷新也能保持同步狀態
+                localStorage.setItem('lastGitHubSyncData', JSON.stringify({
+                    timestamp: new Date().toISOString(),
+                    sha: data.content.sha,
+                    url: data.content.html_url
+                }));
+                
                 // 觸發同步成功事件
-                this.triggerSyncEvent('success');
+                this.triggerSyncEvent('success', data);
                 
                 resolve(data);
             })
@@ -474,6 +489,57 @@ class Admin {
         
         // 分發事件
         document.dispatchEvent(event);
+    }
+    
+    /**
+     * 手動同步數據到GitHub
+     * 用戶可以通過UI按鈕觸發此功能
+     */
+    manualSyncToGitHub() {
+        // 顯示同步開始訊息
+        this.showGitHubStatus('正在準備同步數據到GitHub...', 'info');
+        
+        // 檢查設置是否完整
+        if (!this.githubSettings.token || !this.githubSettings.repo) {
+            this.showGitHubStatus('GitHub設置不完整，請先配置GitHub設置', 'danger');
+            return;
+        }
+        
+        // 獲取所有書籍數據
+        const books = db.getAllBooks();
+        
+        // 檢查是否有數據
+        if (!books || books.length === 0) {
+            this.showGitHubStatus('沒有書籍數據可同步', 'warning');
+            return;
+        }
+        
+        // 創建要上傳的數據對象
+        const syncData = {
+            books: books,
+            lastSync: new Date().toISOString(),
+            version: '1.0'
+        };
+        
+        // 上傳到GitHub
+        this.uploadToGitHub(syncData)
+            .then(data => {
+                console.log('手動同步成功:', data);
+                this.showGitHubStatus(`同步成功！共同步了 ${books.length} 筆書籍記錄`, 'success');
+                
+                // 更新最後同步時間
+                localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                
+                // 觸發同步成功事件
+                this.triggerSyncEvent('success', data);
+            })
+            .catch(error => {
+                console.error('手動同步失敗:', error);
+                this.showGitHubStatus(`同步失敗: ${error.message}`, 'danger');
+                
+                // 觸發同步失敗事件
+                this.triggerSyncEvent('error', error);
+            });
     }
 }
 
