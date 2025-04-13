@@ -47,66 +47,117 @@ class Admin {
         const authorizeGitHubBtn = document.getElementById('authorizeGitHubBtn');
         const testGitHubConnectionBtn = document.getElementById('testGitHubConnectionBtn');
         
-        // 如果元素存在，添加事件監聽器
-        if (saveGitHubSettingsBtn) {
-            // 載入現有設置
-            if (githubToken) githubToken.value = this.githubSettings.token || '';
-            if (githubRepo) githubRepo.value = this.githubSettings.repo || '';
-            if (githubBranch) githubBranch.value = this.githubSettings.branch || 'main';
-            if (githubPath) githubPath.value = this.githubSettings.path || 'books-data.json';
+        // 載入現有設置
+        if (githubToken) githubToken.value = this.githubSettings.token || '';
+        if (githubRepo) githubRepo.value = this.githubSettings.repo || '';
+        if (githubBranch) githubBranch.value = this.githubSettings.branch || 'main';
+        if (githubPath) githubPath.value = this.githubSettings.path || 'books-data.json';
+        
+        // 設置認證方式選項
+        if (patAuth && oauthAuth) {
+            if (this.githubSettings.authMethod === 'oauth') {
+                oauthAuth.checked = true;
+                if (patAuthSection) patAuthSection.classList.add('d-none');
+                if (oauthAuthSection) oauthAuthSection.classList.remove('d-none');
+            } else {
+                patAuth.checked = true;
+                if (patAuthSection) patAuthSection.classList.remove('d-none');
+                if (oauthAuthSection) oauthAuthSection.classList.add('d-none');
+            }
             
-            // 設置認證方式選項
-            if (patAuth && oauthAuth) {
-                if (this.githubSettings.authMethod === 'oauth') {
-                    oauthAuth.checked = true;
-                    if (patAuthSection) patAuthSection.classList.add('d-none');
-                    if (oauthAuthSection) oauthAuthSection.classList.remove('d-none');
-                } else {
-                    patAuth.checked = true;
+            // 認證方式切換事件
+            patAuth.addEventListener('change', () => {
+                if (patAuth.checked) {
                     if (patAuthSection) patAuthSection.classList.remove('d-none');
                     if (oauthAuthSection) oauthAuthSection.classList.add('d-none');
                 }
-                
-                // 認證方式切換事件
-                patAuth.addEventListener('change', () => {
-                    if (patAuth.checked) {
-                        if (patAuthSection) patAuthSection.classList.remove('d-none');
-                        if (oauthAuthSection) oauthAuthSection.classList.add('d-none');
-                    }
-                });
-                
-                oauthAuth.addEventListener('change', () => {
-                    if (oauthAuth.checked) {
-                        if (patAuthSection) patAuthSection.classList.add('d-none');
-                        if (oauthAuthSection) oauthAuthSection.classList.remove('d-none');
-                    }
-                });
-            }
+            });
             
-            // 授權GitHub按鈕事件
-            if (authorizeGitHubBtn) {
-                authorizeGitHubBtn.addEventListener('click', () => {
-                    this.authorizeGitHub();
-                });
-            }
-            
-            // 保存設置按鈕事件
+            oauthAuth.addEventListener('change', () => {
+                if (oauthAuth.checked) {
+                    if (patAuthSection) patAuthSection.classList.add('d-none');
+                    if (oauthAuthSection) oauthAuthSection.classList.remove('d-none');
+                }
+            });
+        }
+        
+        // 授權GitHub按鈕事件
+        if (authorizeGitHubBtn) {
+            authorizeGitHubBtn.addEventListener('click', () => {
+                this.authorizeGitHub();
+            });
+        }
+        
+        // 保存設置按鈕事件 - 直接綁定事件，不需要檢查saveGitHubSettingsBtn是否存在
+        if (saveGitHubSettingsBtn) {
             saveGitHubSettingsBtn.addEventListener('click', () => {
                 this.saveGitHubSettings();
             });
-            
-            // 測試連接按鈕事件
-            if (testGitHubConnectionBtn) {
-                testGitHubConnectionBtn.addEventListener('click', () => {
-                    this.testGitHubConnection();
-                });
-            }
+        } else {
+            console.error('找不到儲存設定按鈕元素');
+            // 嘗試在DOM加載完成後再次綁定
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('saveGitHubSettingsBtn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        this.saveGitHubSettings();
+                    });
+                }
+            });
+        }
+        
+        // 測試連接按鈕事件
+        if (testGitHubConnectionBtn) {
+            testGitHubConnectionBtn.addEventListener('click', () => {
+                this.testGitHubConnection();
+            });
+        } else {
+            console.error('找不到測試連接按鈕元素');
+            // 嘗試在DOM加載完成後再次綁定
+            document.addEventListener('DOMContentLoaded', () => {
+                const btn = document.getElementById('testGitHubConnectionBtn');
+                if (btn) {
+                    btn.addEventListener('click', () => {
+                        this.testGitHubConnection();
+                    });
+                }
+            });
         }
         
         // 如果同步按鈕存在，添加事件監聽器
         if (syncGitHubBtn) {
             syncGitHubBtn.addEventListener('click', () => {
                 this.manualSyncToGitHub();
+            });
+        }
+        
+        // 監聽GitHub設置模態框顯示事件，確保在模態框顯示時綁定按鈕事件
+        const githubSettingsModal = document.getElementById('githubSettingsModal');
+        if (githubSettingsModal) {
+            githubSettingsModal.addEventListener('shown.bs.modal', () => {
+                // 重新獲取按鈕引用並綁定事件
+                const saveBtn = document.getElementById('saveGitHubSettingsBtn');
+                const testBtn = document.getElementById('testGitHubConnectionBtn');
+                
+                if (saveBtn) {
+                    // 移除可能存在的舊事件監聽器
+                    saveBtn.replaceWith(saveBtn.cloneNode(true));
+                    // 獲取新的引用並綁定事件
+                    const newSaveBtn = document.getElementById('saveGitHubSettingsBtn');
+                    newSaveBtn.addEventListener('click', () => {
+                        this.saveGitHubSettings();
+                    });
+                }
+                
+                if (testBtn) {
+                    // 移除可能存在的舊事件監聽器
+                    testBtn.replaceWith(testBtn.cloneNode(true));
+                    // 獲取新的引用並綁定事件
+                    const newTestBtn = document.getElementById('testGitHubConnectionBtn');
+                    newTestBtn.addEventListener('click', () => {
+                        this.testGitHubConnection();
+                    });
+                }
             });
         }
     }
