@@ -196,8 +196,50 @@ class App {
      * 載入書籍數據
      */
     loadBooks() {
+        // 添加數據加載中的提示
+        if (this.noResults) {
+            this.noResults.classList.remove('d-none');
+            this.noResults.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>正在加載書籍數據...</div>';
+        }
+        
+        // 獲取書籍數據
         const books = db.getAllBooks();
+        
+        // 顯示書籍
         this.displayBooks(books);
+        
+        // 監聽數據加載完成事件，用於處理異步加載的情況
+        document.addEventListener('booksLoaded', (event) => {
+            console.log('檢測到書籍數據加載完成事件');
+            
+            // 嘗試從事件詳情中獲取書籍數據
+            let updatedBooks = [];
+            if (event.detail && Array.isArray(event.detail.books)) {
+                console.log(`從事件中獲取到${event.detail.books.length}筆書籍數據`);
+                updatedBooks = event.detail.books;
+            } else {
+                // 如果事件中沒有數據，則從數據庫獲取
+                console.log('從數據庫重新獲取書籍數據');
+                updatedBooks = db.getAllBooks();
+            }
+            
+            // 顯示更新後的書籍數據
+            this.displayBooks(updatedBooks);
+            
+            // 更新UI狀態
+            if (this.noResults && updatedBooks.length === 0) {
+                this.noResults.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合條件的書籍資料</div>';
+            }
+        }, { once: true });
+        
+        // 如果5秒後仍未收到數據加載事件，嘗試再次加載
+        setTimeout(() => {
+            const currentBooks = db.getAllBooks();
+            if (currentBooks.length === 0) {
+                console.log('數據加載超時，嘗試重新加載');
+                db.loadDefaultBooks();
+            }
+        }, 5000);
     }
     
     /**
@@ -215,6 +257,14 @@ class App {
      * @param {Array} books 書籍數組
      */
     displayBooks(books) {
+        console.log(`顯示書籍列表: ${books.length}筆資料`);
+        
+        // 確保books是數組
+        if (!Array.isArray(books)) {
+            console.error('顯示書籍時收到非數組數據:', books);
+            books = [];
+        }
+        
         // 清空表格
         this.booksTableBody.innerHTML = '';
         

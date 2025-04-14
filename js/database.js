@@ -14,8 +14,9 @@ class Database {
      */
     initDatabase() {
         // 檢查是否已有書籍數據
-        if (!localStorage.getItem('books')) {
-            localStorage.setItem('books', JSON.stringify([]));
+        if (!localStorage.getItem('books') || JSON.parse(localStorage.getItem('books')).length === 0) {
+            // 嘗試從data/books.json加載預設數據
+            this.loadDefaultBooks();
         }
         
         // 檢查是否已有備份設定
@@ -42,7 +43,119 @@ class Database {
      * @returns {Array} 書籍數組
      */
     getAllBooks() {
-        return JSON.parse(localStorage.getItem('books')) || [];
+        let books = [];
+        
+        try {
+            // 嘗試從localStorage獲取數據
+            books = JSON.parse(localStorage.getItem('books')) || [];
+        } catch (error) {
+            console.warn('從localStorage獲取數據失敗:', error);
+            // 如果localStorage失敗，嘗試從全局變量獲取
+            books = window._booksData || [];
+        }
+        
+        // 如果books為空，嘗試再次加載預設數據
+        if (books.length === 0) {
+            this.loadDefaultBooks();
+            // 再次嘗試獲取數據
+            try {
+                books = JSON.parse(localStorage.getItem('books')) || [];
+            } catch (error) {
+                books = window._booksData || [];
+            }
+        }
+        
+        return books;
+    }
+    
+    /**
+     * 加載預設書籍數據
+     * 從data/books.json加載預設數據，解決手機上無法顯示數據的問題
+     */
+    loadDefaultBooks() {
+        console.log('嘗試加載預設書籍數據...');
+        try {
+            // 使用fetch API從data/books.json加載預設數據
+            fetch('data/books.json')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(data => {
+                    if (Array.isArray(data) && data.length > 0) {
+                        console.log(`成功加載${data.length}筆預設書籍數據`);
+                        // 嘗試使用localStorage保存數據
+                        try {
+                            localStorage.setItem('books', JSON.stringify(data));
+                        } catch (storageError) {
+                            console.warn('無法保存到localStorage:', storageError);
+                            // 在localStorage失敗的情況下，使用全局變數作為備份
+                            window._booksData = data;
+                        }
+                        // 觸發數據加載完成事件
+                        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: data } }));
+                    } else {
+                        console.warn('預設數據格式不正確或為空');
+                    }
+                })
+                .catch(error => {
+                    console.error('加載預設數據失敗:', error);
+                    // 加載失敗時，提供一些基本的示例數據
+                    this.useHardcodedData();
+                });
+        } catch (error) {
+            console.error('加載預設數據時發生錯誤:', error);
+            // 發生錯誤時，使用硬編碼的示例數據
+            this.useHardcodedData();
+        }
+    },
+    
+    /**
+     * 使用硬編碼的示例數據
+     * 當所有其他方法都失敗時的最後手段
+     */
+    useHardcodedData() {
+        console.log('使用硬編碼的示例數據');
+        const sampleData = [
+            {
+                "id": "sample1",
+                "title": "示例書籍1",
+                "author": "示例作者",
+                "category": "示例類別",
+                "cabinet": "A",
+                "row": "1",
+                "publisher": "示例出版社",
+                "description": "這是一本示例書籍",
+                "isbn": "9789571234567",
+                "createdAt": new Date().toISOString(),
+                "updatedAt": new Date().toISOString()
+            },
+            {
+                "id": "sample2",
+                "title": "示例書籍2",
+                "author": "另一位作者",
+                "category": "另一個類別",
+                "cabinet": "B",
+                "row": "2",
+                "publisher": "另一家出版社",
+                "description": "這是另一本示例書籍",
+                "isbn": "9789571234568",
+                "createdAt": new Date().toISOString(),
+                "updatedAt": new Date().toISOString()
+            }
+        ];
+        
+        try {
+            localStorage.setItem('books', JSON.stringify(sampleData));
+        } catch (storageError) {
+            console.warn('無法保存硬編碼數據到localStorage:', storageError);
+            window._booksData = sampleData;
+        }
+        
+        // 觸發數據加載完成事件
+        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: sampleData } }));
     }
     
     /**
