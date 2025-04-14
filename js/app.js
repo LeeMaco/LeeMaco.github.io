@@ -205,6 +205,14 @@ class App {
             document.addEventListener('booksLoaded', (event) => {
                 const count = event.detail?.count || 0;
                 this.showMessage(`已成功載入 ${count} 筆書籍數據`, 'success');
+                
+                // 獲取並顯示書籍數據
+                const books = db.getAllBooks();
+                this.displayBooks(books);
+                console.log(`已顯示 ${books.length} 筆書籍數據`);
+                
+                // 更新結果計數
+                this.updateResultCount(books.length);
             }, { once: true });
             
             // 添加書籍載入錯誤事件監聽器
@@ -212,6 +220,14 @@ class App {
                 const errorMsg = event.detail?.error || '未知錯誤';
                 this.showMessage(`載入數據時發生錯誤: ${errorMsg}`, 'danger');
                 console.error('數據庫初始化錯誤:', errorMsg);
+                
+                // 嘗試使用默認數據
+                const defaultBooks = db.getDefaultBooks ? db.getDefaultBooks() : [];
+                if (defaultBooks.length > 0) {
+                    this.displayBooks(defaultBooks);
+                    this.updateResultCount(defaultBooks.length);
+                    this.showMessage(`已載入 ${defaultBooks.length} 筆默認書籍數據`, 'info');
+                }
             }, { once: true });
             
             // 獲取書籍數據
@@ -225,7 +241,7 @@ class App {
                 this.showMessage('正在嘗試載入示例數據...', 'info');
                 
                 // 嘗試從books.json直接載入
-                fetch('data/books.json')
+                fetch('./data/books.json')
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
@@ -240,44 +256,89 @@ class App {
                             // 重新載入書籍
                             const updatedBooks = db.getAllBooks();
                             this.displayBooks(updatedBooks);
+                            this.updateResultCount(updatedBooks.length);
                             this.showMessage(`已成功載入 ${updatedBooks.length} 筆書籍數據 (新增: ${result.imported}, 更新: ${result.updated})`, 'success');
                         } else {
-                            this.displayBooks([]);
-                            this.showMessage('示例數據文件為空或格式不正確', 'warning');
-                            // 顯示更詳細的錯誤提示
-                            if (this.noResults) {
-                                this.noResults.classList.remove('d-none');
-                                this.noResults.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>示例數據文件為空或格式不正確，請手動添加書籍或檢查數據文件</div>';
+                            // 嘗試使用默認數據
+                            const defaultBooks = db.getDefaultBooks ? db.getDefaultBooks() : [];
+                            if (defaultBooks.length > 0) {
+                                const result = db.importBooks(defaultBooks, false);
+                                const updatedBooks = db.getAllBooks();
+                                this.displayBooks(updatedBooks);
+                                this.updateResultCount(updatedBooks.length);
+                                this.showMessage(`已載入 ${updatedBooks.length} 筆默認書籍數據`, 'info');
+                            } else {
+                                this.displayBooks([]);
+                                this.showMessage('示例數據文件為空或格式不正確', 'warning');
+                                // 顯示更詳細的錯誤提示
+                                if (this.noResults) {
+                                    this.noResults.classList.remove('d-none');
+                                    this.noResults.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>示例數據文件為空或格式不正確，請手動添加書籍或檢查數據文件</div>';
+                                }
                             }
                         }
                     })
                     .catch(error => {
                         console.error('載入books.json失敗:', error);
-                        this.displayBooks([]);
-                        this.showMessage(`無法載入示例數據: ${error.message}`, 'danger');
                         
-                        // 顯示更詳細的錯誤提示
-                        if (this.noResults) {
-                            this.noResults.classList.remove('d-none');
-                            this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>載入示例數據失敗: ${error.message}<br>請檢查網絡連接或手動添加書籍</div>`;
+                        // 嘗試使用默認數據
+                        const defaultBooks = db.getDefaultBooks ? db.getDefaultBooks() : [];
+                        if (defaultBooks.length > 0) {
+                            const result = db.importBooks(defaultBooks, false);
+                            const updatedBooks = db.getAllBooks();
+                            this.displayBooks(updatedBooks);
+                            this.updateResultCount(updatedBooks.length);
+                            this.showMessage(`已載入 ${updatedBooks.length} 筆默認書籍數據`, 'info');
+                        } else {
+                            this.displayBooks([]);
+                            this.showMessage(`無法載入示例數據: ${error.message}`, 'danger');
+                            
+                            // 顯示更詳細的錯誤提示
+                            if (this.noResults) {
+                                this.noResults.classList.remove('d-none');
+                                this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>載入示例數據失敗: ${error.message}<br>請檢查網絡連接或手動添加書籍</div>`;
+                            }
                         }
                     });
             } else {
                 // 顯示已載入的書籍
                 this.displayBooks(books);
+                this.updateResultCount(books.length);
                 console.log(`已顯示 ${books.length} 筆書籍數據`);
                 this.showMessage(`已載入 ${books.length} 筆書籍數據`, 'success');
             }
         } catch (error) {
             console.error('載入書籍數據時發生錯誤:', error);
-            this.showMessage(`載入數據時發生錯誤: ${error.message}`, 'danger');
-            this.displayBooks([]);
             
-            // 顯示更詳細的錯誤提示
-            if (this.noResults) {
-                this.noResults.classList.remove('d-none');
-                this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>載入數據時發生錯誤: ${error.message}<br>請刷新頁面重試或聯繫管理員</div>`;
+            // 嘗試使用默認數據
+            const defaultBooks = db.getDefaultBooks ? db.getDefaultBooks() : [];
+            if (defaultBooks.length > 0) {
+                const result = db.importBooks(defaultBooks, false);
+                const updatedBooks = db.getAllBooks();
+                this.displayBooks(updatedBooks);
+                this.updateResultCount(updatedBooks.length);
+                this.showMessage(`已載入 ${updatedBooks.length} 筆默認書籍數據`, 'info');
+            } else {
+                this.showMessage(`載入數據時發生錯誤: ${error.message}`, 'danger');
+                this.displayBooks([]);
+                
+                // 顯示更詳細的錯誤提示
+                if (this.noResults) {
+                    this.noResults.classList.remove('d-none');
+                    this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>載入數據時發生錯誤: ${error.message}<br>請刷新頁面重試或聯繫管理員</div>`;
+                }
             }
+        }
+    }
+    
+    /**
+     * 更新結果計數
+     * @param {number} count 書籍數量
+     */
+    updateResultCount(count) {
+        if (this.resultCount) {
+            this.resultCount.textContent = `${count} 筆資料`;
+            this.resultCount.className = count > 0 ? 'badge bg-primary' : 'badge bg-warning';
         }
     }
     

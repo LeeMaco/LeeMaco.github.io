@@ -18,7 +18,7 @@ class Database {
             // 初始化時添加示例數據
             try {
                 // 嘗試從books.json載入示例數據
-                fetch('data/books.json')
+                fetch('./data/books.json')
                     .then(response => {
                         if (!response.ok) {
                             throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
@@ -29,24 +29,32 @@ class Database {
                         if (!data || !Array.isArray(data)) {
                             throw new Error('數據格式無效，應為數組');
                         }
-                        localStorage.setItem('books', JSON.stringify(data));
-                        console.log(`已從books.json載入 ${data.length} 筆示例數據`);
-                        // 觸發數據載入完成事件
-                        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: data.length } }));
+                        // 確保數據有效後再保存
+                        if (data.length > 0) {
+                            localStorage.setItem('books', JSON.stringify(data));
+                            console.log(`已從books.json載入 ${data.length} 筆示例數據`);
+                            // 觸發數據載入完成事件
+                            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: data.length } }));
+                        } else {
+                            throw new Error('數據文件為空');
+                        }
                     })
                     .catch(error => {
                         console.error('載入示例數據失敗:', error);
-                        // 如果載入失敗，設置空數組
-                        localStorage.setItem('books', JSON.stringify([]));
-                        // 觸發載入失敗事件
-                        document.dispatchEvent(new CustomEvent('booksLoadError', { detail: { error: error.message } }));
+                        // 如果載入失敗，設置默認示例數據
+                        const defaultBooks = this.getDefaultBooks();
+                        localStorage.setItem('books', JSON.stringify(defaultBooks));
+                        console.log(`已載入 ${defaultBooks.length} 筆默認示例數據`);
+                        // 觸發數據載入完成事件
+                        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: defaultBooks.length } }));
                     });
             } catch (error) {
                 console.error('初始化數據庫時發生錯誤:', error);
-                // 確保即使出錯也設置一個空數組
-                localStorage.setItem('books', JSON.stringify([]));
-                // 觸發載入失敗事件
-                document.dispatchEvent(new CustomEvent('booksLoadError', { detail: { error: error.message } }));
+                // 確保即使出錯也設置默認示例數據
+                const defaultBooks = this.getDefaultBooks();
+                localStorage.setItem('books', JSON.stringify(defaultBooks));
+                // 觸發載入完成事件
+                document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: defaultBooks.length } }));
             }
         }
         
@@ -264,6 +272,83 @@ class Database {
             filtered: filteredCount,
             updated: updatedCount
         };
+    }
+    
+    /**
+     * 獲取默認書籍數據
+     * @returns {Array} 默認書籍數組
+     */
+    getDefaultBooks() {
+        return [
+            {
+                "id": "1",
+                "title": "JavaScript高級程序設計",
+                "author": "Nicholas C. Zakas",
+                "volume": "1",
+                "category": "science",
+                "cabinet": "A",
+                "row": "3",
+                "publisher": "人民郵電出版社",
+                "description": "全面介紹JavaScript語言核心的ECMAScript和DOM、BOM等API",
+                "isbn": "9787115275790",
+                "notes": "第四版",
+                "series": "前端開發系列"
+            },
+            {
+                "id": "2",
+                "title": "三體",
+                "author": "劉慈欣",
+                "volume": "1",
+                "category": "fiction",
+                "cabinet": "B",
+                "row": "2",
+                "publisher": "重慶出版社",
+                "description": "中國科幻小說的里程碑之作",
+                "isbn": "9787536692930",
+                "notes": "雨果獎獲獎作品",
+                "series": "三體三部曲"
+            },
+            {
+                "id": "3",
+                "title": "人類簡史",
+                "author": "尤瓦爾·赫拉利",
+                "category": "history",
+                "cabinet": "C",
+                "row": "1",
+                "publisher": "中信出版社",
+                "description": "從動物到上帝的人類發展史",
+                "isbn": "9787508647357",
+                "series": "簡史系列"
+            },
+            {
+                "id": "4",
+                "title": "三體II：黑暗森林",
+                "author": "劉慈欣",
+                "volume": "2",
+                "category": "fiction",
+                "cabinet": "B",
+                "row": "2",
+                "publisher": "重慶出版社",
+                "description": "宇宙社會學黑暗森林法則的精彩闡述",
+                "isbn": "9787536693968",
+                "notes": "三體三部曲第二部",
+                "series": "三體三部曲"
+            },
+            {
+                "id": "5",
+                "title": "三體III：死神永生",
+                "author": "劉慈欣",
+                "volume": "3",
+                "category": "fiction",
+                "cabinet": "B",
+                "row": "2",
+                "publisher": "重慶出版社",
+                "description": "宇宙盡頭與時間盡頭的終極思考",
+                "isbn": "9787229030933",
+                "notes": "三體三部曲第三部",
+                "series": "三體三部曲"
+            }
+        ];
     }
     
     /**
