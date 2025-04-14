@@ -39,9 +39,6 @@ class Database {
         } else {
             // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
             this.autoSyncFromGitHub();
-        } else {
-            // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
-            this.autoSyncFromGitHub();
         }
         
         // 檢查是否已有備份設定
