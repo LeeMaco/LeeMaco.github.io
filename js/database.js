@@ -36,6 +36,12 @@ class Database {
                     // 如果GitHub載入失敗，嘗試從本地JSON文件載入
                     this.loadBooksFromLocalFile();
                 });
+        } else {
+            // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
+            this.autoSyncFromGitHub();
+        } else {
+            // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
+            this.autoSyncFromGitHub();
         }
         
         // 檢查是否已有備份設定
@@ -182,6 +188,69 @@ class Database {
             // 發生錯誤時返回空數組
             return [];
         }
+    }
+    
+    /**
+     * 自動從GitHub同步最新數據
+     * 在用戶進入首頁時自動調用，不影響用戶體驗
+     */
+    autoSyncFromGitHub() {
+        console.log('嘗試自動從GitHub同步最新數據...');
+        
+        // 檢查上次同步時間，避免頻繁同步
+        const lastSync = localStorage.getItem('lastGitHubSync');
+        if (lastSync) {
+            const lastSyncTime = new Date(lastSync).getTime();
+            const currentTime = new Date().getTime();
+            const timeDiff = currentTime - lastSyncTime;
+            
+            // 如果距離上次同步不到30分鐘，則跳過自動同步
+            if (timeDiff < 30 * 60 * 1000) {
+                console.log(`距離上次同步僅 ${Math.floor(timeDiff / 1000 / 60)} 分鐘，跳過自動同步`);
+                return;
+            }
+        }
+        
+        // 嘗試從GitHub獲取最新數據
+        this.fetchBooksFromGitHub()
+            .then(data => {
+                if (data && data.books && Array.isArray(data.books)) {
+                    // 更新本地存儲
+                    localStorage.setItem('books', JSON.stringify(data.books));
+                    console.log(`自動同步完成：成功從GitHub載入 ${data.books.length} 筆書籍數據`);
+                    
+                    // 觸發數據更新事件
+                    this.handleDataLoaded('github', data.books.length);
+                    
+                    // 觸發同步成功事件
+                    this.triggerSyncEvent('success');
+                }
+            })
+            .catch(error => {
+                console.warn('自動同步失敗:', error.message);
+                // 自動同步失敗不顯示錯誤通知，避免影響用戶體驗
+            });
+    }
+    
+    /**
+     * 觸發同步事件
+     * @param {string} status 同步狀態 ('success' 或 'error')
+     * @param {Error} error 錯誤對象（如果有）
+     */
+    triggerSyncEvent(status, error = null) {
+        // 創建自定義事件
+        const event = new CustomEvent('githubSync', {
+            detail: {
+                status: status,
+                timestamp: new Date().toISOString(),
+                error: error
+            }
+        });
+        
+        // 分發事件
+        document.dispatchEvent(event);
+        
+        console.log(`GitHub同步事件已觸發 [狀態: ${status}]`);
     }
     
     /**
