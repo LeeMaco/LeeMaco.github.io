@@ -13,18 +13,6 @@
       "updatedAt": "2025-04-11T17:49:38.482Z"
     },
     {
-      "title": "%C3%A7%C2%9C%C2%BC%C3%A9%C2%8F%C2%A1%C3%A8%C2%90%C2%8C%C3%A5%C2%B0%C2%91%C3%A5%C2%A5%C2%B3",
-      "author": "%C3%A9%C2%99%C2%B3%C3%A5%C2%90%C2%8D%C3%A8%C2%88%C2%9E",
-      "series": "%C3%A5%C2%85%C2%A8",
-      "publisher": "%C3%A9%C2%95%C2%B7%C3%A9%C2%B4%C2%BB",
-      "cabinet": "X",
-      "notes": "%C3%A9%C2%80%C2%80",
-      "category": "%C3%A6%C2%9C%C2%AA%C3%A5%C2%88%C2%86%C3%A9%C2%A1%C2%9E",
-      "id": "m9d30lrmc1nrf",
-      "createdAt": "2025-04-11T17:49:38.482Z",
-      "updatedAt": "2025-04-11T17:49:38.482Z"
-    },
-    {
       "title": "%C3%A5%C2%81%C2%B6%C3%A5%C2%83%C2%8F%C3%A7%C2%94%C2%B7%C3%A5%C2%8F%C2%8B%C3%A7%C2%9A%C2%84%C3%A5%C2%81%C2%87%C3%A9%C2%9D%C2%A2",
       "author": "%C3%A8%C2%BB%C2%8A%C3%A8%C2%B0%C2%B7%C3%A6%C2%99%C2%B4%C3%A5%C2%AD%C2%90",
       "series": "%C3%A5%C2%85%C2%A8",
@@ -45769,5 +45757,7 @@
       "createdAt": "2025-04-13T17:25:16.737Z",
       "updatedAt": "2025-04-13T17:25:16.737Z"
     }
-  ]
+  ],
+  "lastSync": "2025-04-14T16:26:12.245Z",
+  "version": "1.0"
 }
