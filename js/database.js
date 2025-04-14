@@ -19,22 +19,34 @@ class Database {
             try {
                 // 嘗試從books.json載入示例數據
                 fetch('data/books.json')
-                    .then(response => response.json())
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
+                        }
+                        return response.json();
+                    })
                     .then(data => {
+                        if (!data || !Array.isArray(data)) {
+                            throw new Error('數據格式無效，應為數組');
+                        }
                         localStorage.setItem('books', JSON.stringify(data));
-                        console.log('已從books.json載入示例數據');
+                        console.log(`已從books.json載入 ${data.length} 筆示例數據`);
                         // 觸發數據載入完成事件
-                        document.dispatchEvent(new Event('booksLoaded'));
+                        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: data.length } }));
                     })
                     .catch(error => {
                         console.error('載入示例數據失敗:', error);
                         // 如果載入失敗，設置空數組
                         localStorage.setItem('books', JSON.stringify([]));
+                        // 觸發載入失敗事件
+                        document.dispatchEvent(new CustomEvent('booksLoadError', { detail: { error: error.message } }));
                     });
             } catch (error) {
                 console.error('初始化數據庫時發生錯誤:', error);
                 // 確保即使出錯也設置一個空數組
                 localStorage.setItem('books', JSON.stringify([]));
+                // 觸發載入失敗事件
+                document.dispatchEvent(new CustomEvent('booksLoadError', { detail: { error: error.message } }));
             }
         }
         

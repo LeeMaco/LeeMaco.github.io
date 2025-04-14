@@ -233,16 +233,26 @@ class Admin {
                     }
                     
                     // Base64編碼 - 使用TextEncoder處理Unicode字符
-                    // 使用TextEncoder和Uint8Array處理Unicode字符，解決中文編碼問題
+                    // 改進的編碼方法，確保正確處理中文和其他Unicode字符
                     const encoder = new TextEncoder();
                     const uint8Array = encoder.encode(jsonData);
-                    const content = Array.from(uint8Array)
-                        .map(b => String.fromCharCode(b))
-                        .join('')
-                        .split('')
-                        .map(c => c.charCodeAt(0) < 128 ? c : encodeURIComponent(c))
-                        .join('');
-                    const base64Content = btoa(content);
+                    
+                    // 直接將Uint8Array轉換為Base64，避免中間字符轉換可能導致的問題
+                    let binaryString = '';
+                    uint8Array.forEach(byte => {
+                        binaryString += String.fromCharCode(byte);
+                    });
+                    
+                    // 使用btoa進行Base64編碼
+                    const base64Content = btoa(binaryString);
+                    
+                    // 記錄編碼結果的大小
+                    console.log(`數據編碼完成，Base64大小: ${Math.round(base64Content.length / 1024)}KB`);
+                    
+                    // 檢查編碼結果是否有效
+                    if (!base64Content || base64Content.length === 0) {
+                        throw new Error('數據編碼失敗，請檢查數據格式');
+                    }
                     
                     // 準備請求體
                     const requestBody = {
