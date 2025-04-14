@@ -123,6 +123,7 @@ class Database {
                     console.log('正在從GitHub獲取最新數據...');
                     const data = await this.fetchBooksFromGitHub();
                     
+                    // 確保data.books是有效的數組
                     if (data && data.books && Array.isArray(data.books)) {
                         // 更新本地存儲
                         localStorage.setItem('books', JSON.stringify(data.books));
@@ -132,11 +133,17 @@ class Database {
                         this.handleDataLoaded('github', data.books.length);
                         
                         return data.books;
+                    } else {
+                        console.warn('從GitHub獲取的數據格式無效');
+                        // 觸發錯誤事件
+                        this.handleDataLoaded('error', 0, new Error('數據格式無效'));
+                        throw new Error('從GitHub獲取的數據格式無效');
                     }
                 } catch (error) {
                     console.error('從GitHub獲取數據失敗，將使用本地數據:', error);
                     // 觸發錯誤事件
                     this.handleDataLoaded('error', 0, error);
+                    throw error; // 將錯誤向上傳遞，以便UI層可以顯示適當的錯誤信息
                 }
             }
             
@@ -152,11 +159,19 @@ class Database {
             }
             
             // 嘗試解析JSON數據
-            const books = JSON.parse(booksData);
+            let books;
+            try {
+                books = JSON.parse(booksData);
+            } catch (parseError) {
+                console.error('解析書籍數據時發生錯誤:', parseError);
+                return [];
+            }
             
             // 檢查解析後的數據是否為數組
             if (!Array.isArray(books)) {
                 console.error('書籍數據格式無效，應為數組');
+                // 重置為空數組
+                localStorage.setItem('books', JSON.stringify([]));
                 return [];
             }
             
@@ -227,7 +242,23 @@ class Database {
             localStorage.setItem('lastGitHubSync', new Date().toISOString());
             
             console.log('成功從GitHub獲取數據', data);
-            return data;
+            
+            // 處理不同的數據格式
+            if (Array.isArray(data)) {
+                // 如果數據本身就是數組，直接返回
+                return { books: data };
+            } else if (data && typeof data === 'object') {
+                // 如果數據是對象，檢查是否有books屬性
+                if (data.books && Array.isArray(data.books)) {
+                    return data;
+                } else {
+                    // 如果是其他格式的對象，將其包裝在books屬性中
+                    return { books: [data] };
+                }
+            } else {
+                // 如果數據格式完全不符合預期，拋出錯誤
+                throw new Error('從GitHub獲取的數據格式無效');
+            }
         } catch (error) {
             console.error('從GitHub獲取數據時發生錯誤:', error);
             throw error;

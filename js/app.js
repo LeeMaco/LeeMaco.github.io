@@ -129,6 +129,38 @@ class App {
             });
         }
         
+        // GitHub同步按鈕事件
+        const syncGitHubBtn = document.getElementById('syncGitHubBtn');
+        if (syncGitHubBtn) {
+            syncGitHubBtn.addEventListener('click', () => {
+                // 顯示同步中的狀態提示
+                this.showMessage('正在從GitHub同步數據...', 'info');
+                
+                // 嘗試從GitHub獲取最新數據
+                db.getAllBooks(true) // 傳入true表示強制刷新
+                    .then(books => {
+                        // 確保books是數組
+                        if (!Array.isArray(books)) {
+                            console.error('從GitHub同步數據時收到無效數據:', books);
+                            this.showMessage('從GitHub同步數據時收到無效數據格式', 'danger');
+                            return;
+                        }
+                        
+                        // 顯示同步成功的狀態提示
+                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                        
+                        // 更新顯示
+                        this.displayBooks(books);
+                    })
+                    .catch(error => {
+                        console.error('從GitHub同步數據時發生錯誤:', error);
+                        
+                        // 顯示同步失敗的狀態提示
+                        this.showMessage(`從GitHub同步數據時發生錯誤: ${error.message}`, 'danger');
+                    });
+            });
+        }
+        
         // 書籍表單事件
         this.bookForm.addEventListener('submit', (e) => {
             e.preventDefault();
@@ -196,8 +228,27 @@ class App {
      * 載入書籍數據
      */
     loadBooks() {
-        const books = db.getAllBooks();
-        this.displayBooks(books);
+        // 顯示載入中的狀態提示
+        this.showMessage('正在載入書籍數據...', 'info');
+        
+        // 使用Promise方式獲取書籍數據
+        db.getAllBooks()
+            .then(books => {
+                // 確保books是數組
+                if (!Array.isArray(books)) {
+                    console.error('載入書籍數據時收到無效數據:', books);
+                    this.showMessage('載入書籍數據時收到無效數據格式', 'danger');
+                    this.displayBooks([]);
+                    return;
+                }
+                this.displayBooks(books);
+                this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+            })
+            .catch(error => {
+                console.error('載入書籍數據時發生錯誤:', error);
+                this.showMessage(`載入書籍數據時發生錯誤: ${error.message}`, 'danger');
+                this.displayBooks([]);
+            });
     }
     
     /**
@@ -205,9 +256,15 @@ class App {
      * 注意：類別篩選功能已移除，此函數保留用於其他可能的用途
      */
     loadCategories() {
-        // 獲取所有類別（可能用於其他功能）
-        const categories = db.getAllCategories();
-        // 類別篩選下拉框已移除，不再需要填充選項
+        // 使用Promise方式獲取所有類別
+        db.getAllCategories()
+            .then(categories => {
+                console.log('成功載入類別:', categories);
+                // 類別篩選下拉框已移除，不再需要填充選項
+            })
+            .catch(error => {
+                console.error('載入類別時發生錯誤:', error);
+            });
     }
     
     /**
@@ -217,6 +274,21 @@ class App {
     displayBooks(books) {
         // 清空表格
         this.booksTableBody.innerHTML = '';
+        
+        // 確保books是數組
+        if (!books || !Array.isArray(books)) {
+            console.error('顯示書籍時收到無效數據:', books);
+            // 顯示錯誤提示
+            this.resultCount.textContent = '0 筆資料';
+            this.resultCount.className = 'badge bg-danger';
+            
+            if (this.noResults) {
+                this.noResults.classList.remove('d-none');
+                this.noResults.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>搜尋時發生錯誤：數據庫返回無效數據</div>';
+            }
+            this.booksTable.classList.add('d-none');
+            return;
+        }
         
         // 更新結果計數
         this.resultCount.textContent = `${books.length} 筆資料`;
@@ -331,12 +403,76 @@ class App {
                 return;
             }
             
-            let results = db.getAllBooks();
+            // 使用Promise方式獲取書籍數據
+            db.getAllBooks()
+                .then(results => {
+                    // 檢查數據庫是否返回有效數據
+                    if (!Array.isArray(results)) {
+                        throw new Error('數據庫返回無效數據');
+                    }
+                    
+                    // 檢查數據庫是否為空
+                    if (results.length === 0) {
+                        this.showMessage('數據庫中沒有書籍資料', 'warning');
+                        this.displayBooks([]);
+                        return;
+                    }
+                    
+                    // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
+                    const filteredResults = results.filter(book => {
+                        // 安全地檢查每個屬性是否存在且為字符串類型
+                        const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
+                        const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
+                        const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
+                        const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
+                        const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
+                        const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
+                        const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
+                        const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
+                        const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
+                        const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
+                        
+                        // 返回任一屬性匹配的結果
+                        return titleMatch || authorMatch || descriptionMatch || notesMatch || 
+                               publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
+                               cabinetMatch || rowMatch;
+                    });
+                    
+                    // 顯示搜尋結果和狀態提示
+                    this.displayBooks(filteredResults);
+                    
+                    // 顯示搜尋條件的狀態提示
+                    const resultMessage = `搜尋關鍵字「${query}」，找到 ${filteredResults.length} 筆資料`;
+                    this.showMessage(resultMessage, filteredResults.length > 0 ? 'info' : 'warning');
+                    
+                    // 如果沒有結果，在noResults區域顯示更友好的提示
+                    if (filteredResults.length === 0 && this.noResults) {
+                        this.noResults.classList.remove('d-none');
+                        this.noResults.innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合「${query}」的書籍資料，請嘗試其他關鍵字</div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('搜尋錯誤:', error);
+                    this.showMessage(`搜尋時發生錯誤: ${error.message}`, 'danger');
+                    
+                    // 顯示錯誤提示在noResults區域
+                    if (this.noResults) {
+                        this.noResults.classList.remove('d-none');
+                        this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>搜尋時發生錯誤: ${error.message}</div>`;
+                    }
+                    
+                    // 隱藏表格
+                    if (this.booksTable) {
+                        this.booksTable.classList.add('d-none');
+                    }
+                    
+                    // 更新結果計數
+                    this.resultCount.textContent = '0 筆資料';
+                    this.resultCount.className = 'badge bg-danger';
+                });
+                
+            return; // 提前返回，因為後續處理在Promise中進行
             
-            // 檢查數據庫是否返回有效數據
-            if (!Array.isArray(results)) {
-                throw new Error('數據庫返回無效數據');
-            }
             
             // 檢查數據庫是否為空
             if (results.length === 0) {
@@ -392,6 +528,25 @@ class App {
                 this.booksTable.classList.add('d-none');
             }
         }
+    }
+    
+    /**
+     * 從GitHub同步數據
+     */
+    syncFromGitHub() {
+        // 顯示同步中的狀態提示
+        this.showMessage('正在從GitHub同步數據...', 'info');
+        
+        // 強制從GitHub刷新數據
+        db.getAllBooks(true)
+            .then(books => {
+                this.displayBooks(books);
+                this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+            })
+            .catch(error => {
+                console.error('從GitHub同步數據時發生錯誤:', error);
+                this.showMessage(`從GitHub同步數據失敗: ${error.message}`, 'danger');
+            });
     }
     
     /**
