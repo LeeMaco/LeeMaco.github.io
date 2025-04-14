@@ -232,13 +232,22 @@ class Admin {
                             `數據較大 (${dataSizeKB}KB)，上傳可能需要較長時間<br>請耐心等待`);
                     }
                     
-                    // Base64編碼
-                    const content = btoa(jsonData);
+                    // Base64編碼 - 使用TextEncoder處理Unicode字符
+                    // 使用TextEncoder和Uint8Array處理Unicode字符，解決中文編碼問題
+                    const encoder = new TextEncoder();
+                    const uint8Array = encoder.encode(jsonData);
+                    const content = Array.from(uint8Array)
+                        .map(b => String.fromCharCode(b))
+                        .join('')
+                        .split('')
+                        .map(c => c.charCodeAt(0) < 128 ? c : encodeURIComponent(c))
+                        .join('');
+                    const base64Content = btoa(content);
                     
                     // 準備請求體
                     const requestBody = {
                         message: `更新書籍數據 (${new Date().toLocaleString()})`,
-                        content: content,
+                        content: base64Content,
                         branch: this.githubSettings.branch
                     };
                     
