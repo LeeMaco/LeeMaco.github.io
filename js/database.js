@@ -18,7 +18,7 @@ class Database {
             // 初始化時添加示例數據
             try {
                 // 觸發數據載入開始事件
-                document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取數據...' } }));
+                document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取最新數據...' } }));
                 
                 // 嘗試從GitHub獲取books.json數據
                 this.fetchBooksFromGitHub()
@@ -26,6 +26,15 @@ class Database {
                         try {
                             // 使用處理函數處理載入的數據
                             this.handleDataLoaded(data, 'GitHub');
+                            
+                            // 觸發初始化成功事件
+                            document.dispatchEvent(new CustomEvent('databaseInitialized', { 
+                                detail: { 
+                                    source: 'GitHub',
+                                    count: data.length,
+                                    timestamp: new Date().toISOString() 
+                                } 
+                            }));
                         } catch (error) {
                             throw error;
                         }
@@ -127,17 +136,41 @@ class Database {
         
         try {
             // 顯示載入狀態
-            document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取數據...' } }));
+            document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取最新數據...' } }));
             
-            const response = await fetch(rawUrl);
+            // 添加緩存破壞參數，確保獲取最新數據
+            const cacheBuster = `?_=${Date.now()}`;
+            const response = await fetch(`${rawUrl}${cacheBuster}`, {
+                headers: {
+                    'Cache-Control': 'no-cache, no-store, must-revalidate',
+                    'Pragma': 'no-cache',
+                    'Expires': '0'
+                }
+            });
+            
             if (!response.ok) {
                 throw new Error(`GitHub API錯誤! 狀態: ${response.status}`);
             }
             
             const data = await response.json();
+            console.log(`成功從GitHub獲取 ${data.length} 筆最新書籍數據`);
+            
+            // 觸發數據載入成功事件
+            document.dispatchEvent(new CustomEvent('booksLoadedFromGitHub', { 
+                detail: { count: data.length, timestamp: new Date().toISOString() } 
+            }));
+            
             return data;
         } catch (error) {
             console.error('從GitHub獲取數據失敗:', error);
+            // 觸發詳細的錯誤事件
+            document.dispatchEvent(new CustomEvent('githubFetchError', { 
+                detail: { 
+                    message: '從GitHub獲取數據失敗', 
+                    error: error.message,
+                    timestamp: new Date().toISOString()
+                } 
+            }));
             throw error;
         }
     }
@@ -153,16 +186,39 @@ class Database {
             
             try {
                 // 首先嘗試從GitHub獲取最新數據
+                document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取最新數據...' } }));
                 const data = await this.fetchBooksFromGitHub();
+                
                 // 更新本地存儲
                 localStorage.setItem('books', JSON.stringify(data));
                 console.log(`已從GitHub更新 ${data.length} 筆書籍數據`);
-                // 觸發數據更新事件
-                document.dispatchEvent(new CustomEvent('booksUpdated', { detail: { count: data.length } }));
+                
+                // 觸發數據更新事件，包含更多詳細信息
+                document.dispatchEvent(new CustomEvent('booksUpdated', { 
+                    detail: { 
+                        count: data.length,
+                        source: 'GitHub',
+                        timestamp: new Date().toISOString(),
+                        message: '已成功從GitHub獲取最新數據'
+                    } 
+                }));
+                
                 return data;
             } catch (error) {
                 console.warn('無法從GitHub獲取最新數據，使用本地緩存:', error);
-                document.dispatchEvent(new CustomEvent('booksLoadingError', { detail: { message: '無法從GitHub獲取最新數據，使用本地緩存', error: error.message } }));
+                
+                // 觸發詳細的錯誤事件
+                document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                    detail: { 
+                        message: '無法從GitHub獲取最新數據，使用本地緩存', 
+                        error: error.message,
+                        timestamp: new Date().toISOString(),
+                        fallbackSource: 'localStorage'
+                    } 
+                }));
+                
+                // 顯示使用本地緩存的載入狀態
+                document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從本地緩存獲取數據...' } }));
             }
             
             // 嘗試從localStorage獲取數據
@@ -171,6 +227,13 @@ class Database {
             // 檢查數據是否存在
             if (!booksData) {
                 console.warn('localStorage中沒有找到書籍數據');
+                document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                    detail: { 
+                        message: 'localStorage中沒有找到書籍數據，嘗試重新初始化', 
+                        timestamp: new Date().toISOString() 
+                    } 
+                }));
+                
                 // 嘗試重新初始化數據庫
                 this.initDatabase();
                 return [];
@@ -182,13 +245,40 @@ class Database {
             // 檢查解析後的數據是否為數組
             if (!Array.isArray(books)) {
                 console.error('書籍數據格式無效，應為數組');
+                document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                    detail: { 
+                        message: '書籍數據格式無效，應為數組', 
+                        timestamp: new Date().toISOString() 
+                    } 
+                }));
                 return [];
             }
             
-            console.log(`成功載入 ${books.length} 筆書籍數據`);
+            console.log(`成功從本地緩存載入 ${books.length} 筆書籍數據`);
+            
+            // 觸發從本地緩存載入成功事件
+            document.dispatchEvent(new CustomEvent('booksLoaded', { 
+                detail: { 
+                    count: books.length, 
+                    source: 'localStorage',
+                    timestamp: new Date().toISOString(),
+                    message: '已從本地緩存載入數據'
+                } 
+            }));
+            
             return books;
         } catch (error) {
             console.error('獲取書籍數據時發生錯誤:', error);
+            
+            // 觸發嚴重錯誤事件
+            document.dispatchEvent(new CustomEvent('booksLoadError', { 
+                detail: { 
+                    error: error.message,
+                    timestamp: new Date().toISOString(),
+                    message: '獲取書籍數據時發生嚴重錯誤'
+                } 
+            }));
+            
             // 發生錯誤時返回空數組
             return [];
         }
@@ -545,17 +635,44 @@ class Database {
      */
     handleDataLoaded(data, source) {
         if (!data || !Array.isArray(data)) {
-            throw new Error('數據格式無效，應為數組');
+            const errorMsg = '數據格式無效，應為數組';
+            console.error(errorMsg);
+            document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                detail: { 
+                    message: errorMsg, 
+                    source: source,
+                    timestamp: new Date().toISOString() 
+                } 
+            }));
+            throw new Error(errorMsg);
         }
         
         // 確保數據有效後再保存
         if (data.length > 0) {
+            // 保存到localStorage
             localStorage.setItem('books', JSON.stringify(data));
             console.log(`已從${source}載入 ${data.length} 筆書籍數據`);
-            // 觸發數據載入完成事件
-            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: data.length, source: source } }));
+            
+            // 觸發數據載入完成事件，包含更多詳細信息
+            document.dispatchEvent(new CustomEvent('booksLoaded', { 
+                detail: { 
+                    count: data.length, 
+                    source: source,
+                    timestamp: new Date().toISOString(),
+                    message: `已從${source}成功載入 ${data.length} 筆書籍數據`
+                } 
+            }));
         } else {
-            throw new Error(`${source}數據文件為空`);
+            const errorMsg = `${source}數據文件為空`;
+            console.error(errorMsg);
+            document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                detail: { 
+                    message: errorMsg, 
+                    source: source,
+                    timestamp: new Date().toISOString() 
+                } 
+            }));
+            throw new Error(errorMsg);
         }
     }
     
