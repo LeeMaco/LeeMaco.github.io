@@ -196,145 +196,55 @@ class App {
      * 載入書籍數據
      */
     loadBooks() {
-        // 添加數據加載中的提示
-        if (this.noResults) {
-            this.noResults.classList.remove('d-none');
-            this.noResults.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>正在加載書籍數據...</div>';
-        }
-        
         try {
+            // 顯示載入中的提示
+            this.resultCount.textContent = '載入中...';
+            this.resultCount.className = 'badge bg-info';
+            
             // 獲取書籍數據
             const books = db.getAllBooks();
             
-            // 顯示書籍
-            this.displayBooks(books);
-            
-            // 監聽數據加載完成事件，用於處理異步加載的情況
-            const booksLoadedHandler = (event) => {
-                console.log('檢測到書籍數據加載完成事件');
+            // 檢查是否有數據
+            if (books.length === 0) {
+                console.log('沒有找到書籍數據，嘗試從data/books.json載入');
                 
-                try {
-                    // 嘗試從事件詳情中獲取書籍數據
-                    let updatedBooks = [];
-                    if (event.detail && Array.isArray(event.detail.books)) {
-                        console.log(`從事件中獲取到${event.detail.books.length}筆書籍數據`);
-                        updatedBooks = event.detail.books;
-                    } else {
-                        // 如果事件中沒有數據，則從數據庫獲取
-                        console.log('從數據庫重新獲取書籍數據');
-                        updatedBooks = db.getAllBooks();
-                    }
-                    
-                    // 顯示更新後的書籍數據
-                    this.displayBooks(updatedBooks);
-                    
-                    // 更新UI狀態
-                    if (this.noResults) {
-                        if (updatedBooks.length === 0) {
-                            this.noResults.innerHTML = '<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合條件的書籍資料</div>';
-                        } else {
-                            this.noResults.classList.add('d-none');
+                // 嘗試從books.json直接載入
+                fetch('data/books.json')
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
                         }
-                    }
-                    
-                    // 顯示成功加載的通知
-                    this.showMessage(`成功加載 ${updatedBooks.length} 筆書籍數據`, 'success');
-                } catch (eventError) {
-                    console.error('處理書籍加載事件時發生錯誤:', eventError);
-                    this.showMessage('處理書籍數據時發生錯誤，請重新整理頁面', 'danger');
-                }
-            };
-            
-            // 註冊事件監聽器
-            document.addEventListener('booksLoaded', booksLoadedHandler, { once: true });
-            
-            // 如果5秒後仍未收到數據加載事件，嘗試再次加載
-            const loadTimeout = setTimeout(() => {
-                const currentBooks = db.getAllBooks();
-                if (currentBooks.length === 0) {
-                    console.log('數據加載超時，嘗試重新加載');
-                    // 移除舊的事件監聽器
-                    document.removeEventListener('booksLoaded', booksLoadedHandler);
-                    // 重新註冊事件監聽器
-                    document.addEventListener('booksLoaded', booksLoadedHandler, { once: true });
-                    // 顯示重試通知
-                    if (this.noResults) {
-                        this.noResults.innerHTML = '<div class="alert alert-info"><i class="fas fa-sync fa-spin me-2"></i>數據加載超時，正在重試...</div>';
-                    }
-                    // 重新加載數據
-                    db.loadDefaultBooks();
-                }
-            }, 5000);
-            
-            // 如果10秒後仍未加載成功，提供手動重試選項
-            setTimeout(() => {
-                const finalBooks = db.getAllBooks();
-                if (finalBooks.length === 0) {
-                    clearTimeout(loadTimeout);
-                    console.error('數據加載失敗，提供手動重試選項');
-                    if (this.noResults) {
-                        this.noResults.innerHTML = `
-                            <div class="alert alert-danger">
-                                <i class="fas fa-exclamation-circle me-2"></i>數據加載失敗
-                                <button class="btn btn-sm btn-outline-danger ms-3" onclick="app.retryLoadBooks()">
-                                    <i class="fas fa-sync me-1"></i>重試
-                                </button>
-                            </div>
-                        `;
-                    }
-                }
-            }, 10000);
+                        return response.json();
+                    })
+                    .then(data => {
+                        console.log(`成功從books.json載入 ${data.length} 筆數據`);
+                        // 將數據導入數據庫
+                        if (data && Array.isArray(data) && data.length > 0) {
+                            db.importBooks(data, false);
+                            // 重新載入書籍
+                            const updatedBooks = db.getAllBooks();
+                            this.displayBooks(updatedBooks);
+                            this.showMessage(`已成功載入 ${updatedBooks.length} 筆書籍數據`, 'success');
+                        } else {
+                            this.displayBooks([]);
+                            this.showMessage('示例數據文件為空或格式不正確', 'warning');
+                        }
+                    })
+                    .catch(error => {
+                        console.error('載入books.json失敗:', error);
+                        this.displayBooks([]);
+                        this.showMessage('無法載入示例數據，請手動添加書籍', 'warning');
+                    });
+            } else {
+                // 顯示已載入的書籍
+                this.displayBooks(books);
+                console.log(`已顯示 ${books.length} 筆書籍數據`);
+            }
         } catch (error) {
             console.error('載入書籍數據時發生錯誤:', error);
-            if (this.noResults) {
-                this.noResults.innerHTML = `
-                    <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-circle me-2"></i>載入書籍數據時發生錯誤
-                        <button class="btn btn-sm btn-outline-danger ms-3" onclick="app.retryLoadBooks()">
-                            <i class="fas fa-sync me-1"></i>重試
-                        </button>
-                    </div>
-                `;
-            }
+            this.showMessage(`載入數據時發生錯誤: ${error.message}`, 'danger');
+            this.displayBooks([]);
         }
-    }
-    
-    /**
-     * 重試加載書籍數據
-     */
-    retryLoadBooks() {
-        if (this.noResults) {
-            this.noResults.innerHTML = '<div class="alert alert-info"><i class="fas fa-spinner fa-spin me-2"></i>正在重新加載書籍數據...</div>';
-        }
-        
-        // 清除localStorage中的書籍數據，強制重新加載
-        try {
-            localStorage.removeItem('books');
-        } catch (e) {
-            console.warn('無法清除localStorage中的書籍數據:', e);
-        }
-        
-        // 重新加載預設數據
-        db.loadDefaultBooks();
-        
-        // 監聽數據加載完成事件
-        document.addEventListener('booksLoaded', (event) => {
-            let books = [];
-            if (event.detail && Array.isArray(event.detail.books)) {
-                books = event.detail.books;
-            } else {
-                books = db.getAllBooks();
-            }
-            
-            this.displayBooks(books);
-            
-            if (books.length > 0) {
-                this.showMessage(`成功重新加載 ${books.length} 筆書籍數據`, 'success');
-            } else {
-                this.showMessage('重新加載失敗，請刷新頁面或聯繫管理員', 'danger');
-            }
-        }, { once: true });
-    }
     }
     
     /**
@@ -352,14 +262,6 @@ class App {
      * @param {Array} books 書籍數組
      */
     displayBooks(books) {
-        console.log(`顯示書籍列表: ${books.length}筆資料`);
-        
-        // 確保books是數組
-        if (!Array.isArray(books)) {
-            console.error('顯示書籍時收到非數組數據:', books);
-            books = [];
-        }
-        
         // 清空表格
         this.booksTableBody.innerHTML = '';
         

@@ -14,9 +14,28 @@ class Database {
      */
     initDatabase() {
         // 檢查是否已有書籍數據
-        if (!localStorage.getItem('books') || JSON.parse(localStorage.getItem('books')).length === 0) {
-            // 嘗試從data/books.json加載預設數據
-            this.loadDefaultBooks();
+        if (!localStorage.getItem('books')) {
+            // 初始化時添加示例數據
+            try {
+                // 嘗試從books.json載入示例數據
+                fetch('data/books.json')
+                    .then(response => response.json())
+                    .then(data => {
+                        localStorage.setItem('books', JSON.stringify(data));
+                        console.log('已從books.json載入示例數據');
+                        // 觸發數據載入完成事件
+                        document.dispatchEvent(new Event('booksLoaded'));
+                    })
+                    .catch(error => {
+                        console.error('載入示例數據失敗:', error);
+                        // 如果載入失敗，設置空數組
+                        localStorage.setItem('books', JSON.stringify([]));
+                    });
+            } catch (error) {
+                console.error('初始化數據庫時發生錯誤:', error);
+                // 確保即使出錯也設置一個空數組
+                localStorage.setItem('books', JSON.stringify([]));
+            }
         }
         
         // 檢查是否已有備份設定
@@ -43,246 +62,34 @@ class Database {
      * @returns {Array} 書籍數組
      */
     getAllBooks() {
-        let books = [];
-        
         try {
             // 嘗試從localStorage獲取數據
-            books = JSON.parse(localStorage.getItem('books')) || [];
-        } catch (error) {
-            console.warn('從localStorage獲取數據失敗:', error);
-            // 如果localStorage失敗，嘗試從全局變量獲取
-            books = window._booksData || [];
-        }
-        
-        // 如果books為空，嘗試再次加載預設數據
-        if (books.length === 0) {
-            this.loadDefaultBooks();
-            // 再次嘗試獲取數據
-            try {
-                books = JSON.parse(localStorage.getItem('books')) || [];
-            } catch (error) {
-                books = window._booksData || [];
-            }
-        }
-        
-        return books;
-    }
-    
-    /**
-     * 加載預設書籍數據
-     * 從data/books.json加載預設數據，解決手機上無法顯示數據的問題
-     */
-    loadDefaultBooks() {
-        console.log('嘗試加載預設書籍數據...');
-        
-        // 設置重試計數器和最大重試次數
-        let retryCount = 0;
-        const maxRetries = 3;
-        
-        const loadData = () => {
-            retryCount++;
-            console.log(`加載預設數據嘗試 ${retryCount}/${maxRetries}`);
+            const booksData = localStorage.getItem('books');
             
-            try {
-                // 嘗試多種路徑加載數據
-                const timestamp = new Date().getTime();
-                
-                // 方法1: 使用相對路徑
-                const relativePath = `data/books.json?t=${timestamp}`;
-                
-                // 方法2: 使用絕對路徑
-                const baseUrl = window.location.origin + window.location.pathname;
-                const absolutePath = new URL('data/books.json', baseUrl).href + `?t=${timestamp}`;
-                
-                // 方法3: 使用根路徑
-                const rootPath = window.location.origin + '/data/books.json' + `?t=${timestamp}`;
-                
-                console.log('嘗試從以下路徑加載數據:');
-                console.log('- 相對路徑:', relativePath);
-                console.log('- 絕對路徑:', absolutePath);
-                console.log('- 根路徑:', rootPath);
-                
-                // 首先嘗試絕對路徑
-                fetch(absolutePath)
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
-                        }
-                        return response.json();
-                    })
-                    .then(data => this.processLoadedData(data, retryCount, maxRetries, loadData))
-                    .catch(error => {
-                        console.warn(`使用絕對路徑加載失敗:`, error);
-                        
-                        // 嘗試相對路徑
-                        fetch(relativePath)
-                            .then(response => {
-                                if (!response.ok) {
-                                    throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
-                                }
-                                return response.json();
-                            })
-                            .then(data => this.processLoadedData(data, retryCount, maxRetries, loadData))
-                            .catch(error => {
-                                console.warn(`使用相對路徑加載失敗:`, error);
-                                
-                                // 最後嘗試根路徑
-                                fetch(rootPath)
-                                    .then(response => {
-                                        if (!response.ok) {
-                                            throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
-                                        }
-                                        return response.json();
-                                    })
-                                    .then(data => this.processLoadedData(data, retryCount, maxRetries, loadData))
-                                    .catch(error => {
-                                        console.error(`所有路徑加載失敗 (嘗試 ${retryCount}/${maxRetries}):`, error);
-                                        if (retryCount < maxRetries) {
-                                            setTimeout(loadData, 1000); // 延遲1秒後重試
-                                        } else {
-                                            // 所有重試都失敗，使用硬編碼數據
-                                            this.useHardcodedData();
-                                        }
-                                    });
-                            });
-                    });
-            } catch (error) {
-                console.error(`加載預設數據時發生錯誤 (嘗試 ${retryCount}/${maxRetries}):`, error);
-                if (retryCount < maxRetries) {
-                    setTimeout(loadData, 1000); // 延遲1秒後重試
-                } else {
-                    // 所有重試都失敗，使用硬編碼數據
-                    this.useHardcodedData();
-                }
+            // 檢查數據是否存在
+            if (!booksData) {
+                console.warn('localStorage中沒有找到書籍數據');
+                // 嘗試重新初始化數據庫
+                this.initDatabase();
+                return [];
             }
-        };
-        
-        // 開始加載數據
-        loadData();
-    }
-    
-    /**
-     * 處理加載的數據
-     * @param {Array} data 加載的數據
-     * @param {number} retryCount 當前重試次數
-     * @param {number} maxRetries 最大重試次數
-     * @param {Function} loadData 加載數據的函數
-     */
-    processLoadedData(data, retryCount, maxRetries, loadData) {
-        if (Array.isArray(data) && data.length > 0) {
-            console.log(`成功加載${data.length}筆預設書籍數據`);
-            // 嘗試使用localStorage保存數據
-            try {
-                localStorage.setItem('books', JSON.stringify(data));
-                console.log('成功保存數據到localStorage');
-            } catch (storageError) {
-                console.warn('無法保存到localStorage:', storageError);
-                // 在localStorage失敗的情況下，使用全局變數作為備份
-                window._booksData = data;
-                console.log('已將數據保存到全局變量');
+            
+            // 嘗試解析JSON數據
+            const books = JSON.parse(booksData);
+            
+            // 檢查解析後的數據是否為數組
+            if (!Array.isArray(books)) {
+                console.error('書籍數據格式無效，應為數組');
+                return [];
             }
-            // 觸發數據加載完成事件
-            try {
-                document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: data } }));
-                console.log('已觸發booksLoaded事件');
-            } catch (eventError) {
-                console.error('觸發booksLoaded事件失敗:', eventError);
-            }
-        } else {
-            console.warn('預設數據格式不正確或為空');
-            if (retryCount < maxRetries) {
-                setTimeout(loadData, 1000); // 延遲1秒後重試
-            } else {
-                this.useHardcodedData();
-            }
+            
+            console.log(`成功載入 ${books.length} 筆書籍數據`);
+            return books;
+        } catch (error) {
+            console.error('獲取書籍數據時發生錯誤:', error);
+            // 發生錯誤時返回空數組
+            return [];
         }
-    }
-    
-    /**
-     * 使用硬編碼的示例數據
-     * 當所有其他方法都失敗時的最後手段
-     */
-    useHardcodedData() {
-        console.log('使用硬編碼的示例數據');
-        const timestamp = new Date().toISOString();
-        const sampleData = [
-            {
-                "id": "sample1",
-                "title": "示例書籍1",
-                "author": "示例作者",
-                "category": "文學",
-                "cabinet": "A",
-                "row": "1",
-                "publisher": "示例出版社",
-                "description": "這是一本示例書籍，用於在無法加載真實數據時顯示",
-                "isbn": "9789571234567",
-                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
-                "createdAt": timestamp,
-                "updatedAt": timestamp
-            },
-            {
-                "id": "sample2",
-                "title": "示例書籍2",
-                "author": "另一位作者",
-                "category": "科學",
-                "cabinet": "B",
-                "row": "2",
-                "publisher": "另一家出版社",
-                "description": "這是另一本示例書籍，用於在無法加載真實數據時顯示",
-                "isbn": "9789571234568",
-                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
-                "createdAt": timestamp,
-                "updatedAt": timestamp
-            },
-            {
-                "id": "sample3",
-                "title": "示例書籍3",
-                "author": "第三位作者",
-                "category": "歷史",
-                "cabinet": "C",
-                "row": "3",
-                "publisher": "第三家出版社",
-                "description": "這是第三本示例書籍，用於在無法加載真實數據時顯示",
-                "isbn": "9789571234569",
-                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
-                "createdAt": timestamp,
-                "updatedAt": timestamp
-            },
-            {
-                "id": "sample4",
-                "title": "示例書籍4",
-                "author": "第四位作者",
-                "category": "藝術",
-                "cabinet": "D",
-                "row": "4",
-                "publisher": "第四家出版社",
-                "description": "這是第四本示例書籍，用於在無法加載真實數據時顯示",
-                "isbn": "9789571234570",
-                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
-                "createdAt": timestamp,
-                "updatedAt": timestamp
-            }
-        ];
-        
-        try {
-            localStorage.setItem('books', JSON.stringify(sampleData));
-            console.log('成功保存硬編碼數據到localStorage');
-        } catch (storageError) {
-            console.warn('無法保存硬編碼數據到localStorage:', storageError);
-            // 在localStorage失敗的情況下，使用全局變數作為備份
-            window._booksData = sampleData;
-            console.log('已將硬編碼數據保存到全局變量');
-        }
-        
-        // 觸發數據加載完成事件
-        try {
-            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: sampleData } }));
-            console.log('已觸發booksLoaded事件');
-        } catch (eventError) {
-            console.error('觸發booksLoaded事件失敗:', eventError);
-        }
-        
-        return sampleData;
     }
     
     /**
