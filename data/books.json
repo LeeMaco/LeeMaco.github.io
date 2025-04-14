@@ -22135,20 +22135,6 @@
       "updatedAt": "2025-04-06T08:11:18.616Z"
     },
     {
-      "id": "1743927185367",
-      "title": "19%C3%A6%C2%84%C2%9B33(%C3%A5%C2%96%C2%AE%C3%A8%C2%BA%C2%AB)Once More",
-      "author": "%C3%A5%C2%B0%C2%8F%C3%A7%C2%94%C2%B0%C3%A5%C2%8E%C2%9F%C3%A6%C2%B0%C2%B4%C3%A6%C2%98%C2%A0",
-      "series": "%C3%A5%C2%85%C2%A8",
-      "publisher": "%C3%A9%C2%95%C2%B7%C3%A9%C2%B4%C2%BB",
-      "description": "",
-      "cabinet": "X",
-      "row": "",
-      "isbn": "",
-      "notes": "2018/10/23%C3%A9%C2%80%C2%80%C3%A7%C2%AC%C2%AC13%C3%A7%C2%AE%C2%B1",
-      "createdAt": "2025-04-06T08:13:05.367Z",
-      "updatedAt": "2025-04-06T08:13:05.367Z"
-    },
-    {
       "id": "1743927185371",
       "title": "19%C3%A6%C2%84%C2%9B34(%C3%A5%C2%96%C2%AE%C3%A8%C2%BA%C2%AB)LoveLife",
       "author": "%C3%A5%C2%B0%C2%8F%C3%A7%C2%94%C2%B0%C3%A5%C2%8E%C2%9F%C3%A6%C2%B0%C2%B4%C3%A6%C2%98%C2%A0",
@@ -53256,6 +53242,6 @@
       "updatedAt": "2025-04-11T20:37:17.717Z"
     }
   ],
-  "lastSync": "2025-04-14T15:24:04.268Z",
+  "lastSync": "2025-04-14T15:40:20.364Z",
   "version": "1.0"
 }
