@@ -74,43 +74,71 @@ class Database {
      */
     loadDefaultBooks() {
         console.log('嘗試加載預設書籍數據...');
-        try {
-            // 使用fetch API從data/books.json加載預設數據
-            fetch('data/books.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    if (Array.isArray(data) && data.length > 0) {
-                        console.log(`成功加載${data.length}筆預設書籍數據`);
-                        // 嘗試使用localStorage保存數據
-                        try {
-                            localStorage.setItem('books', JSON.stringify(data));
-                        } catch (storageError) {
-                            console.warn('無法保存到localStorage:', storageError);
-                            // 在localStorage失敗的情況下，使用全局變數作為備份
-                            window._booksData = data;
+        
+        // 設置重試計數器和最大重試次數
+        let retryCount = 0;
+        const maxRetries = 3;
+        
+        const loadData = () => {
+            retryCount++;
+            console.log(`加載預設數據嘗試 ${retryCount}/${maxRetries}`);
+            
+            try {
+                // 使用fetch API從data/books.json加載預設數據
+                // 添加時間戳防止緩存
+                const timestamp = new Date().getTime();
+                fetch(`data/books.json?t=${timestamp}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
                         }
-                        // 觸發數據加載完成事件
-                        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: data } }));
-                    } else {
-                        console.warn('預設數據格式不正確或為空');
-                    }
-                })
-                .catch(error => {
-                    console.error('加載預設數據失敗:', error);
-                    // 加載失敗時，提供一些基本的示例數據
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (Array.isArray(data) && data.length > 0) {
+                            console.log(`成功加載${data.length}筆預設書籍數據`);
+                            // 嘗試使用localStorage保存數據
+                            try {
+                                localStorage.setItem('books', JSON.stringify(data));
+                            } catch (storageError) {
+                                console.warn('無法保存到localStorage:', storageError);
+                                // 在localStorage失敗的情況下，使用全局變數作為備份
+                                window._booksData = data;
+                            }
+                            // 觸發數據加載完成事件
+                            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: data } }));
+                        } else {
+                            console.warn('預設數據格式不正確或為空');
+                            if (retryCount < maxRetries) {
+                                setTimeout(loadData, 1000); // 延遲1秒後重試
+                            } else {
+                                this.useHardcodedData();
+                            }
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`加載預設數據失敗 (嘗試 ${retryCount}/${maxRetries}):`, error);
+                        if (retryCount < maxRetries) {
+                            setTimeout(loadData, 1000); // 延遲1秒後重試
+                        } else {
+                            // 所有重試都失敗，使用硬編碼數據
+                            this.useHardcodedData();
+                        }
+                    });
+            } catch (error) {
+                console.error(`加載預設數據時發生錯誤 (嘗試 ${retryCount}/${maxRetries}):`, error);
+                if (retryCount < maxRetries) {
+                    setTimeout(loadData, 1000); // 延遲1秒後重試
+                } else {
+                    // 所有重試都失敗，使用硬編碼數據
                     this.useHardcodedData();
-                });
-        } catch (error) {
-            console.error('加載預設數據時發生錯誤:', error);
-            // 發生錯誤時，使用硬編碼的示例數據
-            this.useHardcodedData();
-        }
-    },
+                }
+            }
+        };
+        
+        // 開始加載數據
+        loadData();
+    }
     
     /**
      * 使用硬編碼的示例數據
@@ -118,44 +146,85 @@ class Database {
      */
     useHardcodedData() {
         console.log('使用硬編碼的示例數據');
+        const timestamp = new Date().toISOString();
         const sampleData = [
             {
                 "id": "sample1",
                 "title": "示例書籍1",
                 "author": "示例作者",
-                "category": "示例類別",
+                "category": "文學",
                 "cabinet": "A",
                 "row": "1",
                 "publisher": "示例出版社",
-                "description": "這是一本示例書籍",
+                "description": "這是一本示例書籍，用於在無法加載真實數據時顯示",
                 "isbn": "9789571234567",
-                "createdAt": new Date().toISOString(),
-                "updatedAt": new Date().toISOString()
+                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
+                "createdAt": timestamp,
+                "updatedAt": timestamp
             },
             {
                 "id": "sample2",
                 "title": "示例書籍2",
                 "author": "另一位作者",
-                "category": "另一個類別",
+                "category": "科學",
                 "cabinet": "B",
                 "row": "2",
                 "publisher": "另一家出版社",
-                "description": "這是另一本示例書籍",
+                "description": "這是另一本示例書籍，用於在無法加載真實數據時顯示",
                 "isbn": "9789571234568",
-                "createdAt": new Date().toISOString(),
-                "updatedAt": new Date().toISOString()
+                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
+                "createdAt": timestamp,
+                "updatedAt": timestamp
+            },
+            {
+                "id": "sample3",
+                "title": "示例書籍3",
+                "author": "第三位作者",
+                "category": "歷史",
+                "cabinet": "C",
+                "row": "3",
+                "publisher": "第三家出版社",
+                "description": "這是第三本示例書籍，用於在無法加載真實數據時顯示",
+                "isbn": "9789571234569",
+                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
+                "createdAt": timestamp,
+                "updatedAt": timestamp
+            },
+            {
+                "id": "sample4",
+                "title": "示例書籍4",
+                "author": "第四位作者",
+                "category": "藝術",
+                "cabinet": "D",
+                "row": "4",
+                "publisher": "第四家出版社",
+                "description": "這是第四本示例書籍，用於在無法加載真實數據時顯示",
+                "isbn": "9789571234570",
+                "notes": "這是備用數據，請嘗試重新整理頁面或檢查網絡連接",
+                "createdAt": timestamp,
+                "updatedAt": timestamp
             }
         ];
         
         try {
             localStorage.setItem('books', JSON.stringify(sampleData));
+            console.log('成功保存硬編碼數據到localStorage');
         } catch (storageError) {
             console.warn('無法保存硬編碼數據到localStorage:', storageError);
+            // 在localStorage失敗的情況下，使用全局變數作為備份
             window._booksData = sampleData;
+            console.log('已將硬編碼數據保存到全局變量');
         }
         
         // 觸發數據加載完成事件
-        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: sampleData } }));
+        try {
+            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { books: sampleData } }));
+            console.log('已觸發booksLoaded事件');
+        } catch (eventError) {
+            console.error('觸發booksLoaded事件失敗:', eventError);
+        }
+        
+        return sampleData;
     }
     
     /**
