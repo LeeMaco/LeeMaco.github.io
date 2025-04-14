@@ -195,16 +195,16 @@ class App {
     /**
      * 載入書籍數據
      */
-    loadBooks() {
+    async loadBooks() {
         try {
             // 顯示載入中的提示
-            this.resultCount.textContent = '載入中...';
+            this.resultCount.textContent = '從GitHub載入中...';
             this.resultCount.className = 'badge bg-info';
             
             // 添加書籍載入事件監聽器
             document.addEventListener('booksLoaded', (event) => {
                 const count = event.detail?.count || 0;
-                this.showMessage(`已成功載入 ${count} 筆書籍數據`, 'success');
+                this.showMessage(`已成功從GitHub載入 ${count} 筆書籍數據`, 'success');
                 
                 // 獲取並顯示書籍數據
                 const books = db.getAllBooks();
@@ -218,7 +218,7 @@ class App {
             // 添加書籍載入錯誤事件監聽器
             document.addEventListener('booksLoadError', (event) => {
                 const errorMsg = event.detail?.error || '未知錯誤';
-                this.showMessage(`載入數據時發生錯誤: ${errorMsg}`, 'danger');
+                this.showMessage(`從GitHub載入數據時發生錯誤: ${errorMsg}`, 'danger');
                 console.error('數據庫初始化錯誤:', errorMsg);
                 
                 // 嘗試使用默認數據
@@ -230,8 +230,23 @@ class App {
                 }
             }, { once: true });
             
-            // 獲取書籍數據
-            const books = db.getAllBooks();
+            // 添加數據載入中事件監聽器
+            document.addEventListener('booksLoading', (event) => {
+                const message = event.detail?.message || '正在載入數據...';
+                this.showMessage(message, 'info');
+            });
+            
+            // 添加數據更新事件監聽器
+            document.addEventListener('booksUpdated', (event) => {
+                const count = event.detail?.count || 0;
+                this.showMessage(`已從GitHub更新 ${count} 筆書籍數據`, 'success');
+                this.displayBooks(db.getAllBooks());
+                this.updateResultCount(count);
+            });
+            
+            // 獲取書籍數據 (現在是異步的)
+            const database = new Database();
+            const books = await database.getAllBooks();
             
             // 檢查是否有數據
             if (books.length === 0) {

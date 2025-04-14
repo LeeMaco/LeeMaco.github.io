@@ -17,44 +17,84 @@ class Database {
         if (!localStorage.getItem('books')) {
             // 初始化時添加示例數據
             try {
-                // 嘗試從books.json載入示例數據
-                fetch('./data/books.json')
-                    .then(response => {
-                        if (!response.ok) {
-                            throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
-                        }
-                        return response.json();
-                    })
+                // 觸發數據載入開始事件
+                document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取數據...' } }));
+                
+                // 嘗試從GitHub獲取books.json數據
+                this.fetchBooksFromGitHub()
                     .then(data => {
-                        if (!data || !Array.isArray(data)) {
-                            throw new Error('數據格式無效，應為數組');
-                        }
-                        // 確保數據有效後再保存
-                        if (data.length > 0) {
-                            localStorage.setItem('books', JSON.stringify(data));
-                            console.log(`已從books.json載入 ${data.length} 筆示例數據`);
-                            // 觸發數據載入完成事件
-                            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: data.length } }));
-                        } else {
-                            throw new Error('數據文件為空');
+                        try {
+                            // 使用處理函數處理載入的數據
+                            this.handleDataLoaded(data, 'GitHub');
+                        } catch (error) {
+                            throw error;
                         }
                     })
                     .catch(error => {
-                        console.error('載入示例數據失敗:', error);
-                        // 如果載入失敗，設置默認示例數據
-                        const defaultBooks = this.getDefaultBooks();
-                        localStorage.setItem('books', JSON.stringify(defaultBooks));
-                        console.log(`已載入 ${defaultBooks.length} 筆默認示例數據`);
-                        // 觸發數據載入完成事件
-                        document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: defaultBooks.length } }));
+                        console.error('從GitHub載入數據失敗:', error);
+                        document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                            detail: { 
+                                message: '從GitHub獲取數據失敗，嘗試從本地載入', 
+                                error: error.message 
+                            } 
+                        }));
+                        
+                        // 嘗試從本地載入
+                        console.log('嘗試從本地載入數據...');
+                        document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從本地獲取數據...' } }));
+                        
+                        fetch('./data/books.json')
+                            .then(response => {
+                                if (!response.ok) {
+                                    throw new Error(`HTTP錯誤! 狀態: ${response.status}`);
+                                }
+                                return response.json();
+                            })
+                            .then(data => {
+                                try {
+                                    // 使用處理函數處理載入的數據
+                                    this.handleDataLoaded(data, '本地');
+                                } catch (error) {
+                                    throw error;
+                                }
+                            })
+                            .catch(localError => {
+                                console.error('載入本地數據失敗:', localError);
+                                document.dispatchEvent(new CustomEvent('booksLoadingError', { 
+                                    detail: { 
+                                        message: '從本地獲取數據失敗，使用默認數據', 
+                                        error: localError.message 
+                                    } 
+                                }));
+                                
+                                // 如果本地載入也失敗，設置默認示例數據
+                                const defaultBooks = this.getDefaultBooks();
+                                try {
+                                    // 使用處理函數處理默認數據
+                                    this.handleDataLoaded(defaultBooks, '默認');
+                                } catch (error) {
+                                    console.error('處理默認數據失敗:', error);
+                                    document.dispatchEvent(new CustomEvent('booksLoadError', { 
+                                        detail: { error: '無法載入任何數據，系統可能無法正常運行' } 
+                                    }));
+                                }
+                            });
                     });
             } catch (error) {
                 console.error('初始化數據庫時發生錯誤:', error);
+                document.dispatchEvent(new CustomEvent('booksLoadError', { detail: { error: error.message } }));
+                
                 // 確保即使出錯也設置默認示例數據
                 const defaultBooks = this.getDefaultBooks();
-                localStorage.setItem('books', JSON.stringify(defaultBooks));
-                // 觸發載入完成事件
-                document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: defaultBooks.length } }));
+                try {
+                    // 使用處理函數處理默認數據
+                    this.handleDataLoaded(defaultBooks, '默認');
+                } catch (error) {
+                    console.error('處理默認數據失敗:', error);
+                    document.dispatchEvent(new CustomEvent('booksLoadError', { 
+                        detail: { error: '無法載入任何數據，系統可能無法正常運行' } 
+                    }));
+                }
             }
         }
         
@@ -78,11 +118,53 @@ class Database {
     }
     
     /**
-     * 獲取所有書籍
-     * @returns {Array} 書籍數組
+     * 從GitHub獲取books.json數據
+     * @returns {Promise<Array>} 書籍數據的Promise
      */
-    getAllBooks() {
+    async fetchBooksFromGitHub() {
+        // GitHub原始內容URL
+        const rawUrl = 'https://raw.githubusercontent.com/leemaco/leemaco.github.io/main/data/books.json';
+        
         try {
+            // 顯示載入狀態
+            document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在從GitHub獲取數據...' } }));
+            
+            const response = await fetch(rawUrl);
+            if (!response.ok) {
+                throw new Error(`GitHub API錯誤! 狀態: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            return data;
+        } catch (error) {
+            console.error('從GitHub獲取數據失敗:', error);
+            throw error;
+        }
+    }
+    
+    /**
+     * 獲取所有書籍
+     * @returns {Promise<Array>} 書籍數組的Promise
+     */
+    async getAllBooks() {
+        try {
+            // 顯示載入狀態
+            document.dispatchEvent(new CustomEvent('booksLoading', { detail: { message: '正在獲取書籍數據...' } }));
+            
+            try {
+                // 首先嘗試從GitHub獲取最新數據
+                const data = await this.fetchBooksFromGitHub();
+                // 更新本地存儲
+                localStorage.setItem('books', JSON.stringify(data));
+                console.log(`已從GitHub更新 ${data.length} 筆書籍數據`);
+                // 觸發數據更新事件
+                document.dispatchEvent(new CustomEvent('booksUpdated', { detail: { count: data.length } }));
+                return data;
+            } catch (error) {
+                console.warn('無法從GitHub獲取最新數據，使用本地緩存:', error);
+                document.dispatchEvent(new CustomEvent('booksLoadingError', { detail: { message: '無法從GitHub獲取最新數據，使用本地緩存', error: error.message } }));
+            }
+            
             // 嘗試從localStorage獲取數據
             const booksData = localStorage.getItem('books');
             
@@ -430,57 +512,50 @@ class Database {
     
     /**
      * 同步數據到GitHub
-     * 使用GitHub API進行數據同步
      */
     syncToGitHub() {
         // 檢查是否已登入
-        if (!auth || !auth.isLoggedIn()) {
+        const auth = new Auth();
+        if (!auth.isLoggedIn()) {
             return;
         }
         
-        console.log('同步數據到GitHub...');
+        // 檢查是否已設置GitHub
+        const admin = new Admin();
+        const settings = admin.githubSettings;
         
-        // 獲取所有書籍數據
-        const books = this.getAllBooks();
+        if (!settings.token || !settings.repo) {
+            console.warn('GitHub設置不完整，無法同步');
+            return;
+        }
         
-        // 創建要上傳的數據對象
-        const syncData = {
-            books: books,
-            lastSync: new Date().toISOString(),
-            version: '1.0'
-        };
+        // 觸發同步事件
+        document.dispatchEvent(new CustomEvent('syncToGitHub', { 
+            detail: { 
+                data: this.getAllBooks(),
+                settings: settings
+            } 
+        }));
+    }
+    
+    /**
+     * 處理數據載入完成
+     * @param {Array} data 載入的數據
+     * @param {string} source 數據來源
+     */
+    handleDataLoaded(data, source) {
+        if (!data || !Array.isArray(data)) {
+            throw new Error('數據格式無效，應為數組');
+        }
         
-        // 檢查admin實例是否存在
-        if (typeof admin !== 'undefined' && admin.uploadToGitHub) {
-            // 使用admin.js中的uploadToGitHub函數
-            admin.uploadToGitHub(syncData)
-                .then(response => {
-                    console.log('數據同步完成', response);
-                    // 存儲最後同步時間
-                    localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                    // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
-                })
-                .catch(error => {
-                    console.error('數據同步失敗', error);
-                    // 觸發同步失敗事件
-                    this.triggerSyncEvent('error', error);
-                });
+        // 確保數據有效後再保存
+        if (data.length > 0) {
+            localStorage.setItem('books', JSON.stringify(data));
+            console.log(`已從${source}載入 ${data.length} 筆書籍數據`);
+            // 觸發數據載入完成事件
+            document.dispatchEvent(new CustomEvent('booksLoaded', { detail: { count: data.length, source: source } }));
         } else {
-            // 如果admin實例不存在，使用模擬API請求
-            this.simulateGitHubApiRequest(JSON.stringify(syncData, null, 2))
-                .then(response => {
-                    console.log('數據同步完成（模擬）', response);
-                    // 存儲最後同步時間
-                    localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                    // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
-                })
-                .catch(error => {
-                    console.error('數據同步失敗', error);
-                    // 觸發同步失敗事件
-                    this.triggerSyncEvent('error', error);
-                });
+            throw new Error(`${source}數據文件為空`);
         }
     }
     
