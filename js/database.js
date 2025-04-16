@@ -33,15 +33,20 @@ class Database {
                     this.handleDataLoaded('github', data.books.length);
                     
                     // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
+                    this.triggerSyncEvent('success', null, `成功從GitHub載入 ${data.books.length} 筆書籍數據`);
                 } else {
                     console.warn('從GitHub獲取的數據格式無效');
+                    // 觸發同步失敗事件
+                    this.triggerSyncEvent('error', null, '從GitHub獲取的數據格式無效');
                     // 如果GitHub沒有有效數據，嘗試從本地JSON文件載入
                     this.loadBooksFromLocalFile();
                 }
             })
             .catch(error => {
                 console.error('從GitHub載入數據失敗:', error);
+                // 觸發同步失敗事件
+                this.triggerSyncEvent('error', error, `從GitHub載入數據失敗: ${error.message}`);
+                
                 // 如果GitHub載入失敗，檢查本地是否已有數據
                 const booksData = localStorage.getItem('books');
                 if (booksData && booksData !== '[]') {
@@ -240,34 +245,188 @@ class Database {
                     this.handleDataLoaded('github', data.books.length);
                     
                     // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
+                    this.triggerSyncEvent('success', null, `成功從GitHub載入 ${data.books.length} 筆書籍數據`);
+                } else {
+                    console.warn('自動同步返回的數據格式無效');
+                    this.triggerSyncEvent('error', null, '從GitHub獲取的數據格式無效');
                 }
             })
             .catch(error => {
                 console.warn('自動同步失敗:', error.message);
                 // 自動同步失敗不顯示錯誤通知，避免影響用戶體驗
+                // 但仍然觸發同步事件，以便UI可以顯示適當的狀態
+                this.triggerSyncEvent('error', error, `同步失敗: ${error.message}`);
             });
+    }
+    
+    /**
+     * 測試GitHub連接
+     * 用於在設置頁面測試GitHub設置是否正確
+     * @returns {Promise<Object>} 測試結果的Promise
+     */
+    async testGitHubConnection() {
+        try {
+            console.log('測試GitHub連接...');
+            
+            // 檢查是否已登入
+            if (typeof window.auth === 'undefined' || !window.auth.isLoggedIn()) {
+                return {
+                    success: false,
+                    message: '請先登入系統'
+                };
+            }
+            
+            // 獲取GitHub設置
+            const settings = localStorage.getItem('githubSettings');
+            if (!settings) {
+                return {
+                    success: false,
+                    message: '未設置GitHub倉庫信息'
+                };
+            }
+            
+            let parsedSettings;
+            try {
+                parsedSettings = JSON.parse(settings);
+            } catch (e) {
+                return {
+                    success: false,
+                    message: 'GitHub設置格式無效'
+                };
+            }
+            
+            const { token, repo, branch, path } = parsedSettings;
+            
+            if (!token || !repo) {
+                return {
+                    success: false,
+                    message: 'GitHub設置不完整，請確保已設置訪問令牌和倉庫名稱'
+                };
+            }
+            
+            // 構建API URL進行測試請求
+            const filePath = path || 'books.json';
+            const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}`;
+            
+            // 設置請求頭
+            const headers = {
+                'Authorization': `token ${token}`,
+                'Accept': 'application/vnd.github.v3.raw'
+            };
+            
+            // 發送請求
+            const response = await fetch(apiUrl, { headers });
+            
+            // 檢查響應狀態
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`GitHub API測試錯誤 (${response.status}): ${errorText}`);
+                
+                // 根據狀態碼提供更具體的錯誤信息
+                let errorMessage = `GitHub API錯誤: ${response.status} ${response.statusText}`;
+                
+                if (response.status === 401) {
+                    errorMessage = 'GitHub授權失敗：請檢查您的訪問令牌是否有效';
+                } else if (response.status === 403) {
+                    errorMessage = 'GitHub訪問受限：可能是API速率限制或權限問題';
+                } else if (response.status === 404) {
+                    errorMessage = '找不到GitHub倉庫或文件：請檢查倉庫名稱和文件路徑是否正確';
+                }
+                
+                return {
+                    success: false,
+                    message: errorMessage
+                };
+            }
+            
+            // 測試成功
+            return {
+                success: true,
+                message: '成功連接到GitHub倉庫'
+            };
+            
+        } catch (error) {
+            console.error('測試GitHub連接時發生錯誤:', error);
+            return {
+                success: false,
+                message: `連接錯誤: ${error.message}`
+            };
+        }
     }
     
     /**
      * 觸發同步事件
      * @param {string} status 同步狀態 ('success' 或 'error')
      * @param {Error} error 錯誤對象（如果有）
+     * @param {string} message 自定義錯誤消息（如果有）
      */
-    triggerSyncEvent(status, error = null) {
+    triggerSyncEvent(status, error = null, message = null) {
         // 創建自定義事件
         const event = new CustomEvent('githubSync', {
             detail: {
                 status: status,
                 timestamp: new Date().toISOString(),
-                error: error
+                error: error,
+                message: message || (error ? error.message : null)
             }
         });
         
         // 分發事件
         document.dispatchEvent(event);
         
-        console.log(`GitHub同步事件已觸發 [狀態: ${status}]`);
+        console.log(`GitHub同步事件已觸發 [狀態: ${status}]${message ? ': ' + message : ''}`);
+        
+        // 顯示通知
+        if (status === 'error' && message) {
+            this.showNotification('GitHub同步失敗', message, 'error');
+        } else if (status === 'success') {
+            this.showNotification('GitHub同步成功', '已成功從GitHub獲取最新數據', 'success');
+        }
+    }
+    
+    /**
+     * 顯示通知
+     * @param {string} title 通知標題
+     * @param {string} message 通知消息
+     * @param {string} type 通知類型 ('success', 'error', 'warning', 'info')
+     */
+    showNotification(title, message, type = 'info') {
+        // 檢查是否支持原生通知
+        if ('Notification' in window) {
+            // 檢查通知權限
+            if (Notification.permission === 'granted') {
+                // 創建通知
+                new Notification(title, {
+                    body: message,
+                    icon: type === 'error' ? '/img/error.png' : '/img/success.png'
+                });
+            } else if (Notification.permission !== 'denied') {
+                // 請求通知權限
+                Notification.requestPermission().then(permission => {
+                    if (permission === 'granted') {
+                        new Notification(title, {
+                            body: message,
+                            icon: type === 'error' ? '/img/error.png' : '/img/success.png'
+                        });
+                    }
+                });
+            }
+        }
+        
+        // 創建自定義事件，以便UI層可以顯示通知
+        const event = new CustomEvent('notification', {
+            detail: {
+                title: title,
+                message: message,
+                type: type,
+                timestamp: new Date().toISOString()
+            }
+        });
+        
+        // 分發事件
+        document.dispatchEvent(event);
+        
+        console.log(`通知: [${type}] ${title} - ${message}`);
     }
     
     /**
@@ -275,35 +434,49 @@ class Database {
      * @returns {Promise<Object>} 包含書籍數據的Promise
      */
     async fetchBooksFromGitHub() {
-        // 檢查是否已登入且有GitHub設置
-        if (typeof auth === 'undefined' || !auth.isLoggedIn()) {
-            console.warn('未登入GitHub，無法獲取最新數據');
-            return Promise.reject(new Error('未登入GitHub'));
-        }
-        
-        // 獲取GitHub設置
-        const settings = localStorage.getItem('githubSettings');
-        if (!settings) {
-            console.warn('未設置GitHub倉庫信息，無法獲取最新數據');
-            return Promise.reject(new Error('未設置GitHub倉庫信息'));
-        }
-        
-        const { token, repo, branch, path } = JSON.parse(settings);
-        
-        if (!token || !repo) {
-            console.warn('GitHub設置不完整，無法獲取最新數據');
-            return Promise.reject(new Error('GitHub設置不完整'));
-        }
-        
-        console.log(`正在從GitHub倉庫 ${repo} 獲取數據...`);
-        
-        // 添加緩存破壞參數，確保獲取最新數據
-        const cacheBuster = `?timestamp=${Date.now()}`;
-        
-        // 構建API URL
-        const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}${cacheBuster}`;
-        
         try {
+            // 檢查是否已登入且有GitHub設置
+            if (typeof window.auth === 'undefined') {
+                console.warn('認證模組未載入，無法獲取最新數據');
+                return Promise.reject(new Error('認證模組未載入'));
+            }
+            
+            if (!window.auth.isLoggedIn()) {
+                console.warn('未登入GitHub，無法獲取最新數據');
+                return Promise.reject(new Error('未登入GitHub'));
+            }
+            
+            // 獲取GitHub設置
+            const settings = localStorage.getItem('githubSettings');
+            if (!settings) {
+                console.warn('未設置GitHub倉庫信息，無法獲取最新數據');
+                return Promise.reject(new Error('未設置GitHub倉庫信息'));
+            }
+            
+            let parsedSettings;
+            try {
+                parsedSettings = JSON.parse(settings);
+            } catch (e) {
+                console.error('解析GitHub設置時發生錯誤:', e);
+                return Promise.reject(new Error('GitHub設置格式無效'));
+            }
+            
+            const { token, repo, branch, path } = parsedSettings;
+            
+            if (!token || !repo) {
+                console.warn('GitHub設置不完整，無法獲取最新數據');
+                return Promise.reject(new Error('GitHub設置不完整'));
+            }
+            
+            console.log(`正在從GitHub倉庫 ${repo} 獲取數據...`);
+            
+            // 添加緩存破壞參數，確保獲取最新數據
+            const cacheBuster = `?timestamp=${Date.now()}`;
+            
+            // 構建API URL
+            const filePath = path || 'books.json';
+            const apiUrl = `https://api.github.com/repos/${repo}/contents/${filePath}${cacheBuster}`;
+            
             // 設置請求頭
             const headers = {
                 'Authorization': `token ${token}`,
@@ -318,11 +491,31 @@ class Database {
             if (!response.ok) {
                 const errorText = await response.text();
                 console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
-                throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
+                
+                // 根據狀態碼提供更具體的錯誤信息
+                let errorMessage = `GitHub API錯誤: ${response.status} ${response.statusText}`;
+                
+                if (response.status === 401) {
+                    errorMessage = 'GitHub授權失敗：請檢查您的訪問令牌是否有效';
+                } else if (response.status === 403) {
+                    errorMessage = 'GitHub訪問受限：可能是API速率限制或權限問題';
+                } else if (response.status === 404) {
+                    errorMessage = '找不到GitHub倉庫或文件：請檢查倉庫名稱和文件路徑是否正確';
+                }
+                
+                throw new Error(errorMessage);
             }
             
             // 解析數據
-            const data = await response.json();
+            let data;
+            try {
+                const contentText = await response.text();
+                console.log('從GitHub獲取的原始數據:', contentText.substring(0, 200) + '...');
+                data = JSON.parse(contentText);
+            } catch (e) {
+                console.error('解析GitHub數據時發生錯誤:', e);
+                throw new Error('從GitHub獲取的數據不是有效的JSON格式');
+            }
             
             // 存儲最後同步時間
             localStorage.setItem('lastGitHubSync', new Date().toISOString());
@@ -330,19 +523,48 @@ class Database {
             console.log('成功從GitHub獲取數據', data);
             
             // 處理不同的數據格式
+            console.log('處理從GitHub獲取的數據格式:', typeof data, Array.isArray(data));
+            
             if (Array.isArray(data)) {
                 // 如果數據本身就是數組，直接返回
+                console.log('數據是數組格式，包含', data.length, '個項目');
                 return { books: data };
             } else if (data && typeof data === 'object') {
                 // 如果數據是對象，檢查是否有books屬性
                 if (data.books && Array.isArray(data.books)) {
+                    console.log('數據是包含books屬性的對象，books包含', data.books.length, '個項目');
                     return data;
+                } else if (data.content && typeof data.content === 'string') {
+                    // GitHub API可能返回Base64編碼的內容
+                    try {
+                        console.log('數據包含Base64編碼的content屬性，嘗試解碼...');
+                        const decodedContent = atob(data.content);
+                        const parsedContent = JSON.parse(decodedContent);
+                        
+                        if (Array.isArray(parsedContent)) {
+                            console.log('解碼後的數據是數組，包含', parsedContent.length, '個項目');
+                            return { books: parsedContent };
+                        } else if (parsedContent && typeof parsedContent === 'object') {
+                            if (parsedContent.books && Array.isArray(parsedContent.books)) {
+                                console.log('解碼後的數據是包含books屬性的對象，包含', parsedContent.books.length, '個項目');
+                                return parsedContent;
+                            } else {
+                                console.log('解碼後的數據是對象，但不包含books數組，將其包裝為單一項目');
+                                return { books: [parsedContent] };
+                            }
+                        }
+                    } catch (e) {
+                        console.error('解碼或解析Base64內容時發生錯誤:', e);
+                        throw new Error('無法解析GitHub返回的Base64編碼內容');
+                    }
                 } else {
                     // 如果是其他格式的對象，將其包裝在books屬性中
+                    console.log('數據是對象，但不包含books數組或content屬性，將其包裝為單一項目');
                     return { books: [data] };
                 }
             } else {
                 // 如果數據格式完全不符合預期，拋出錯誤
+                console.error('數據格式無效:', data);
                 throw new Error('從GitHub獲取的數據格式無效');
             }
         } catch (error) {
