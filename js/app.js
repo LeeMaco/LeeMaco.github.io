@@ -86,6 +86,9 @@ class App {
         
         // 同步狀態元素 (如果不存在，則創建一個通知區域)
         this.syncStatus = document.getElementById('syncStatus') || this.createSyncStatusElement();
+        
+        // 同步狀態指示器
+        this.syncIndicator = document.getElementById('syncIndicator') || this.createSyncIndicatorElement();
     }
     
     /**
@@ -100,6 +103,27 @@ class App {
         statusElement.style.zIndex = '5';
         document.body.appendChild(statusElement);
         return statusElement;
+    }
+    
+    /**
+     * 創建同步狀態指示器元素
+     * @returns {HTMLElement} 同步狀態指示器元素
+     */
+    createSyncIndicatorElement() {
+        // 創建一個小指示器，顯示在同步按鈕旁邊
+        const indicatorElement = document.createElement('span');
+        indicatorElement.id = 'syncIndicator';
+        indicatorElement.className = 'badge bg-secondary ms-1';
+        indicatorElement.style.fontSize = '0.7em';
+        indicatorElement.textContent = '未同步';
+        
+        // 找到同步按鈕並添加指示器
+        const syncButton = document.getElementById('syncGitHubBtn');
+        if (syncButton && syncButton.parentNode) {
+            syncButton.parentNode.insertBefore(indicatorElement, syncButton.nextSibling);
+        }
+        
+        return indicatorElement;
     }
     
     /**
@@ -226,8 +250,9 @@ class App {
     
     /**
      * 載入書籍數據
+     * @param {boolean} autoSync 是否自動同步
      */
-    loadBooks() {
+    loadBooks(autoSync = true) {
         // 顯示載入中的狀態提示
         this.showMessage('正在載入書籍數據...', 'info');
         
@@ -243,12 +268,80 @@ class App {
                 }
                 this.displayBooks(books);
                 this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+                
+                // 如果啟用自動同步，嘗試從GitHub同步最新數據
+                if (autoSync) {
+                    this.autoSyncFromGitHub();
+                }
             })
             .catch(error => {
                 console.error('載入書籍數據時發生錯誤:', error);
                 this.showMessage(`載入書籍數據時發生錯誤: ${error.message}`, 'danger');
                 this.displayBooks([]);
             });
+    }
+    
+    /**
+     * 自動從GitHub同步數據
+     */
+    autoSyncFromGitHub() {
+        // 更新同步指示器狀態
+        if (this.syncIndicator) {
+            this.syncIndicator.className = 'badge bg-warning ms-1';
+            this.syncIndicator.textContent = '同步中...';
+        }
+        
+        // 嘗試從GitHub獲取最新數據（不強制刷新，使用增量同步）
+        db.getAllBooks(false) // 傳入false表示非強制刷新，會檢查版本和時間
+            .then(result => {
+                // 根據同步結果更新指示器
+                if (this.syncIndicator) {
+                    if (result && result.status === 'success') {
+                        this.syncIndicator.className = 'badge bg-success ms-1';
+                        this.syncIndicator.textContent = '已同步';
+                        
+                        // 顯示增量同步成功的詳細提示
+                        let syncMessage = `成功從GitHub同步數據，共 ${result.total || 0} 筆書籍`;
+                        if (result.added > 0 || result.updated > 0 || result.deleted > 0) {
+                            syncMessage += ` (新增: ${result.added || 0}, 更新: ${result.updated || 0}`;
+                            if (result.deleted > 0) {
+                                syncMessage += `, 刪除: ${result.deleted}`;
+                            }
+                            syncMessage += ')';
+                        }
+                        this.showMessage(syncMessage, 'success', 3000);
+                        
+                        // 如果有數據變更，重新載入顯示
+                        if (result.added > 0 || result.updated > 0 || result.deleted > 0) {
+                            this.loadBooks(false); // 重新載入但不再次同步
+                        }
+                    } else if (result && result.status === 'skipped') {
+                        this.syncIndicator.className = 'badge bg-info ms-1';
+                        this.syncIndicator.textContent = '已是最新';
+                        
+                        // 顯示跳過同步的原因
+                        if (result.message) {
+                            console.log(`同步已跳過: ${result.message}`);
+                        }
+                    } else {
+                        this.syncIndicator.className = 'badge bg-secondary ms-1';
+                        this.syncIndicator.textContent = '未同步';
+                    }
+                }
+            })
+            .catch(error => {
+                console.error('自動同步數據時發生錯誤:', error);
+                // 更新指示器狀態為錯誤
+                if (this.syncIndicator) {
+                    this.syncIndicator.className = 'badge bg-danger ms-1';
+                    this.syncIndicator.textContent = '同步失敗';
+                }
+                
+                // 顯示錯誤提示，但使用較短的顯示時間，避免干擾用戶
+                this.showMessage(`同步時發生錯誤: ${error.message}`, 'warning', 2000);
+            });
+    }
+    }
     }
     
     /**
