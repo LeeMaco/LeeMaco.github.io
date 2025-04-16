@@ -39,9 +39,6 @@ class Database {
         } else {
             // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
             this.autoSyncFromGitHub();
-        } else {
-            // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
-            this.autoSyncFromGitHub();
         }
         
         // 檢查是否已有備份設定
@@ -70,19 +67,38 @@ class Database {
         try {
             // 嘗試從books.json載入示例數據
             fetch('data/books.json')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`載入失敗: ${response.status} ${response.statusText}`);
+                    }
+                    return response.json();
+                })
                 .then(data => {
-                    localStorage.setItem('books', JSON.stringify(data));
-                    console.log('已從books.json載入示例數據');
-                    // 觸發數據載入完成事件
-                    this.handleDataLoaded('local', data.length);
+                    // 檢查數據格式
+                    if (Array.isArray(data)) {
+                        localStorage.setItem('books', JSON.stringify(data));
+                        console.log(`已從books.json載入示例數據，共 ${data.length} 筆`);
+                        // 觸發數據載入完成事件
+                        this.handleDataLoaded('local', data.length);
+                    } else if (data && typeof data === 'object') {
+                        // 如果是對象但不是數組，嘗試轉換
+                        const booksArray = data.books && Array.isArray(data.books) ? data.books : [data];
+                        localStorage.setItem('books', JSON.stringify(booksArray));
+                        console.log(`已從books.json載入並轉換數據，共 ${booksArray.length} 筆`);
+                        this.handleDataLoaded('local', booksArray.length);
+                    } else {
+                        // 數據格式完全不符合預期
+                        console.error('books.json數據格式無效');
+                        localStorage.setItem('books', JSON.stringify([]));
+                        this.handleDataLoaded('empty', 0, new Error('數據格式無效'));
+                    }
                 })
                 .catch(error => {
                     console.error('載入示例數據失敗:', error);
                     // 如果載入失敗，設置空數組
                     localStorage.setItem('books', JSON.stringify([]));
                     // 觸發數據載入完成事件（空數據）
-                    this.handleDataLoaded('empty', 0);
+                    this.handleDataLoaded('empty', 0, error);
                 });
         } catch (error) {
             console.error('初始化數據庫時發生錯誤:', error);
@@ -143,12 +159,27 @@ class Database {
                         console.warn('從GitHub獲取的數據格式無效');
                         // 觸發錯誤事件
                         this.handleDataLoaded('error', 0, new Error('數據格式無效'));
+                        
+                        // 嘗試從本地獲取數據作為備選
+                        console.log('嘗試從本地存儲獲取數據作為備選...');
+                        const localBooks = this.getLocalBooks();
+                        if (localBooks && localBooks.length > 0) {
+                            return localBooks;
+                        }
+                        
                         throw new Error('從GitHub獲取的數據格式無效');
                     }
                 } catch (error) {
                     console.error('從GitHub獲取數據失敗，將使用本地數據:', error);
                     // 觸發錯誤事件
                     this.handleDataLoaded('error', 0, error);
+                    
+                    // 嘗試從本地獲取數據作為備選
+                    const localBooks = this.getLocalBooks();
+                    if (localBooks && localBooks.length > 0) {
+                        return localBooks;
+                    }
+                    
                     throw error; // 將錯誤向上傳遞，以便UI層可以顯示適當的錯誤信息
                 }
             }
@@ -191,6 +222,32 @@ class Database {
     }
     
     /**
+     * 從本地存儲獲取書籍數據（作為備選方案）
+     * @returns {Array} 書籍數組
+     */
+    getLocalBooks() {
+        try {
+            const booksData = localStorage.getItem('books');
+            if (!booksData) {
+                console.warn('本地存儲中沒有書籍數據');
+                return [];
+            }
+            
+            const books = JSON.parse(booksData);
+            if (!Array.isArray(books)) {
+                console.warn('本地存儲中的書籍數據格式無效');
+                return [];
+            }
+            
+            console.log(`從本地存儲獲取到 ${books.length} 筆書籍數據`);
+            return books;
+        } catch (error) {
+            console.error('從本地存儲獲取書籍數據時發生錯誤:', error);
+            return [];
+        }
+    }
+    
+    /**
      * 自動從GitHub同步最新數據
      * 在用戶進入首頁時自動調用，不影響用戶體驗
      */
@@ -215,6 +272,14 @@ class Database {
         this.fetchBooksFromGitHub()
             .then(data => {
                 if (data && data.books && Array.isArray(data.books)) {
+                    // 檢查數據是否為空
+                    if (data.books.length === 0) {
+                        console.log('從GitHub獲取的數據為空數組，保留現有數據');
+                        // 不更新本地存儲，但仍記錄同步時間
+                        localStorage.setItem('lastGitHubSync', new Date().toISOString());
+                        return;
+                    }
+                    
                     // 更新本地存儲
                     localStorage.setItem('books', JSON.stringify(data.books));
                     console.log(`自動同步完成：成功從GitHub載入 ${data.books.length} 筆書籍數據`);
@@ -224,11 +289,15 @@ class Database {
                     
                     // 觸發同步成功事件
                     this.triggerSyncEvent('success');
+                } else {
+                    console.warn('自動同步獲取的數據格式無效，保留現有數據');
                 }
             })
             .catch(error => {
                 console.warn('自動同步失敗:', error.message);
                 // 自動同步失敗不顯示錯誤通知，避免影響用戶體驗
+                // 觸發同步失敗事件，但不顯示給用戶
+                this.triggerSyncEvent('error', error);
             });
     }
     
@@ -312,6 +381,9 @@ class Database {
             // 處理不同的數據格式
             if (Array.isArray(data)) {
                 // 如果數據本身就是數組，直接返回
+                if (data.length === 0) {
+                    console.log('從GitHub獲取的數據為空數組');
+                }
                 return { books: data };
             } else if (data && typeof data === 'object') {
                 // 如果數據是對象，檢查是否有books屬性
@@ -319,10 +391,16 @@ class Database {
                     return data;
                 } else {
                     // 如果是其他格式的對象，將其包裝在books屬性中
+                    console.log('數據格式不包含books屬性，進行自動轉換');
                     return { books: [data] };
                 }
+            } else if (data === null || data === undefined) {
+                // 處理空數據情況
+                console.warn('從GitHub獲取的數據為空');
+                return { books: [] };
             } else {
                 // 如果數據格式完全不符合預期，拋出錯誤
+                console.error('獲取的數據格式無效:', typeof data);
                 throw new Error('獲取的數據格式無效');
             }
         } catch (error) {
