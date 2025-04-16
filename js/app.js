@@ -266,26 +266,31 @@ class App {
      * @param {boolean} silent 是否靜默同步
      */
     checkForUpdates(silent = false) {
-        // 使用靜默模式檢查更新
-        db.syncFromGitHub(false, silent)
-            .then(result => {
-                if (result.status === 'success' && !silent) {
-                    // 如果同步成功且非靜默模式，顯示成功消息
-                    this.showMessage(`成功從GitHub同步 ${result.total} 筆書籍數據`, 'success');
-                    
-                    // 重新載入書籍數據（不再檢查更新，避免循環）
-                    this.loadBooks(false);
-                } else if (result.status === 'error' && !silent) {
-                    // 如果同步失敗且非靜默模式，顯示錯誤消息
-                    this.showMessage(`從GitHub同步數據時發生錯誤: ${result.message}`, 'danger');
-                }
-            })
-            .catch(error => {
-                if (!silent) {
-                    console.error('檢查更新時發生錯誤:', error);
-                    this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
-                }
-            });
+        try {
+            // 使用getAllBooks方法進行同步，而不是直接調用syncFromGitHub
+            // 因為在新的模塊化結構中，syncFromGitHub已移至DatabaseManager.js
+            db.getAllBooks(true) // 傳入true表示強制刷新
+                .then(books => {
+                    if (!silent) {
+                        // 如果非靜默模式，顯示成功消息
+                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                        
+                        // 更新顯示（不再重新載入，避免循環）
+                        this.displayBooks(books);
+                    }
+                })
+                .catch(error => {
+                    if (!silent) {
+                        console.error('檢查更新時發生錯誤:', error);
+                        this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
+                    }
+                });
+        } catch (error) {
+            if (!silent) {
+                console.error('檢查更新時發生錯誤:', error);
+                this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
+            }
+        }
     }
     
     /**
