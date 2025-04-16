@@ -326,11 +326,58 @@
                         <label for="githubPath" class="form-label">檔案路徑</label>
                         <input type="text" class="form-control" id="githubPath" placeholder="books-data.json" value="books-data.json">
                     </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#autoSyncSettingsModal">
+                            <i class="fas fa-sync-alt me-1"></i> 自動同步設置
+                        </button>
+                    </div>
                     <div id="githubStatus" class="alert d-none"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="saveGitHubSettingsBtn">儲存設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 自動同步設置模態框 -->
+    <div class="modal fade" id="autoSyncSettingsModal" tabindex="-1" aria-labelledby="autoSyncSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="autoSyncSettingsModalLabel">自動同步設置</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="autoSyncSettingsForm">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enableAutoSync" checked>
+                            <label class="form-check-label" for="enableAutoSync">啟用自動同步</label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="syncInterval" class="form-label">檢查間隔 (分鐘)</label>
+                            <input type="number" class="form-control" id="syncInterval" min="5" max="1440" value="30">
+                            <div class="form-text">設置自動檢查GitHub更新的時間間隔，建議不少於5分鐘。</div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="syncOnStartup" checked>
+                            <label class="form-check-label" for="syncOnStartup">應用啟動時同步</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="syncOnNetworkReconnect" checked>
+                            <label class="form-check-label" for="syncOnNetworkReconnect">網絡恢復時同步</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="silentSync" checked>
+                            <label class="form-check-label" for="silentSync">靜默同步 (不顯示通知)</label>
+                            <div class="form-text">啟用後，自動同步成功時不會顯示通知，避免打擾用戶。</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveAutoSyncSettingsBtn">保存設置</button>
                 </div>
             </div>
         </div>

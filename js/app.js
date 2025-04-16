@@ -1,5 +1,6 @@
 /**
  * 主應用模組 - 整合所有功能並處理用戶界面交互
+ * 優化首頁查詢書籍功能，實現自動檢查GitHub更新
  */
 
 class App {
@@ -18,6 +19,9 @@ class App {
         
         // 監聽GitHub同步事件
         this.listenForGitHubSyncEvents();
+        
+        // 初始化自動同步設置
+        this.initAutoSyncSettings();
     }
     
     /**
@@ -86,9 +90,6 @@ class App {
         
         // 同步狀態元素 (如果不存在，則創建一個通知區域)
         this.syncStatus = document.getElementById('syncStatus') || this.createSyncStatusElement();
-        
-        // 同步狀態指示器
-        this.syncIndicator = document.getElementById('syncIndicator') || this.createSyncIndicatorElement();
     }
     
     /**
@@ -103,27 +104,6 @@ class App {
         statusElement.style.zIndex = '5';
         document.body.appendChild(statusElement);
         return statusElement;
-    }
-    
-    /**
-     * 創建同步狀態指示器元素
-     * @returns {HTMLElement} 同步狀態指示器元素
-     */
-    createSyncIndicatorElement() {
-        // 創建一個小指示器，顯示在同步按鈕旁邊
-        const indicatorElement = document.createElement('span');
-        indicatorElement.id = 'syncIndicator';
-        indicatorElement.className = 'badge bg-secondary ms-1';
-        indicatorElement.style.fontSize = '0.7em';
-        indicatorElement.textContent = '未同步';
-        
-        // 找到同步按鈕並添加指示器
-        const syncButton = document.getElementById('syncGitHubBtn');
-        if (syncButton && syncButton.parentNode) {
-            syncButton.parentNode.insertBefore(indicatorElement, syncButton.nextSibling);
-        }
-        
-        return indicatorElement;
     }
     
     /**
@@ -250,9 +230,9 @@ class App {
     
     /**
      * 載入書籍數據
-     * @param {boolean} autoSync 是否自動同步
+     * @param {boolean} checkForUpdates 是否檢查更新
      */
-    loadBooks(autoSync = true) {
+    loadBooks(checkForUpdates = true) {
         // 顯示載入中的狀態提示
         this.showMessage('正在載入書籍數據...', 'info');
         
@@ -269,9 +249,9 @@ class App {
                 this.displayBooks(books);
                 this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
                 
-                // 如果啟用自動同步，嘗試從GitHub同步最新數據
-                if (autoSync) {
-                    this.autoSyncFromGitHub();
+                // 檢查更新
+                if (checkForUpdates) {
+                    this.checkForUpdates(true);
                 }
             })
             .catch(error => {
@@ -282,66 +262,108 @@ class App {
     }
     
     /**
-     * 自動從GitHub同步數據
+     * 檢查GitHub更新
+     * @param {boolean} silent 是否靜默同步
      */
-    autoSyncFromGitHub() {
-        // 更新同步指示器狀態
-        if (this.syncIndicator) {
-            this.syncIndicator.className = 'badge bg-warning ms-1';
-            this.syncIndicator.textContent = '同步中...';
-        }
-        
-        // 嘗試從GitHub獲取最新數據（不強制刷新，使用增量同步）
-        db.getAllBooks(false) // 傳入false表示非強制刷新，會檢查版本和時間
+    checkForUpdates(silent = false) {
+        // 使用靜默模式檢查更新
+        db.syncFromGitHub(false, silent)
             .then(result => {
-                // 根據同步結果更新指示器
-                if (this.syncIndicator) {
-                    if (result && result.status === 'success') {
-                        this.syncIndicator.className = 'badge bg-success ms-1';
-                        this.syncIndicator.textContent = '已同步';
-                        
-                        // 顯示增量同步成功的詳細提示
-                        let syncMessage = `成功從GitHub同步數據，共 ${result.total || 0} 筆書籍`;
-                        if (result.added > 0 || result.updated > 0 || result.deleted > 0) {
-                            syncMessage += ` (新增: ${result.added || 0}, 更新: ${result.updated || 0}`;
-                            if (result.deleted > 0) {
-                                syncMessage += `, 刪除: ${result.deleted}`;
-                            }
-                            syncMessage += ')';
-                        }
-                        this.showMessage(syncMessage, 'success', 3000);
-                        
-                        // 如果有數據變更，重新載入顯示
-                        if (result.added > 0 || result.updated > 0 || result.deleted > 0) {
-                            this.loadBooks(false); // 重新載入但不再次同步
-                        }
-                    } else if (result && result.status === 'skipped') {
-                        this.syncIndicator.className = 'badge bg-info ms-1';
-                        this.syncIndicator.textContent = '已是最新';
-                        
-                        // 顯示跳過同步的原因
-                        if (result.message) {
-                            console.log(`同步已跳過: ${result.message}`);
-                        }
-                    } else {
-                        this.syncIndicator.className = 'badge bg-secondary ms-1';
-                        this.syncIndicator.textContent = '未同步';
-                    }
+                if (result.status === 'success' && !silent) {
+                    // 如果同步成功且非靜默模式，顯示成功消息
+                    this.showMessage(`成功從GitHub同步 ${result.total} 筆書籍數據`, 'success');
+                    
+                    // 重新載入書籍數據（不再檢查更新，避免循環）
+                    this.loadBooks(false);
+                } else if (result.status === 'error' && !silent) {
+                    // 如果同步失敗且非靜默模式，顯示錯誤消息
+                    this.showMessage(`從GitHub同步數據時發生錯誤: ${result.message}`, 'danger');
                 }
             })
             .catch(error => {
-                console.error('自動同步數據時發生錯誤:', error);
-                // 更新指示器狀態為錯誤
-                if (this.syncIndicator) {
-                    this.syncIndicator.className = 'badge bg-danger ms-1';
-                    this.syncIndicator.textContent = '同步失敗';
+                if (!silent) {
+                    console.error('檢查更新時發生錯誤:', error);
+                    this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
                 }
-                
-                // 顯示錯誤提示，但使用較短的顯示時間，避免干擾用戶
-                this.showMessage(`同步時發生錯誤: ${error.message}`, 'warning', 2000);
             });
     }
-    }
+    
+    /**
+     * 優化數據緩存策略
+     * 確保在網絡不穩定情況下也能提供良好的查詢體驗
+     */
+    setupCacheStrategy() {
+        // 實現本地緩存策略
+        const cacheBooks = async (books) => {
+            if (!books || !Array.isArray(books) || books.length === 0) return;
+            
+            try {
+                // 緩存書籍數據到sessionStorage
+                // 使用sessionStorage而非localStorage，避免長期占用存儲空間
+                sessionStorage.setItem('cachedBooks', JSON.stringify({
+                    timestamp: new Date().getTime(),
+                    data: books
+                }));
+                console.log(`已緩存 ${books.length} 筆書籍數據到sessionStorage`);
+            } catch (error) {
+                console.warn('緩存書籍數據失敗:', error);
+            }
+        };
+        
+        // 從緩存獲取書籍數據
+        const getCachedBooks = () => {
+            try {
+                const cachedData = sessionStorage.getItem('cachedBooks');
+                if (!cachedData) return null;
+                
+                const parsed = JSON.parse(cachedData);
+                const now = new Date().getTime();
+                const cacheAge = now - parsed.timestamp;
+                
+                // 緩存有效期為30分鐘
+                if (cacheAge > 30 * 60 * 1000) {
+                    console.log('緩存數據已過期');
+                    return null;
+                }
+                
+                console.log(`從緩存獲取 ${parsed.data.length} 筆書籍數據，緩存時間: ${Math.round(cacheAge / 1000 / 60)} 分鐘前`);
+                return parsed.data;
+            } catch (error) {
+                console.warn('獲取緩存數據失敗:', error);
+                return null;
+            }
+        };
+        
+        // 覆蓋原有的書籍顯示方法，添加緩存功能
+        const originalDisplayBooks = this.displayBooks;
+        this.displayBooks = (books) => {
+            // 顯示書籍
+            originalDisplayBooks.call(this, books);
+            
+            // 緩存書籍數據
+            cacheBooks(books);
+        };
+        
+        // 覆蓋原有的載入書籍方法，添加緩存功能
+        const originalLoadBooks = this.loadBooks;
+        this.loadBooks = (checkForUpdates = true) => {
+            // 嘗試從緩存獲取數據
+            const cachedBooks = getCachedBooks();
+            
+            if (cachedBooks) {
+                // 如果有緩存數據，先顯示緩存數據
+                this.displayBooks(cachedBooks);
+                this.showMessage(`已從緩存載入 ${cachedBooks.length} 筆書籍數據`, 'info');
+                
+                // 然後在背景檢查更新
+                if (checkForUpdates) {
+                    setTimeout(() => this.checkForUpdates(true), 1000);
+                }
+            } else {
+                // 如果沒有緩存數據，使用原方法載入
+                originalLoadBooks.call(this, checkForUpdates);
+            }
+        };
     }
     
     /**
@@ -966,6 +988,113 @@ class App {
     }
     
     /**
+     * 初始化自動同步設置
+     */
+    async initAutoSyncSettings() {
+        try {
+            // 載入自動同步設置
+            const settings = await db.getAutoSyncSettings();
+            console.log('已載入自動同步設置:', settings);
+            
+            // 設置自動同步管理器
+            if (typeof db.autoSyncManager === 'undefined') {
+                console.log('初始化自動同步管理器...');
+                // 檢查是否有GitHubSync實例
+                if (typeof db.githubSync !== 'undefined') {
+                    // 創建AutoSyncManager實例
+                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    console.log('自動同步管理器已初始化');
+                } else {
+                    console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
+                }
+            }
+            
+            // 初始化自動同步設置界面
+            const autoSyncSettingsModal = document.getElementById('autoSyncSettingsModal');
+            if (autoSyncSettingsModal) {
+                this.initAutoSyncSettingsUI(settings);
+            }
+        } catch (error) {
+            console.error('初始化自動同步設置失敗:', error);
+        }
+    }
+    
+    /**
+     * 初始化自動同步設置界面
+     * @param {Object} settings 自動同步設置
+     */
+    initAutoSyncSettingsUI(settings) {
+        // 獲取設置元素
+        const enableAutoSync = document.getElementById('enableAutoSync');
+        const syncInterval = document.getElementById('syncInterval');
+        const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+        const syncOnStartup = document.getElementById('syncOnStartup');
+        const silentSync = document.getElementById('silentSync');
+        const saveAutoSyncSettingsBtn = document.getElementById('saveAutoSyncSettingsBtn');
+        
+        if (enableAutoSync && syncInterval) {
+            // 設置初始值
+            enableAutoSync.checked = settings.enabled !== false;
+            syncInterval.value = settings.intervalMinutes || 30;
+            
+            if (syncOnNetworkReconnect) {
+                syncOnNetworkReconnect.checked = settings.syncOnNetworkReconnect !== false;
+            }
+            
+            if (syncOnStartup) {
+                syncOnStartup.checked = settings.syncOnStartup !== false;
+            }
+            
+            if (silentSync) {
+                silentSync.checked = settings.silentSync !== false;
+            }
+            
+            // 添加保存按鈕事件
+            if (saveAutoSyncSettingsBtn) {
+                saveAutoSyncSettingsBtn.addEventListener('click', () => this.saveAutoSyncSettings());
+            }
+        }
+    }
+    
+    /**
+     * 保存自動同步設置
+     */
+    async saveAutoSyncSettings() {
+        try {
+            // 獲取設置元素
+            const enableAutoSync = document.getElementById('enableAutoSync');
+            const syncInterval = document.getElementById('syncInterval');
+            const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+            const syncOnStartup = document.getElementById('syncOnStartup');
+            const silentSync = document.getElementById('silentSync');
+            
+            // 構建設置對象
+            const settings = {
+                enabled: enableAutoSync.checked,
+                intervalMinutes: parseInt(syncInterval.value) || 30,
+                syncOnNetworkReconnect: syncOnNetworkReconnect ? syncOnNetworkReconnect.checked : true,
+                syncOnStartup: syncOnStartup ? syncOnStartup.checked : true,
+                silentSync: silentSync ? silentSync.checked : true
+            };
+            
+            // 保存設置
+            await db.saveAutoSyncSettings(settings);
+            
+            // 顯示成功消息
+            this.showMessage('自動同步設置已保存', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoSyncSettingsModal'));
+            if (modal) {
+                modal.hide();
+            }
+        } catch (error) {
+            console.error('保存自動同步設置失敗:', error);
+            this.showMessage(`保存設置失敗: ${error.message}`, 'danger');
+        }
+    }
+    
+    /**
      * 監聽GitHub同步事件
      */
     listenForGitHubSyncEvents() {
@@ -977,7 +1106,16 @@ class App {
      * @param {CustomEvent} event 同步事件
      */
     handleGitHubSyncEvent(event) {
-        const { status, timestamp, error } = event.detail;
+        const { status, timestamp, error, source } = event.detail;
+        
+        // 如果是靜默同步且成功，不顯示通知
+        if (source === 'autoSync' && status === 'success') {
+            const autoSyncSettings = db.getAutoSyncSettings();
+            if (autoSyncSettings && autoSyncSettings.silentSync) {
+                console.log('靜默同步成功，不顯示通知');
+                return;
+            }
+        }
         
         // 選擇通知類型和圖標
         let toastClass = '';
