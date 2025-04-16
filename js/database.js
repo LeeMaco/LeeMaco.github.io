@@ -12,34 +12,54 @@ class Database {
     
     /**
      * 初始化數據庫
+     * 無論是否有本地數據，都優先從GitHub獲取最新數據
      */
     initDatabase() {
-        // 檢查是否已有書籍數據
+        // 如果沒有書籍數據，先初始化為空數組
         if (!localStorage.getItem('books')) {
             localStorage.setItem('books', JSON.stringify([]));
-            
-            // 嘗試從GitHub獲取數據
-            this.fetchBooksFromGitHub()
-                .then(data => {
-                    if (data && data.books && Array.isArray(data.books)) {
-                        localStorage.setItem('books', JSON.stringify(data.books));
-                        console.log('已從GitHub載入數據');
-                        // 觸發數據載入完成事件
-                        this.handleDataLoaded('github', data.books.length);
-                    } else {
-                        // 如果GitHub沒有數據，嘗試從本地JSON文件載入
-                        this.loadBooksFromLocalFile();
-                    }
-                })
-                .catch(error => {
-                    console.error('從GitHub載入數據失敗:', error);
-                    // 如果GitHub載入失敗，嘗試從本地JSON文件載入
-                    this.loadBooksFromLocalFile();
-                });
-        } else {
-            // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
-            this.autoSyncFromGitHub();
         }
+        
+        // 無論是否有本地數據，都優先嘗試從GitHub獲取最新數據
+        console.log('初始化數據庫：嘗試從GitHub獲取最新數據...');
+        this.fetchBooksFromGitHub()
+            .then(data => {
+                if (data && data.books && Array.isArray(data.books)) {
+                    // 更新本地存儲
+                    localStorage.setItem('books', JSON.stringify(data.books));
+                    console.log(`成功從GitHub載入 ${data.books.length} 筆書籍數據`);
+                    
+                    // 觸發數據載入完成事件
+                    this.handleDataLoaded('github', data.books.length);
+                    
+                    // 觸發同步成功事件
+                    this.triggerSyncEvent('success');
+                } else {
+                    console.warn('從GitHub獲取的數據格式無效');
+                    // 如果GitHub沒有有效數據，嘗試從本地JSON文件載入
+                    this.loadBooksFromLocalFile();
+                }
+            })
+            .catch(error => {
+                console.error('從GitHub載入數據失敗:', error);
+                // 如果GitHub載入失敗，檢查本地是否已有數據
+                const booksData = localStorage.getItem('books');
+                if (booksData && booksData !== '[]') {
+                    try {
+                        const books = JSON.parse(booksData);
+                        if (Array.isArray(books) && books.length > 0) {
+                            console.log(`使用本地存儲的 ${books.length} 筆書籍數據`);
+                            this.handleDataLoaded('local_storage', books.length);
+                            return;
+                        }
+                    } catch (e) {
+                        console.error('解析本地數據失敗:', e);
+                    }
+                }
+                
+                // 如果本地沒有有效數據，嘗試從本地JSON文件載入
+                this.loadBooksFromLocalFile();
+            });
         
         // 檢查是否已有備份設定
         if (!localStorage.getItem('backupSettings')) {
