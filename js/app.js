@@ -376,7 +376,7 @@ class App {
         this.showMessage('正在載入書籍數據...', 'info');
         
         // 使用Promise方式獲取書籍數據
-        db.getAllBooks()
+        this.db.getAllBooks()
             .then(books => {
                 // 確保books是數組
                 if (!Array.isArray(books)) {
@@ -397,7 +397,7 @@ class App {
                 console.error('載入書籍數據時發生錯誤:', error);
                 this.showMessage(`載入書籍數據時發生錯誤: ${error.message}`, 'danger');
                 this.displayBooks([]);
-            });
+            });}
     }
     
     /**
@@ -408,7 +408,7 @@ class App {
         try {
             // 使用getAllBooks方法進行同步，而不是直接調用syncFromGitHub
             // 因為在新的模塊化結構中，syncFromGitHub已移至DatabaseManager.js
-            db.getAllBooks(true) // 傳入true表示強制刷新
+            this.db.getAllBooks(true) // 傳入true表示強制刷新
                 .then(books => {
                     // 始終更新顯示，確保首次登入時能看到數據
                     this.displayBooks(books);
@@ -518,7 +518,7 @@ class App {
      */
     loadCategories() {
         // 使用Promise方式獲取所有類別
-        db.getAllCategories()
+        this.db.getAllCategories()
             .then(categories => {
                 console.log('成功載入類別:', categories);
                 // 類別篩選下拉框已移除，不再需要填充選項
@@ -665,7 +665,7 @@ class App {
             }
             
             // 使用Promise方式獲取書籍數據
-            db.getAllBooks()
+            this.db.getAllBooks()
                 .then(results => {
                     // 檢查數據庫是否返回有效數據
                     if (!Array.isArray(results)) {
@@ -799,7 +799,7 @@ class App {
         this.showMessage('正在從GitHub同步數據...', 'info');
         
         // 強制從GitHub刷新數據
-        db.getAllBooks(true)
+        this.db.getAllBooks(true)
             .then(books => {
                 this.displayBooks(books);
                 this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
@@ -899,7 +899,7 @@ class App {
     /**
      * 儲存書籍
      */
-    saveBook() {
+    async saveBook() {
         // 檢查必填欄位
         if (!this.bookTitle.value.trim() || !this.bookAuthor.value.trim() || !this.bookCategory.value.trim()) {
             alert('請填寫必填欄位：書名、作者和類別');
@@ -920,16 +920,22 @@ class App {
             notes: this.bookNotes.value.trim()
         };
         
-        // 新增或更新書籍
-        if (this.bookId.value) {
-            // 更新現有書籍
-            book.id = this.bookId.value;
-            db.updateBook(book);
-            this.showMessage('書籍已更新', 'success');
-        } else {
-            // 新增書籍
-            db.addBook(book);
-            this.showMessage('書籍已新增', 'success');
+        try {
+            // 新增或更新書籍
+            if (this.bookId.value) {
+                // 更新現有書籍
+                book.id = this.bookId.value;
+                await this.db.updateBook(book);
+                this.showMessage('書籍已更新', 'success');
+            } else {
+                // 新增書籍
+                await this.db.addBook(book);
+                this.showMessage('書籍已新增', 'success');
+            }
+        } catch (error) {
+            console.error('保存書籍失敗:', error);
+            this.showMessage(`保存書籍失敗: ${error.message}`, 'danger');
+            return;
         }
         
         // 關閉彈窗
@@ -962,10 +968,15 @@ class App {
      * 刪除書籍
      * @param {string} id 書籍ID
      */
-    deleteBook(id) {
-        db.deleteBook(id);
-        this.showMessage('書籍已刪除', 'success');
-        this.loadBooks();
+    async deleteBook(id) {
+        try {
+            await this.db.deleteBook(id);
+            this.showMessage('書籍已刪除', 'success');
+            this.loadBooks();
+        } catch (error) {
+            console.error('刪除書籍失敗:', error);
+            this.showMessage(`刪除書籍失敗: ${error.message}`, 'danger');
+        }
     }
     
     /**
@@ -1089,20 +1100,25 @@ class App {
     /**
      * 載入備份設定
      */
-    loadBackupSettings() {
-        const settings = db.getBackupSettings();
-        
-        if (settings) {
-            this.backupEmail.value = settings.email || '';
+    async loadBackupSettings() {
+        try {
+            const settings = await this.db.getBackupSettings();
             
-            if (settings.type === 'auto') {
-                this.autoBackup.checked = true;
-                this.backupFrequency.value = settings.frequency || 'daily';
-                this.autoBackupOptions.classList.remove('d-none');
-            } else {
-                this.manualBackup.checked = true;
-                this.autoBackupOptions.classList.add('d-none');
+            if (settings) {
+                this.backupEmail.value = settings.email || '';
+                
+                if (settings.type === 'auto') {
+                    this.autoBackup.checked = true;
+                    this.backupFrequency.value = settings.frequency || 'daily';
+                    this.autoBackupOptions.classList.remove('d-none');
+                } else {
+                    this.manualBackup.checked = true;
+                    this.autoBackupOptions.classList.add('d-none');
+                }
             }
+        } catch (error) {
+            console.error('載入備份設定失敗:', error);
+            this.showMessage('載入備份設定失敗', 'danger');
         }
     }
     
@@ -1112,16 +1128,16 @@ class App {
     async initAutoSyncSettings() {
         try {
             // 載入自動同步設置
-            const settings = await db.getAutoSyncSettings();
+            const settings = await this.db.getAutoSyncSettings();
             console.log('已載入自動同步設置:', settings);
             
             // 設置自動同步管理器
-            if (typeof db.autoSyncManager === 'undefined') {
+            if (typeof this.db.autoSyncManager === 'undefined') {
                 console.log('初始化自動同步管理器...');
                 // 檢查是否有GitHubSync實例
-                if (typeof db.githubSync !== 'undefined') {
+                if (typeof this.db.githubSync !== 'undefined') {
                     // 創建AutoSyncManager實例
-                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    this.db.autoSyncManager = new AutoSyncManager(this.db.githubSync, this.db.storage);
                     console.log('自動同步管理器已初始化');
                 } else {
                     console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
@@ -1206,7 +1222,7 @@ class App {
             };
             
             // 保存設置
-            await db.saveAutoSyncSettings(settings);
+            await this.db.saveAutoSyncSettings(settings);
             
             // 顯示成功消息
             this.showMessage('自動同步設置已保存', 'success');
@@ -1437,20 +1453,25 @@ class App {
     /**
      * 載入備份設定
      */
-    loadBackupSettings() {
-        const settings = db.getBackupSettings();
-        
-        if (settings) {
-            this.backupEmail.value = settings.email || '';
+    async loadBackupSettings() {
+        try {
+            const settings = await this.db.getBackupSettings();
             
-            if (settings.type === 'auto') {
-                this.autoBackup.checked = true;
-                this.backupFrequency.value = settings.frequency || 'daily';
-                this.autoBackupOptions.classList.remove('d-none');
-            } else {
-                this.manualBackup.checked = true;
-                this.autoBackupOptions.classList.add('d-none');
+            if (settings) {
+                this.backupEmail.value = settings.email || '';
+                
+                if (settings.type === 'auto') {
+                    this.autoBackup.checked = true;
+                    this.backupFrequency.value = settings.frequency || 'daily';
+                    this.autoBackupOptions.classList.remove('d-none');
+                } else {
+                    this.manualBackup.checked = true;
+                    this.autoBackupOptions.classList.add('d-none');
+                }
             }
+        } catch (error) {
+            console.error('載入備份設定失敗:', error);
+            this.showMessage('載入備份設定失敗', 'danger');
         }
     }
     
@@ -1460,16 +1481,16 @@ class App {
     async initAutoSyncSettings() {
         try {
             // 載入自動同步設置
-            const settings = await db.getAutoSyncSettings();
+            const settings = await this.db.getAutoSyncSettings();
             console.log('已載入自動同步設置:', settings);
             
             // 設置自動同步管理器
-            if (typeof db.autoSyncManager === 'undefined') {
+            if (typeof this.db.autoSyncManager === 'undefined') {
                 console.log('初始化自動同步管理器...');
                 // 檢查是否有GitHubSync實例
-                if (typeof db.githubSync !== 'undefined') {
+                if (typeof this.db.githubSync !== 'undefined') {
                     // 創建AutoSyncManager實例
-                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    this.db.autoSyncManager = new AutoSyncManager(this.db.githubSync, this.db.storage);
                     console.log('自動同步管理器已初始化');
                 } else {
                     console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
@@ -1554,7 +1575,7 @@ class App {
             };
             
             // 保存設置
-            await db.saveAutoSyncSettings(settings);
+            await this.db.saveAutoSyncSettings(settings);
             
             // 顯示成功消息
             this.showMessage('自動同步設置已保存', 'success');
@@ -1785,20 +1806,25 @@ class App {
     /**
      * 載入備份設定
      */
-    loadBackupSettings() {
-        const settings = db.getBackupSettings();
-        
-        if (settings) {
-            this.backupEmail.value = settings.email || '';
+    async loadBackupSettings() {
+        try {
+            const settings = await this.db.getBackupSettings();
             
-            if (settings.type === 'auto') {
-                this.autoBackup.checked = true;
-                this.backupFrequency.value = settings.frequency || 'daily';
-                this.autoBackupOptions.classList.remove('d-none');
-            } else {
-                this.manualBackup.checked = true;
-                this.autoBackupOptions.classList.add('d-none');
+            if (settings) {
+                this.backupEmail.value = settings.email || '';
+                
+                if (settings.type === 'auto') {
+                    this.autoBackup.checked = true;
+                    this.backupFrequency.value = settings.frequency || 'daily';
+                    this.autoBackupOptions.classList.remove('d-none');
+                } else {
+                    this.manualBackup.checked = true;
+                    this.autoBackupOptions.classList.add('d-none');
+                }
             }
+        } catch (error) {
+            console.error('載入備份設定失敗:', error);
+            this.showMessage('載入備份設定失敗', 'danger');
         }
     }
     
@@ -1808,16 +1834,16 @@ class App {
     async initAutoSyncSettings() {
         try {
             // 載入自動同步設置
-            const settings = await db.getAutoSyncSettings();
+            const settings = await this.db.getAutoSyncSettings();
             console.log('已載入自動同步設置:', settings);
             
             // 設置自動同步管理器
-            if (typeof db.autoSyncManager === 'undefined') {
+            if (typeof this.db.autoSyncManager === 'undefined') {
                 console.log('初始化自動同步管理器...');
                 // 檢查是否有GitHubSync實例
-                if (typeof db.githubSync !== 'undefined') {
+                if (typeof this.db.githubSync !== 'undefined') {
                     // 創建AutoSyncManager實例
-                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    this.db.autoSyncManager = new AutoSyncManager(this.db.githubSync, this.db.storage);
                     console.log('自動同步管理器已初始化');
                 } else {
                     console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
@@ -1902,7 +1928,7 @@ class App {
             };
             
             // 保存設置
-            await db.saveAutoSyncSettings(settings);
+            await this.db.saveAutoSyncSettings(settings);
             
             // 顯示成功消息
             this.showMessage('自動同步設置已保存', 'success');
