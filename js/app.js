@@ -271,12 +271,12 @@ class App {
             // 因為在新的模塊化結構中，syncFromGitHub已移至DatabaseManager.js
             db.getAllBooks(true) // 傳入true表示強制刷新
                 .then(books => {
+                    // 始終更新顯示，確保首次登入時能看到數據
+                    this.displayBooks(books);
+                    
+                    // 只在非靜默模式下顯示成功消息
                     if (!silent) {
-                        // 如果非靜默模式，顯示成功消息
                         this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
-                        
-                        // 更新顯示（不再重新載入，避免循環）
-                        this.displayBooks(books);
                     }
                 })
                 .catch(error => {
@@ -1018,6 +1018,15 @@ class App {
             const autoSyncSettingsModal = document.getElementById('autoSyncSettingsModal');
             if (autoSyncSettingsModal) {
                 this.initAutoSyncSettingsUI(settings);
+            }
+            
+            // 檢查是否為首次登入，如果是則立即執行數據同步
+            const isFirstLogin = !sessionStorage.getItem('hasLoggedIn');
+            if (isFirstLogin) {
+                console.log('檢測到首次登入，立即執行數據同步');
+                sessionStorage.setItem('hasLoggedIn', 'true');
+                // 立即執行數據同步，但使用靜默模式避免過多提示
+                this.checkForUpdates(true);
             }
         } catch (error) {
             console.error('初始化自動同步設置失敗:', error);
