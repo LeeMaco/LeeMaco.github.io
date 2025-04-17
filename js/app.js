@@ -246,16 +246,8 @@ class App {
                     this.displayBooks([]);
                     return;
                 }
-                
-                // 先顯示書籍，再顯示成功訊息，確保數量一致
                 this.displayBooks(books);
-                
-                // 確認books陣列長度大於0才顯示成功訊息
-                if (books.length > 0) {
-                    this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
-                } else {
-                    this.showMessage('沒有找到書籍數據', 'warning');
-                }
+                // REMOVED: this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
                 
                 // 檢查更新
                 if (checkForUpdates) {
@@ -266,14 +258,14 @@ class App {
                 console.error('載入書籍數據時發生錯誤:', error);
                 this.showMessage(`載入書籍數據時發生錯誤: ${error.message}`, 'danger');
                 this.displayBooks([]);
-            });}
+            });
     }
     
     /**
      * 檢查GitHub更新
-     * @param {boolean} silent 是否靜默同步
+     * @param {boolean} silent 是否靜默同步 (此參數不再影響成功訊息的顯示)
      */
-    checkForUpdates(silent = false) {
+    checkForUpdates(silent = false) { // Note: silent parameter description updated
         try {
             // 使用getAllBooks方法進行同步，而不是直接調用syncFromGitHub
             // 因為在新的模塊化結構中，syncFromGitHub已移至DatabaseManager.js
@@ -282,22 +274,20 @@ class App {
                     // 始終更新顯示，確保首次登入時能看到數據
                     this.displayBooks(books);
                     
-                    // 只在非靜默模式下顯示成功消息
-                    if (!silent) {
-                        if (books.length > 0) {
-                            this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
-                        } else {
-                            this.showMessage('從GitHub同步完成，但沒有找到書籍數據', 'warning');
-                        }
-                    }
+                    // 總是顯示成功消息
+                    // REMOVED: if (!silent) { 
+                    this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                    // REMOVED: }
                 })
                 .catch(error => {
+                    // 只在非靜默模式下顯示錯誤消息，避免初始載入時的潛在錯誤干擾用戶
                     if (!silent) {
                         console.error('檢查更新時發生錯誤:', error);
                         this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
                     }
                 });
         } catch (error) {
+             // 只在非靜默模式下顯示錯誤消息
             if (!silent) {
                 console.error('檢查更新時發生錯誤:', error);
                 this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
