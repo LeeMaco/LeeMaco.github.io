@@ -246,8 +246,16 @@ class App {
                     this.displayBooks([]);
                     return;
                 }
+                
+                // 先顯示書籍，再顯示成功訊息，確保數量一致
                 this.displayBooks(books);
-                this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+                
+                // 確認books陣列長度大於0才顯示成功訊息
+                if (books.length > 0) {
+                    this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+                } else {
+                    this.showMessage('沒有找到書籍數據', 'warning');
+                }
                 
                 // 檢查更新
                 if (checkForUpdates) {
@@ -258,7 +266,7 @@ class App {
                 console.error('載入書籍數據時發生錯誤:', error);
                 this.showMessage(`載入書籍數據時發生錯誤: ${error.message}`, 'danger');
                 this.displayBooks([]);
-            });
+            });}
     }
     
     /**
@@ -276,7 +284,11 @@ class App {
                     
                     // 只在非靜默模式下顯示成功消息
                     if (!silent) {
-                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                        if (books.length > 0) {
+                            this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                        } else {
+                            this.showMessage('從GitHub同步完成，但沒有找到書籍數據', 'warning');
+                        }
                     }
                 })
                 .catch(error => {
