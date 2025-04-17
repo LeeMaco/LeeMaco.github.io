@@ -1,27 +1,40 @@
+import DatabaseManager from './storage/DatabaseManager.js';
+import * as XLSX from 'xlsx';
+import { saveAs } from 'file-saver'; // 假設已通過 npm 安裝或全局引入
+
+// 移除舊的全局變量依賴
+// const db = new Database();
+// const dataProcessor = new DataProcessor();
+// const emailService = new EmailService();
+// const auth = new Auth();
+// const admin = new Admin(db, auth);
+
 /**
  * 主應用模組 - 整合所有功能並處理用戶界面交互
- * 優化首頁查詢書籍功能，實現自動檢查GitHub更新
+ * 使用 DatabaseManager 進行數據管理，並通過 Vite 構建
  */
-
 class App {
     constructor() {
+        // 初始化 DatabaseManager
+        this.db = new DatabaseManager();
+
         // 初始化元素引用
         this.initElements();
-        
+
         // 初始化事件監聽器
         this.initEventListeners();
-        
-        // 載入書籍數據
+
+        // 使用 DatabaseManager 載入書籍數據 (異步)
         this.loadBooks();
-        
-        // 載入類別選項
+
+        // 載入類別選項 (異步)
         this.loadCategories();
-        
-        // 監聽GitHub同步事件
-        this.listenForGitHubSyncEvents();
-        
-        // 初始化自動同步設置
-        this.initAutoSyncSettings();
+
+        // 監聽 DatabaseManager 的事件 (如果需要)
+        this.listenForDbEvents();
+
+        // 初始化設置相關功能 (異步)
+        this.initSettings();
     }
     
     /**
@@ -133,75 +146,144 @@ class App {
             });
         }
         
-        // GitHub同步按鈕事件
+        // GitHub同步按鈕事件 (使用 DatabaseManager 的方法)
         const syncGitHubBtn = document.getElementById('syncGitHubBtn');
         if (syncGitHubBtn) {
-            syncGitHubBtn.addEventListener('click', () => {
-                // 顯示同步中的狀態提示
+            syncGitHubBtn.addEventListener('click', async () => {
                 this.showMessage('正在從GitHub同步數據...', 'info');
-                
-                // 嘗試從GitHub獲取最新數據
-                db.getAllBooks(true) // 傳入true表示強制刷新
-                    .then(books => {
-                        // 確保books是數組
-                        if (!Array.isArray(books)) {
-                            console.error('從GitHub同步數據時收到無效數據:', books);
-                            this.showMessage('從GitHub同步數據時收到無效數據格式', 'danger');
-                            return;
-                        }
-                        
-                        // 顯示同步成功的狀態提示
-                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
-                        
-                        // 更新顯示
-                        this.displayBooks(books);
-                    })
-                    .catch(error => {
-                        console.error('從GitHub同步數據時發生錯誤:', error);
-                        
-                        // 顯示同步失敗的狀態提示
-                        this.showMessage(`從GitHub同步數據時發生錯誤: ${error.message}`, 'danger');
-                    });
+                try {
+                    // 使用 DatabaseManager 的強制同步方法
+                    const result = await this.db.syncWithGitHub(true); // true for force sync
+                    if (result.status === 'success') {
+                        this.showMessage(`成功從GitHub同步 ${result.total || 0} 筆書籍數據`, 'success');
+                        await this.loadBooks(); // Reload books after sync
+                    } else {
+                        this.showMessage(`從GitHub同步數據失敗: ${result.message}`, 'warning');
+                    }
+                } catch (error) {
+                    console.error('從GitHub同步數據時發生錯誤:', error);
+                    this.showMessage(`從GitHub同步數據時發生錯誤: ${error.message}`, 'danger');
+                }
             });
         }
         
         // 書籍表單事件
-        this.bookForm.addEventListener('submit', (e) => {
-            e.preventDefault();
-            this.saveBook();
-        });
-        this.saveBookBtn.addEventListener('click', () => this.saveBook());
-        
-        // 匯入/匯出事件
-        this.confirmImportBtn.addEventListener('click', () => this.importBooks());
-        this.exportBtn.addEventListener('click', () => this.exportBooks());
-        
-        // 備份事件
-        this.autoBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
-        this.manualBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
-        this.saveBackupSettingsBtn.addEventListener('click', () => this.saveBackupSettings());
-        this.manualBackupBtn.addEventListener('click', () => this.performBackup());
-        
-        // EmailJS設定事件
-        const saveEmailJSSettingsBtn = document.getElementById('saveEmailJSSettingsBtn');
-        if (saveEmailJSSettingsBtn) {
-            saveEmailJSSettingsBtn.addEventListener('click', () => this.saveEmailJSSettings());
+        if (this.bookForm) {
+            this.bookForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveBook(); // saveBook is now async
+            });
+        }
+        if (this.saveBookBtn) {
+            this.saveBookBtn.addEventListener('click', () => this.saveBook()); // saveBook is now async
         }
         
-        const testEmailJSBtn = document.getElementById('testEmailJSBtn');
-        if (testEmailJSBtn) {
-            testEmailJSBtn.addEventListener('click', () => this.testEmailJSConnection());
+        // 匯入/匯出事件
+        if (this.confirmImportBtn) {
+            this.confirmImportBtn.addEventListener('click', () => this.importBooks()); // importBooks is now async
+        }
+        if (this.exportBtn) {
+            this.exportBtn.addEventListener('click', () => this.exportBooks()); // exportBooks is now async
+        }
+        
+        // 備份事件 (更新為使用 DatabaseManager 的設置)
+        if (this.autoBackup) {
+            this.autoBackup.addEventListener('change', () => this.toggleBackupOptions());
+        }
+        if (this.manualBackup) {
+            this.manualBackup.addEventListener('change', () => this.toggleBackupOptions());
+        }
+        if (this.saveBackupSettingsBtn) {
+            this.saveBackupSettingsBtn.addEventListener('click', () => this.saveBackupSettings()); // Now async
+        }
+        if (this.manualBackupBtn) {
+            this.manualBackupBtn.addEventListener('click', () => this.performBackup()); // Now async
+        }
+        
+        // EmailJS設定事件
+        this.saveEmailJSSettingsBtn = document.getElementById('saveEmailJSSettingsBtn');
+        if (this.saveEmailJSSettingsBtn) {
+            this.saveEmailJSSettingsBtn.addEventListener('click', () => this.saveEmailJSSettings()); // Now async
+        }
+        this.testEmailJSBtn = document.getElementById('testEmailJSBtn');
+        if (this.testEmailJSBtn) {
+            this.testEmailJSBtn.addEventListener('click', () => this.testEmailJSConnection()); // Now async
+        }
+
+        // GitHub 設定事件
+        this.saveGitHubSettingsBtn = document.getElementById('saveGitHubSettingsBtn');
+        if (this.saveGitHubSettingsBtn) {
+            this.saveGitHubSettingsBtn.addEventListener('click', () => this.saveGitHubSettings()); // Now async
+        }
+        this.testGitHubConnectionBtn = document.getElementById('testGitHubConnectionBtn');
+        if (this.testGitHubConnectionBtn) {
+            this.testGitHubConnectionBtn.addEventListener('click', () => this.testGitHubConnection()); // Now async
+        }
+
+        // 自動同步設定事件
+        this.saveAutoSyncSettingsBtn = document.getElementById('saveAutoSyncSettingsBtn');
+        if (this.saveAutoSyncSettingsBtn) {
+            this.saveAutoSyncSettingsBtn.addEventListener('click', () => this.saveAutoSyncSettings()); // Now async
+        }
+        this.enableAutoSyncCheckbox = document.getElementById('enableAutoSync');
+        if (this.enableAutoSyncCheckbox) {
+            this.enableAutoSyncCheckbox.addEventListener('change', (e) => {
+                const intervalGroup = this.autoSyncIntervalInput?.closest('.mb-3');
+                if (intervalGroup) {
+                    intervalGroup.style.display = e.target.checked ? 'block' : 'none';
+                }
+            });
         }
         
         // 監聽模態框事件
-        document.getElementById('bookModal').addEventListener('show.bs.modal', (e) => {
-            const button = e.relatedTarget;
-            if (button && button.getAttribute('data-book-id')) {
-                this.loadBookForEdit(button.getAttribute('data-book-id'));
-            } else {
-                this.resetBookForm();
-            }
-        });
+        const bookModal = document.getElementById('bookModal');
+        if (bookModal) {
+            bookModal.addEventListener('show.bs.modal', (e) => {
+                const button = e.relatedTarget;
+                if (button && button.getAttribute('data-book-id')) {
+                    this.loadBookForEdit(button.getAttribute('data-book-id')); // Now async
+                } else {
+                    this.resetBookForm();
+                }
+            });
+        }
+
+        const bookDetailsModal = document.getElementById('bookDetailsModal');
+        if (bookDetailsModal) {
+            bookDetailsModal.addEventListener('show.bs.modal', (e) => {
+                const button = e.relatedTarget;
+                const bookId = button?.getAttribute('data-book-id');
+                if (bookId) {
+                    this.loadBookDetails(bookId); // Now async
+                }
+            });
+        }
+
+        const deleteModal = document.getElementById('deleteModal');
+        if (deleteModal) {
+            deleteModal.addEventListener('show.bs.modal', (e) => {
+                const button = e.relatedTarget;
+                const bookId = button?.getAttribute('data-book-id');
+                const bookTitle = button?.getAttribute('data-book-title');
+                if (bookId && bookTitle && this.deleteBookTitle && this.confirmDeleteBtn) {
+                    this.deleteBookTitle.textContent = bookTitle;
+                    this.confirmDeleteBtn.setAttribute('data-book-id', bookId);
+                    this.confirmDeleteBtn.disabled = false;
+                } else {
+                    // 如果沒有 bookId 或 bookTitle，禁用刪除按鈕並顯示錯誤
+                    if(this.deleteBookTitle) this.deleteBookTitle.textContent = '錯誤：無法獲取書籍信息';
+                    if(this.confirmDeleteBtn) this.confirmDeleteBtn.disabled = true;
+                }
+            });
+            // 清理模態框關閉時的狀態
+            deleteModal.addEventListener('hidden.bs.modal', () => {
+                if(this.deleteBookTitle) this.deleteBookTitle.textContent = '';
+                if(this.confirmDeleteBtn) {
+                    this.confirmDeleteBtn.removeAttribute('data-book-id');
+                    this.confirmDeleteBtn.disabled = false;
+                }
+            });
+        }
         
         // 監聽備份模態框事件
         document.getElementById('backupModal').addEventListener('show.bs.modal', () => {
@@ -221,11 +303,68 @@ class App {
             });
         }
         
-        // 監聽刪除確認事件
-        this.confirmDeleteBtn.addEventListener('click', () => {
-            const bookId = this.confirmDeleteBtn.getAttribute('data-book-id');
-            if (bookId) this.deleteBook(bookId);
+        // 監聽刪除確認事件 (已移至 deleteModal 的 show.bs.modal 監聽器內部，此處移除重複的監聽器)
+        // if (this.confirmDeleteBtn) {
+        //     this.confirmDeleteBtn.addEventListener('click', () => {
+        //         const bookId = this.confirmDeleteBtn.getAttribute('data-book-id');
+        //         if (bookId) {
+        //             this.deleteBook(bookId); // Now async
+        //         }
+        //     });
+        // }
+
+        // 監聽數據庫事件 (如果 DatabaseManager 提供了事件機制)
+        // document.addEventListener('databasemanager-event', (e) => this.handleDbEvent(e));
+    }
+
+    /**
+     * 監聽 DatabaseManager 的事件 (示例)
+     */
+    listenForDbEvents() {
+        // 假設 DatabaseManager 觸發 'syncStatusUpdate' 事件
+        document.addEventListener('syncStatusUpdate', (e) => {
+            const { status, message, type, source } = e.detail;
+            console.log(`Sync Status Update (${source}): ${status} - ${message}`);
+
+            // 根據 source 和 status 更新 UI 或顯示通知
+            if (source === 'autoSync' && status === 'success' && type === 'info') {
+                // 對於成功的靜默自動同步，可能只在控制台記錄
+                console.log('Auto-sync successful (silent).');
+            } else if (status === 'syncing') {
+                this.showMessage(`正在同步 (${source})...`, 'info', 10000); // 顯示較長時間
+            } else {
+                this.showMessage(message, type || 'info');
+            }
+
+            // 如果同步成功，重新加載數據
+            if (status === 'success') {
+                this.loadBooks();
+            }
         });
+
+        // 監聽數據加載完成事件
+        document.addEventListener('booksLoaded', (e) => {
+            const { source, count, error } = e.detail;
+            console.log(`Books loaded event: source=${source}, count=${count}, error=${error}`);
+            if (error) {
+                this.showMessage(`載入書籍數據時出錯 (${source}): ${error.message}`, 'danger');
+            } else {
+                // this.showMessage(`成功載入 ${count} 筆書籍數據 (來源: ${source})`, 'success', 3000); // 避免重複提示
+            }
+            // 數據加載後更新 UI
+            this.loadCategories(); // 更新分類下拉列表
+        });
+    }
+
+    /**
+     * 初始化設置相關功能
+     */
+    initSettings() {
+        this.loadBackupSettings(); // Now async
+        this.loadEmailJSSettings(); // Now async
+        this.loadGitHubSettings(); // Now async
+        this.initAutoSyncSettings(); // Now async
+    }
     }
     
     /**
@@ -683,24 +822,39 @@ class App {
      * 顯示書籍詳情
      * @param {Object} book 書籍對象
      */
-    showBookDetails(book) {
-        this.bookDetailsTitle.textContent = book.title;
-        this.detailAuthor.textContent = book.author || '-';
-        this.detailSeries.textContent = book.series || '-';
-        this.detailCategory.textContent = book.category || '-';
-        this.detailCabinet.textContent = book.cabinet || '-';
-        this.detailRow.textContent = book.row || '-';
-        this.detailPublisher.textContent = book.publisher || '-';
-        this.detailDescription.textContent = book.description || '-';
-        this.detailISBN.textContent = book.isbn || '-';
-        this.detailNotes.textContent = book.notes || '-';
-        
-        // 顯示詳情彈窗
-        const modal = new bootstrap.Modal(document.getElementById('bookDetailsModal'));
-        modal.show();
-    }
-    
-    /**
+    async loadBookDetails(id) {
+        try {
+            const book = await this.db.getBookById(id);
+            if (book) {
+                this.bookDetailsTitle.textContent = book.title || '未知書籍';
+                this.detailAuthor.textContent = book.author || 'N/A';
+                this.detailSeries.textContent = book.series || 'N/A';
+                this.detailCategory.textContent = book.category || 'N/A';
+                this.detailCabinet.textContent = book.cabinet || 'N/A';
+                this.detailRow.textContent = book.row || 'N/A';
+                this.detailPublisher.textContent = book.publisher || 'N/A';
+                this.detailDescription.textContent = book.description || '無描述';
+                this.detailISBN.textContent = book.isbn || 'N/A';
+                this.detailNotes.textContent = book.notes || '無備註';
+            } else {
+                this.showMessage('找不到該書籍的詳細資料', 'warning');
+                // 關閉模態框
+                const detailsModal = bootstrap.Modal.getInstance(document.getElementById('bookDetailsModal'));
+                if (detailsModal) {
+                    detailsModal.hide();
+                }
+            }
+        } catch (error) {
+            console.error(`載入書籍詳情 ${id} 失敗:`, error);
+            this.showMessage(`載入書籍詳情失敗: ${error.message}`, 'danger');
+            const detailsModal = bootstrap.Modal.getInstance(document.getElementById('bookDetailsModal'));
+            if (detailsModal) {
+                detailsModal.hide();
+            }
+         }
+     }
+ 
+     /**
      * 編輯書籍
      * @param {Object} book 書籍對象
      */
@@ -815,152 +969,110 @@ class App {
     }
     
     /**
-     * 匯入書籍
+     * 匯入書籍數據
      */
-    importBooks() {
+    async importBooks() {
         const file = this.importFile.files[0];
-        if (!file) {
-            this.showImportStatus('請選擇Excel檔案', 'danger');
-            return;
-        }
-        
         const filterDuplicates = this.filterDuplicates.checked;
-        const autoUploadGitHub = document.getElementById('autoUploadGitHub') && document.getElementById('autoUploadGitHub').checked;
-        
-        // 顯示處理中狀態
-        this.showImportStatus('正在處理檔案...', 'info');
-        
-        // 使用數據處理器解析Excel
-        dataProcessor.parseExcelFile(file)
-            .then(books => {
-                if (books.length === 0) {
-                    this.showImportStatus('Excel檔案中沒有資料', 'warning');
-                    return;
-                }
-                
-                this.showImportStatus(`已從Excel讀取 ${books.length} 筆資料，正在匯入...`, 'info');
-                
-                // 檢查是否使用admin.js中的importFromExcel函數
-                if (typeof admin !== 'undefined' && admin.importFromExcel && autoUploadGitHub) {
-                    // 使用admin.js中的importFromExcel函數（包含GitHub上傳）
-                    this.showImportStatus(`正在匯入資料並上傳到GitHub...`, 'info');
-                    
-                    return admin.importFromExcel(books, true)
-                        .then(result => {
-                            // 顯示匯入結果
-                            let statusMsg = `成功匯入 ${result.imported} 筆資料`;
-                            if (result.updated > 0) {
-                                statusMsg += `，更新 ${result.updated} 筆資料`;
-                            }
-                            if (filterDuplicates && result.filtered > 0) {
-                                statusMsg += `，過濾 ${result.filtered} 筆重複資料`;
-                            }
-                            if (autoUploadGitHub) {
-                                statusMsg += '，並已上傳到GitHub';
-                            }
-                            
-                            this.showImportStatus(statusMsg, 'success');
-                            this.showMessage(statusMsg, 'success');
-                            
-                            // 重新載入書籍和類別
-                            this.loadBooks();
-                            this.loadCategories();
-                        })
-                        .catch(error => {
-                            // 處理上傳錯誤，但仍然顯示本地匯入成功
-                            const errorMsg = `資料已匯入本地，但上傳到GitHub失敗: ${error.message}`;
-                            this.showImportStatus(errorMsg, 'warning');
-                            this.showMessage(errorMsg, 'warning');
-                            
-                            // 重新載入書籍和類別
-                            this.loadBooks();
-                            this.loadCategories();
-                        });
-                } else {
-                    // 使用原有的db.importBooks函數
-                    const result = db.importBooks(books, filterDuplicates);
-                    
-                    // 顯示匯入結果
-                    let statusMsg = `成功匯入 ${result.imported} 筆資料`;
-                    if (result.updated > 0) {
-                        statusMsg += `，更新 ${result.updated} 筆資料`;
-                    }
-                    if (filterDuplicates && result.filtered > 0) {
-                        statusMsg += `，過濾 ${result.filtered} 筆重複資料`;
-                    }
-                    
-                    this.showImportStatus(statusMsg, 'success');
-                    this.showMessage(statusMsg, 'success');
-                    
-                    // 重新載入書籍和類別
-                    this.loadBooks();
-                    this.loadCategories();
-                }
-            })
-            .catch(error => {
-                console.error('匯入錯誤:', error);
-                const errorMsg = `匯入失敗: ${error.message || '請檢查檔案格式'}`;
-                this.showImportStatus(errorMsg, 'danger');
-                this.showMessage(errorMsg, 'danger');
-            });
-    }
-    
-    /**
-     * 顯示匯入狀態
-     * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning, info)
-     */
-    showImportStatus(message, type) {
-        if (!this.importStatus) return;
-        
-        // 根據類型選擇圖標
-        let icon = '';
-        switch(type) {
-            case 'success':
-                icon = '<i class="fas fa-check-circle me-2"></i>';
-                break;
-            case 'danger':
-                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-                break;
-            case 'warning':
-                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
-                break;
-            case 'info':
-            default:
-                icon = '<i class="fas fa-info-circle me-2"></i>';
-                break;
-        }
-        
-        this.importStatus.innerHTML = icon + message;
-        this.importStatus.className = `alert alert-${type}`;
-        this.importStatus.classList.remove('d-none');
-        
-        // 如果是錯誤或警告，滾動到狀態消息位置
-        if (type === 'danger' || type === 'warning') {
-            this.importStatus.scrollIntoView({ behavior: 'smooth' });
-        }
-    }
-    
-    /**
-     * 匯出書籍
-     */
-    exportBooks() {
-        const books = db.getAllBooks();
-        
-        if (books.length === 0) {
-            this.showMessage('沒有資料可匯出', 'warning');
+
+        if (!file) {
+            this.showMessage('請選擇要匯入的文件', 'warning');
             return;
         }
-        
-        // 使用數據處理器創建工作表
-        const workbook = dataProcessor.createExcelWorkbook(books);
-        
-        // 生成檔案名稱
-        const fileName = dataProcessor.generateTimestampFileName('書籍資料');
-        
-        // 匯出Excel檔案
-        XLSX.writeFile(workbook, fileName);
-        this.showMessage('資料已匯出', 'success');
+
+        this.importStatus.textContent = '正在匯入...';
+        this.confirmImportBtn.disabled = true;
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const booksToImport = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (!Array.isArray(booksToImport)) {
+                        throw new Error('無法解析文件中的書籍數據');
+                    }
+
+                    // 使用 DatabaseManager 的批量導入方法
+                    const result = await this.db.bulkImportBooks(booksToImport, filterDuplicates);
+
+                    this.importStatus.textContent = `匯入完成：新增 ${result.added} 筆，更新 ${result.updated} 筆，跳過 ${result.skipped} 筆，錯誤 ${result.errors} 筆。`;
+                    this.showMessage(`匯入完成：新增 ${result.added}，更新 ${result.updated}，跳過 ${result.skipped}`, 'success');
+                    await this.loadBooks(); // 重新載入數據
+                } catch (parseError) {
+                    console.error('解析或匯入文件失敗:', parseError);
+                    this.importStatus.textContent = `匯入失敗: ${parseError.message}`;
+                    this.showMessage(`匯入失敗: ${parseError.message}`, 'danger');
+                } finally {
+                    this.confirmImportBtn.disabled = false;
+                    this.importFile.value = ''; // 清空文件選擇
+                    // 關閉模態框
+                    const importModal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
+                    if (importModal) {
+                        importModal.hide();
+                    }
+                }
+            };
+            reader.onerror = (error) => {
+                console.error('讀取文件失敗:', error);
+                this.importStatus.textContent = '讀取文件失敗';
+                this.showMessage('讀取文件失敗', 'danger');
+                this.confirmImportBtn.disabled = false;
+            };
+            reader.readAsArrayBuffer(file);
+        } catch (error) {
+            console.error('匯入操作失敗:', error);
+            this.importStatus.textContent = `匯入操作失敗: ${error.message}`;
+            this.showMessage(`匯入操作失敗: ${error.message}`, 'danger');
+            this.confirmImportBtn.disabled = false;
+        }
+    }
+
+    /**
+     * 匯出書籍數據為 Excel 文件
+     */
+    async exportBooks() {
+        try {
+            const books = await this.db.getAllBooks();
+            if (books.length === 0) {
+                this.showMessage('沒有書籍數據可供匯出', 'warning');
+                return;
+            }
+
+            // 準備工作表數據
+            const worksheetData = books.map(book => ({
+                '書名': book.title,
+                '作者': book.author,
+                '系列': book.series,
+                '分類': book.category,
+                '書櫃': book.cabinet,
+                '層號': book.row,
+                '出版社': book.publisher,
+                '描述': book.description,
+                'ISBN': book.isbn,
+                '備註': book.notes,
+                // 可以選擇性地添加 ID
+                // 'ID': book.id
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '書籍列表');
+
+            // 生成 Excel 文件並觸發下載
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+            saveAs(dataBlob, '書籍列表.xlsx'); // 需要引入 FileSaver.js
+
+            this.showMessage('書籍數據匯出成功', 'success');
+        } catch (error) {
+            console.error('匯出書籍數據失敗:', error);
+            this.showMessage(`匯出書籍數據失敗: ${error.message}`, 'danger');
+        }
     }
     
     /**
@@ -1114,554 +1226,735 @@ class App {
      * 監聽GitHub同步事件
      */
     listenForGitHubSyncEvents() {
-        document.addEventListener('githubSync', (event) => this.handleGitHubSyncEvent(event));
+-        // 監聽來自 database.js 的事件
+-        document.addEventListener('githubSyncStatus', (e) => {
+-            const { status, message, type } = e.detail;
+-            this.showMessage(message, type);
+-        });
++        // 現在通過 DatabaseManager 的事件監聽器處理
++        // document.addEventListener('syncStatusUpdate', ...);
++        // 保留此方法以備將來擴展，或移除
++        console.log('GitHub 同步事件監聽器設置（通過 DatabaseManager）');
+     }
+ 
+     /**
+      * 初始化自動同步設置
+      */
+-    initAutoSyncSettings() {
+-        const settings = db.getGitHubSettings();
+-        const autoSyncEnabled = settings.autoSync || false;
+-        const autoSyncInterval = settings.autoSyncInterval || 300; // 默認5分鐘
+-        
+-        const enableAutoSyncCheckbox = document.getElementById('enableAutoSync');
+-        const autoSyncIntervalInput = document.getElementById('autoSyncInterval');
+-        
+-        if (enableAutoSyncCheckbox) {
+-            enableAutoSyncCheckbox.checked = autoSyncEnabled;
+-        }
+-        if (autoSyncIntervalInput) {
+-            autoSyncIntervalInput.value = autoSyncInterval;
+-            // 根據是否啟用來顯示/隱藏間隔設置
+-            const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
+-            if (intervalGroup) {
+-                intervalGroup.style.display = autoSyncEnabled ? 'block' : 'none';
+-            }
+-        }
+-        
+-        // 添加事件監聽器以切換間隔設置的顯示
+-        if (enableAutoSyncCheckbox) {
+-            enableAutoSyncCheckbox.addEventListener('change', (e) => {
+-                const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
+-                if (intervalGroup) {
+-                    intervalGroup.style.display = e.target.checked ? 'block' : 'none';
+-                }
+-            });
++    async initAutoSyncSettings() {
++        try {
++            const autoSyncEnabled = await this.db.getSetting('autoSyncEnabled', false);
++            const autoSyncInterval = await this.db.getSetting('autoSyncInterval', 300); // 默認5分鐘 (300秒)
++
++            const enableAutoSyncCheckbox = document.getElementById('enableAutoSync');
++            const autoSyncIntervalInput = document.getElementById('autoSyncInterval');
++
++            if (enableAutoSyncCheckbox) {
++                enableAutoSyncCheckbox.checked = autoSyncEnabled;
++            }
++            if (autoSyncIntervalInput) {
++                autoSyncIntervalInput.value = autoSyncInterval;
++                const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
++                if (intervalGroup) {
++                    intervalGroup.style.display = autoSyncEnabled ? 'block' : 'none';
++                }
++            }
++
++            // 添加事件監聽器以切換間隔設置的顯示
++            if (enableAutoSyncCheckbox) {
++                enableAutoSyncCheckbox.addEventListener('change', (e) => {
++                    const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
++                    if (intervalGroup) {
++                        intervalGroup.style.display = e.target.checked ? 'block' : 'none';
++                    }
++                });
++            }
++        } catch (error) {
++            console.error('初始化自動同步設置失敗:', error);
++            this.showMessage('無法載入自動同步設置', 'warning');
+         }
+     }
+ 
+     /**
+      * 保存GitHub設置
+      */
+-    saveGitHubSettings() {
++    async saveGitHubSettings() {
+         const token = document.getElementById('githubToken').value.trim();
+         const repo = document.getElementById('githubRepo').value.trim();
+         const filePath = document.getElementById('githubFilePath').value.trim();
+         const enableAutoSync = document.getElementById('enableAutoSync').checked;
+         const autoSyncInterval
+         this.showMessage('書籍已刪除', 'success');
+         this.loadBooks();
     }
     
     /**
-     * 處理GitHub同步事件
-     * @param {CustomEvent} event 同步事件
+     * 匯入書籍數據
      */
-    handleGitHubSyncEvent(event) {
-        const { status, timestamp, error, source } = event.detail;
-        
-        // 如果是靜默同步且成功，不顯示通知
-        if (source === 'autoSync' && status === 'success') {
-            const autoSyncSettings = db.getAutoSyncSettings();
-            if (autoSyncSettings && autoSyncSettings.silentSync) {
-                console.log('靜默同步成功，不顯示通知');
+    async importBooks() {
+        const file = this.importFile.files[0];
+        const filterDuplicates = this.filterDuplicates.checked;
+
+        if (!file) {
+            this.showMessage('請選擇要匯入的文件', 'warning');
+            return;
+        }
+
+        this.importStatus.textContent = '正在匯入...';
+        this.confirmImportBtn.disabled = true;
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const booksToImport = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (!Array.isArray(booksToImport)) {
+                        throw new Error('無法解析文件中的書籍數據');
+                    }
+
+                    // 使用 DatabaseManager 的批量導入方法
+                    const result = await this.db.bulkImportBooks(booksToImport, filterDuplicates);
+
+                    this.importStatus.textContent = `匯入完成：新增 ${result.added} 筆，更新 ${result.updated} 筆，跳過 ${result.skipped} 筆，錯誤 ${result.errors} 筆。`;
+                    this.showMessage(`匯入完成：新增 ${result.added}，更新 ${result.updated}，跳過 ${result.skipped}`, 'success');
+                    await this.loadBooks(); // 重新載入數據
+                } catch (parseError) {
+                    console.error('解析或匯入文件失敗:', parseError);
+                    this.importStatus.textContent = `匯入失敗: ${parseError.message}`;
+                    this.showMessage(`匯入失敗: ${parseError.message}`, 'danger');
+                } finally {
+                    this.confirmImportBtn.disabled = false;
+                    this.importFile.value = ''; // 清空文件選擇
+                    // 關閉模態框
+                    const importModal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
+                    if (importModal) {
+                        importModal.hide();
+                    }
+                }
+            };
+            reader.onerror = (error) => {
+                console.error('讀取文件失敗:', error);
+                this.importStatus.textContent = '讀取文件失敗';
+                this.showMessage('讀取文件失敗', 'danger');
+                this.confirmImportBtn.disabled = false;
+            };
+            reader.readAsArrayBuffer(file);
+        } catch (error) {
+            console.error('匯入操作失敗:', error);
+            this.importStatus.textContent = `匯入操作失敗: ${error.message}`;
+            this.showMessage(`匯入操作失敗: ${error.message}`, 'danger');
+            this.confirmImportBtn.disabled = false;
+        }
+    }
+
+    /**
+     * 匯出書籍數據為 Excel 文件
+     */
+    async exportBooks() {
+        try {
+            const books = await this.db.getAllBooks();
+            if (books.length === 0) {
+                this.showMessage('沒有書籍數據可供匯出', 'warning');
                 return;
             }
-        }
-        
-        // 選擇通知類型和圖標
-        let toastClass = '';
-        let icon = '';
-        let message = '';
-        let detailMessage = '';
-        
-        if (status === 'success') {
-            toastClass = 'text-bg-success';
-            icon = '<i class="fas fa-check-circle me-2"></i>';
-            message = '數據已成功同步到GitHub';
-            detailMessage = `同步時間: ${new Date(timestamp).toLocaleString()}`;
-        } else {
-            toastClass = 'text-bg-danger';
-            icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-            message = '同步失敗';
-            
-            // 提供更詳細的錯誤信息
-            if (error) {
-                if (error.message.includes('網絡連接失敗')) {
-                    detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
-                } else if (error.message.includes('授權失敗')) {
-                    detailMessage = '請檢查您的GitHub訪問令牌是否有效';
-                } else if (error.message.includes('權限不足')) {
-                    detailMessage = '請確保您的令牌有足夠的權限操作此倉庫';
-                } else if (error.message.includes('請求超時')) {
-                    detailMessage = '連接GitHub服務器超時，請稍後再試';
-                } else {
-                    detailMessage = error.message || '未知錯誤';
-                }
-            } else {
-                detailMessage = '發生未知錯誤，請稍後再試';
-            }
-        }
-        
-        // 創建通知元素
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center ${toastClass} border-0`;
-        toast.setAttribute('role', 'alert');
-        toast.setAttribute('aria-live', 'assertive');
-        toast.setAttribute('aria-atomic', 'true');
-        
-        // 設置通知內容
-        toast.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">
-                    ${icon}${message}
-                    ${detailMessage ? `<div class="small mt-1">${detailMessage}</div>` : ''}
-                </div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
-            </div>
-        `;
-        
-        // 添加到通知區域
-        this.syncStatus.appendChild(toast);
-        
-        // 顯示通知
-        const bsToast = new bootstrap.Toast(toast, { delay: 6000 }); // 延長顯示時間
-        bsToast.show();
-        
-        // 自動移除通知
-        toast.addEventListener('hidden.bs.toast', () => {
-            toast.remove();
-        });
-        
-        // 如果同步成功，重新載入書籍列表
-        if (status === 'success') {
-            this.loadBooks();
-        }
-        
-        // 如果同步失敗，顯示重試按鈕
-        if (status === 'error' && error) {
-            const retryBtn = document.createElement('button');
-            retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
-            retryBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>重試同步';
-            retryBtn.onclick = () => {
-                // 移除當前通知
-                bsToast.hide();
-                // 顯示新的進度通知
-                this.showMessage('正在重新嘗試同步...', 'info');
-                // 觸發重新同步
-                setTimeout(() => {
-                    const books = db.getAllBooks();
-                    admin.uploadToGitHub({ books: books })
-                        .catch(err => console.error('重試同步失敗:', err));
-                }, 1000);
-            };
-            
-            // 將重試按鈕添加到通知中
-            const toastBody = toast.querySelector('.toast-body');
-            if (toastBody && !toastBody.querySelector('.btn-warning')) {
-                toastBody.appendChild(retryBtn);
-            }
-        }
-    }
-    
-    /**
-     * 儲存備份設定
-     */
-    saveBackupSettings() {
-        const email = this.backupEmail.value.trim();
-        
-        if (!email) {
-            this.showBackupStatus('請輸入Email地址', 'danger');
-            return;
-        }
-        
-        // 使用郵件服務驗證Email格式
-        if (!emailService.validateEmail(email)) {
-            this.showBackupStatus('請輸入有效的Email地址', 'danger');
-            return;
-        }
-        
-        // 構建設定對象
-        const settings = {
-            email: email,
-            type: this.autoBackup.checked ? 'auto' : 'manual'
-        };
-        
-        // 如果是自動備份，添加頻率
-        if (settings.type === 'auto') {
-            settings.frequency = this.backupFrequency.value;
-        }
-        
-        // 儲存設定
-        db.saveBackupSettings(settings);
-        this.showBackupStatus('備份設定已儲存', 'success');
-        
-        // 如果是自動備份，設置定時任務
-        if (settings.type === 'auto') {
-            const scheduleInfo = emailService.setupBackupSchedule(settings);
-            this.showBackupStatus(`自動備份已設定，下次備份時間：${scheduleInfo.nextBackupTime}`, 'success');
-        }
-    }
-    
-    /**
-     * 設置自動備份
-     * @param {Object} settings 備份設定
-     */
-    setupAutoBackup(settings) {
-        // 使用郵件服務設置自動備份排程
-        return emailService.setupBackupSchedule(settings);
-    }
-    
-    /**
-     * 執行備份
-     */
-    performBackup() {
-        const settings = db.getBackupSettings();
-        const emailjsSettings = db.getEmailJSSettings();
-        
-        if (!settings || !settings.email) {
-            this.showBackupStatus('請先設定備份Email', 'danger');
-            return;
-        }
-        
-        if (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID) {
-            this.showBackupStatus('請先完成EmailJS設定 <button class="btn btn-sm btn-primary ms-2" id="openEmailJSSettingsBtn">設定EmailJS</button>', 'danger');
-            
-            // 添加按鈕點擊事件
-            document.getElementById('openEmailJSSettingsBtn').addEventListener('click', () => {
-                // 關閉備份模態框
-                const backupModal = bootstrap.Modal.getInstance(document.getElementById('backupModal'));
-                backupModal.hide();
-                
-                // 打開EmailJS設定模態框
-                setTimeout(() => {
-                    const emailJSModal = new bootstrap.Modal(document.getElementById('emailJSSettingsModal'));
-                    emailJSModal.show();
-                }, 500);
-            });
-            
-            return;
-        }
-        
-        // 匯出資料
-        const books = db.getAllBooks();
-        
-        if (books.length === 0) {
-            this.showBackupStatus('沒有資料可備份', 'warning');
-            return;
-        }
-        
-        // 顯示處理中狀態
-        this.showBackupStatus('正在處理備份...', 'info');
-        
-        try {
-            // 使用數據處理器創建工作表
-            const workbook = dataProcessor.createExcelWorkbook(books);
-            
-            // 生成檔案名稱
-            const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
-            
-            // 匯出Excel檔案
-            try {
-                XLSX.writeFile(workbook, fileName);
-                this.showBackupStatus(`檔案已生成 (${fileName})，正在發送郵件...`, 'info');
-            } catch (fileError) {
-                console.error('檔案生成錯誤:', fileError);
-                this.showBackupStatus(`Excel檔案生成失敗：${fileError.message}，嘗試繼續發送郵件備份...`, 'warning');
-            }
-            
-            // 顯示備份進度
-            const progressStatus = document.createElement('div');
-            progressStatus.className = 'progress mt-2';
-            progressStatus.innerHTML = `
-                <div class="progress-bar progress-bar-striped progress-bar-animated" 
-                     role="progressbar" style="width: 25%" 
-                     aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
-                    準備發送中...
-                </div>
-            `;
-            this.backupStatus.appendChild(progressStatus);
-            
-            // 更新進度條
-            const progressBar = progressStatus.querySelector('.progress-bar');
-            progressBar.style.width = '50%';
-            progressBar.textContent = '正在發送郵件...';
-            
-            // 使用郵件服務發送備份
-            emailService.sendBackupEmail(settings.email, books, fileName, emailjsSettings)
-                .then((result) => {
-                    // 更新進度條
-                    progressBar.style.width = '100%';
-                    progressBar.classList.remove('progress-bar-animated');
-                    progressBar.classList.add('bg-success');
-                    progressBar.textContent = '備份完成！';
-                    
-                    // 顯示詳細信息
-                    const details = result.details || {};
-                    const recordCount = details.recordCount || books.length;
-                    const sizeKB = details.sizeKB || '未知';
-                    
-                    // 顯示成功信息
-                    this.showBackupStatus(`
-                        <div class="d-flex align-items-center">
-                            <i class="fas fa-check-circle text-success me-2 fs-4"></i>
-                            <div>
-                                <strong>備份成功！</strong><br>
-                                檔案已下載 (${fileName})<br>
-                                備份已發送至 ${settings.email}<br>
-                                共 ${recordCount} 筆記錄，大小約 ${sizeKB}KB
-                                <div class="text-muted small">備份時間: ${new Date().toLocaleString()}</div>
-                            </div>
-                        </div>
-                    `, 'success');
-                    
-                    // 顯示全局通知
-                    this.showMessage('備份已成功完成並發送至您的郵箱', 'success');
-                })
-                .catch(error => {
-                    console.error('備份錯誤:', error);
-                    
-                    // 更新進度條
-                    progressBar.style.width = '100%';
-                    progressBar.classList.remove('progress-bar-animated');
-                    progressBar.classList.add('bg-danger');
-                    progressBar.textContent = '發送失敗';
-                    
-                    // 顯示錯誤信息
-                    this.showBackupStatus(`
-                        <div class="alert alert-warning">
-                            <i class="fas fa-exclamation-triangle me-2"></i>
-                            <strong>部分備份成功</strong><br>
-                            Excel檔案已生成 (${fileName})，但郵件發送失敗：<br>
-                            ${error.message}<br>
-                            <div class="mt-2">
-                                <button class="btn btn-sm btn-outline-primary retry-backup-btn">
-                                    <i class="fas fa-redo me-1"></i> 重試發送
-                                </button>
-                            </div>
-                        </div>
-                    `, 'warning');
-                    
-                    // 添加重試按鈕事件
-                    const retryBtn = this.backupStatus.querySelector('.retry-backup-btn');
-                    if (retryBtn) {
-                        retryBtn.addEventListener('click', () => this.performBackup());
-                    }
-                });
-        } catch (error) {
-            console.error('備份生成錯誤:', error);
-            this.showBackupStatus(`
-                <div class="alert alert-danger">
-                    <i class="fas fa-exclamation-circle me-2"></i>
-                    <strong>備份失敗</strong><br>
-                    備份過程中發生錯誤：${error.message}<br>
-                    <div class="text-muted small mt-1">錯誤類型: ${error.name || '未知'}</div>
-                </div>
-            `, 'danger');
-        }
-    }
-    
-    /**
-     * 顯示備份狀態
-     * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning, info)
-     */
-    showBackupStatus(message, type) {
-        if (!this.backupStatus) return;
-        
-        // 根據類型選擇圖標
-        let icon = '';
-        switch(type) {
-            case 'success':
-                icon = '<i class="fas fa-check-circle me-2"></i>';
-                break;
-            case 'danger':
-                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-                break;
-            case 'warning':
-                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
-                break;
-            case 'info':
-            default:
-                icon = '<i class="fas fa-info-circle me-2"></i>';
-                break;
-        }
-        
-        this.backupStatus.innerHTML = icon + message;
-        this.backupStatus.className = `alert alert-${type}`;
-        this.backupStatus.classList.remove('d-none');
-        
-        // 如果是錯誤或警告，滾動到狀態消息位置
-        if (type === 'danger' || type === 'warning') {
-            this.backupStatus.scrollIntoView({ behavior: 'smooth' });
-        }
-    }
-    
-    /**
-     * 顯示EmailJS設定狀態
-     * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning, info)
-     */
-    showEmailJSStatus(message, type) {
-        const emailjsStatus = document.getElementById('emailjsStatus');
-        if (!emailjsStatus) return;
-        
-        // 根據類型選擇圖標
-        let icon = '';
-        switch(type) {
-            case 'success':
-                icon = '<i class="fas fa-check-circle me-2"></i>';
-                break;
-            case 'danger':
-                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-                break;
-            case 'warning':
-                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
-                break;
-            case 'info':
-            default:
-                icon = '<i class="fas fa-info-circle me-2"></i>';
-                break;
-        }
-        
-        emailjsStatus.innerHTML = icon + message;
-        emailjsStatus.className = `alert alert-${type}`;
-        emailjsStatus.classList.remove('d-none');
-    }
-    
-    /**
-     * 加載EmailJS設定
-     */
-    loadEmailJSSettings() {
-        const settings = db.getEmailJSSettings();
-        if (!settings) return;
-        
-        // 填充表單
-        document.getElementById('emailjsUserID').value = settings.userID || '';
-        document.getElementById('emailjsServiceID').value = settings.serviceID || '';
-        document.getElementById('emailjsTemplateID').value = settings.templateID || '';
-    }
-    
-    /**
-     * 保存EmailJS設定
-     */
-    saveEmailJSSettings() {
-        const userID = document.getElementById('emailjsUserID').value.trim();
-        const serviceID = document.getElementById('emailjsServiceID').value.trim();
-        const templateID = document.getElementById('emailjsTemplateID').value.trim();
-        
-        if (!userID || !serviceID || !templateID) {
-            this.showEmailJSStatus('請填寫所有必要欄位', 'danger');
-            return;
-        }
-        
-        // 構建設定對象
-        const settings = {
-            userID: userID,
-            serviceID: serviceID,
-            templateID: templateID
-        };
-        
-        // 儲存設定
-        db.saveEmailJSSettings(settings);
-        this.showEmailJSStatus('EmailJS設定已儲存', 'success');
-    }
-    
-    /**
-     * 測試EmailJS連接
-     */
-    testEmailJSConnection() {
-        const settings = db.getEmailJSSettings();
-        
-        if (!settings || !settings.userID || !settings.serviceID || !settings.templateID) {
-            this.showEmailJSStatus('請先保存完整的EmailJS設定', 'danger');
-            return;
-        }
-        
-        this.showEmailJSStatus('正在測試連接...', 'info');
-        
-        try {
-            // 初始化EmailJS
-            emailjs.init(settings.userID);
-            
-            // 準備測試參數
-            const templateParams = {
-                to_email: 'test@example.com',
-                from_name: '書籍查詢管理系統',
-                message: '這是一個測試訊息，請忽略',
-                file_name: '測試檔案.xlsx',
-                data_json: JSON.stringify({test: 'data'})
-            };
-            
-            // 使用EmailJS發送測試郵件
-            emailjs.send(settings.serviceID, settings.templateID, templateParams)
-                .then(() => {
-                    this.showEmailJSStatus('連接測試成功！EmailJS設定正確', 'success');
-                })
-                .catch((error) => {
-                    console.error('EmailJS測試失敗:', error);
-                    this.showEmailJSStatus(`連接測試失敗：${error.text || error.message}`, 'danger');
-                });
-        } catch (error) {
-            console.error('EmailJS初始化失敗:', error);
-            this.showEmailJSStatus(`連接測試失敗：${error.message}`, 'danger');
-        }
-    }
-    
-    /**
-     * 顯示訊息
-     * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning, info)
-     * @param {number} delay 顯示時間（毫秒）
-     */
-    showMessage(message, type, delay = 5000) {
-        // 創建Toast元素
-        const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
-        const toastId = 'toast-' + Date.now();
-        
-        // 根據類型選擇圖標
-        let icon = '';
-        switch(type) {
-            case 'success':
-                icon = '<i class="fas fa-check-circle me-2"></i>';
-                break;
-            case 'danger':
-                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
-                break;
-            case 'warning':
-                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
-                break;
-            case 'info':
-            default:
-                icon = '<i class="fas fa-info-circle me-2"></i>';
-                break;
-        }
-        
-        const toast = document.createElement('div');
-        toast.className = `toast align-items-center text-white bg-${type} border-0`;
-        toast.id = toastId;
-        toast.setAttribute('role', 'alert');
-        toast.setAttribute('aria-live', 'assertive');
-        toast.setAttribute('aria-atomic', 'true');
-        
-        const toastContent = document.createElement('div');
-        toastContent.className = 'd-flex';
-        
-        const toastBody = document.createElement('div');
-        toastBody.className = 'toast-body d-flex align-items-center';
-        toastBody.innerHTML = icon + message;
-        
-        const closeButton = document.createElement('button');
-        closeButton.type = 'button';
-        closeButton.className = 'btn-close btn-close-white me-2 m-auto';
-        closeButton.setAttribute('data-bs-dismiss', 'toast');
-        closeButton.setAttribute('aria-label', '關閉');
-        
-        toastContent.appendChild(toastBody);
-        toastContent.appendChild(closeButton);
-        toast.appendChild(toastContent);
-        toastContainer.appendChild(toast);
-        
-        // 初始化並顯示Toast
-        const bsToast = new bootstrap.Toast(toast, { delay: delay });
-        bsToast.show();
-        
-        // 自動移除
-        toast.addEventListener('hidden.bs.toast', () => {
-            toast.remove();
-        });
-        
-        return toast;
-    }
-    
-    /**
-     * 創建Toast容器
-     * @returns {HTMLElement} Toast容器
-     */
-    createToastContainer() {
-        const container = document.createElement('div');
-        container.id = 'toastContainer';
-        container.className = 'toast-container position-fixed top-0 end-0 p-3';
-        container.style.zIndex = '1060';
-        document.body.appendChild(container);
-        return container;
-    }
-}
 
-// 初始化應用
-document.addEventListener('DOMContentLoaded', () => {
-    // 檢查是否已登入
-    auth.checkLoginStatus();
+            // 準備工作表數據
+            const worksheetData = books.map(book => ({
+                '書名': book.title,
+                '作者': book.author,
+                '系列': book.series,
+                '分類': book.category,
+                '書櫃': book.cabinet,
+                '層號': book.row,
+                '出版社': book.publisher,
+                '描述': book.description,
+                'ISBN': book.isbn,
+                '備註': book.notes,
+                // 可以選擇性地添加 ID
+                // 'ID': book.id
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '書籍列表');
+
+            // 生成 Excel 文件並觸發下載
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+            saveAs(dataBlob, '書籍列表.xlsx'); // 需要引入 FileSaver.js
+
+            this.showMessage('書籍數據匯出成功', 'success');
+        } catch (error) {
+            console.error('匯出書籍數據失敗:', error);
+            this.showMessage(`匯出書籍數據失敗: ${error.message}`, 'danger');
+        }
+    }
     
-    // 初始化應用
-    window.app = new App();
+    /**
+     * 切換備份選項
+     */
+    toggleBackupOptions() {
+        if (this.autoBackup.checked) {
+            this.autoBackupOptions.classList.remove('d-none');
+        } else {
+            this.autoBackupOptions.classList.add('d-none');
+        }
+    }
     
-    // 設置新增書籍按鈕事件
-    document.getElementById('addBookBtn').addEventListener('click', () => {
-        window.app.addBook();
-    });
-});
+    /**
+     * 載入備份設定
+     */
+    loadBackupSettings() {
+        const settings = db.getBackupSettings();
+        
+        if (settings) {
+            this.backupEmail.value = settings.email || '';
+            
+            if (settings.type === 'auto') {
+                this.autoBackup.checked = true;
+                this.backupFrequency.value = settings.frequency || 'daily';
+                this.autoBackupOptions.classList.remove('d-none');
+            } else {
+                this.manualBackup.checked = true;
+                this.autoBackupOptions.classList.add('d-none');
+            }
+        }
+    }
+    
+    /**
+     * 初始化自動同步設置
+     */
+    async initAutoSyncSettings() {
+        try {
+            // 載入自動同步設置
+            const settings = await db.getAutoSyncSettings();
+            console.log('已載入自動同步設置:', settings);
+            
+            // 設置自動同步管理器
+            if (typeof db.autoSyncManager === 'undefined') {
+                console.log('初始化自動同步管理器...');
+                // 檢查是否有GitHubSync實例
+                if (typeof db.githubSync !== 'undefined') {
+                    // 創建AutoSyncManager實例
+                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    console.log('自動同步管理器已初始化');
+                } else {
+                    console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
+                }
+            }
+            
+            // 初始化自動同步設置界面
+            const autoSyncSettingsModal = document.getElementById('autoSyncSettingsModal');
+            if (autoSyncSettingsModal) {
+                this.initAutoSyncSettingsUI(settings);
+            }
+            
+            // 檢查是否為首次登入，如果是則立即執行數據同步
+            const isFirstLogin = !sessionStorage.getItem('hasLoggedIn');
+            if (isFirstLogin) {
+                console.log('檢測到首次登入，立即執行數據同步');
+                sessionStorage.setItem('hasLoggedIn', 'true');
+                // 立即執行數據同步，但使用靜默模式避免過多提示
+                this.checkForUpdates(true);
+            }
+        } catch (error) {
+            console.error('初始化自動同步設置失敗:', error);
+        }
+    }
+    
+    /**
+     * 初始化自動同步設置界面
+     * @param {Object} settings 自動同步設置
+     */
+    initAutoSyncSettingsUI(settings) {
+        // 獲取設置元素
+        const enableAutoSync = document.getElementById('enableAutoSync');
+        const syncInterval = document.getElementById('syncInterval');
+        const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+        const syncOnStartup = document.getElementById('syncOnStartup');
+        const silentSync = document.getElementById('silentSync');
+        const saveAutoSyncSettingsBtn = document.getElementById('saveAutoSyncSettingsBtn');
+        
+        if (enableAutoSync && syncInterval) {
+            // 設置初始值
+            enableAutoSync.checked = settings.enabled !== false;
+            syncInterval.value = settings.intervalMinutes || 30;
+            
+            if (syncOnNetworkReconnect) {
+                syncOnNetworkReconnect.checked = settings.syncOnNetworkReconnect !== false;
+            }
+            
+            if (syncOnStartup) {
+                syncOnStartup.checked = settings.syncOnStartup !== false;
+            }
+            
+            if (silentSync) {
+                silentSync.checked = settings.silentSync !== false;
+            }
+            
+            // 添加保存按鈕事件
+            if (saveAutoSyncSettingsBtn) {
+                saveAutoSyncSettingsBtn.addEventListener('click', () => this.saveAutoSyncSettings());
+            }
+        }
+    }
+    
+    /**
+     * 保存自動同步設置
+     */
+    async saveAutoSyncSettings() {
+        try {
+            // 獲取設置元素
+            const enableAutoSync = document.getElementById('enableAutoSync');
+            const syncInterval = document.getElementById('syncInterval');
+            const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+            const syncOnStartup = document.getElementById('syncOnStartup');
+            const silentSync = document.getElementById('silentSync');
+            
+            // 構建設置對象
+            const settings = {
+                enabled: enableAutoSync.checked,
+                intervalMinutes: parseInt(syncInterval.value) || 30,
+                syncOnNetworkReconnect: syncOnNetworkReconnect ? syncOnNetworkReconnect.checked : true,
+                syncOnStartup: syncOnStartup ? syncOnStartup.checked : true,
+                silentSync: silentSync ? silentSync.checked : true
+            };
+            
+            // 保存設置
+            await db.saveAutoSyncSettings(settings);
+            
+            // 顯示成功消息
+            this.showMessage('自動同步設置已保存', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoSyncSettingsModal'));
+            if (modal) {
+                modal.hide();
+            }
+        } catch (error) {
+            console.error('保存自動同步設置失敗:', error);
+            this.showMessage(`保存設置失敗: ${error.message}`, 'danger');
+        }
+    }
+    
+    /**
+     * 監聽GitHub同步事件
+     */
+    listenForGitHubSyncEvents() {
+-        // 監聽來自 database.js 的事件
+-        document.addEventListener('githubSyncStatus', (e) => {
+-            const { status, message, type } = e.detail;
+-            this.showMessage(message, type);
+-        });
++        // 現在通過 DatabaseManager 的事件監聽器處理
++        // document.addEventListener('syncStatusUpdate', ...);
++        // 保留此方法以備將來擴展，或移除
++        console.log('GitHub 同步事件監聽器設置（通過 DatabaseManager）');
+     }
+ 
+     /**
+      * 初始化自動同步設置
+      */
+-    initAutoSyncSettings() {
+-        const settings = db.getGitHubSettings();
+-        const autoSyncEnabled = settings.autoSync || false;
+-        const autoSyncInterval = settings.autoSyncInterval || 300; // 默認5分鐘
+-        
+-        const enableAutoSyncCheckbox = document.getElementById('enableAutoSync');
+-        const autoSyncIntervalInput = document.getElementById('autoSyncInterval');
+-        
+-        if (enableAutoSyncCheckbox) {
+-            enableAutoSyncCheckbox.checked = autoSyncEnabled;
+-        }
+-        if (autoSyncIntervalInput) {
+-            autoSyncIntervalInput.value = autoSyncInterval;
+-            // 根據是否啟用來顯示/隱藏間隔設置
+-            const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
+-            if (intervalGroup) {
+-                intervalGroup.style.display = autoSyncEnabled ? 'block' : 'none';
+-            }
+-        }
+-        
+-        // 添加事件監聽器以切換間隔設置的顯示
+-        if (enableAutoSyncCheckbox) {
+-            enableAutoSyncCheckbox.addEventListener('change', (e) => {
+-                const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
+-                if (intervalGroup) {
+-                    intervalGroup.style.display = e.target.checked ? 'block' : 'none';
+-                }
+-            });
++    async initAutoSyncSettings() {
++        try {
++            const autoSyncEnabled = await this.db.getSetting('autoSyncEnabled', false);
++            const autoSyncInterval = await this.db.getSetting('autoSyncInterval', 300); // 默認5分鐘 (300秒)
++
++            const enableAutoSyncCheckbox = document.getElementById('enableAutoSync');
++            const autoSyncIntervalInput = document.getElementById('autoSyncInterval');
++
++            if (enableAutoSyncCheckbox) {
++                enableAutoSyncCheckbox.checked = autoSyncEnabled;
++            }
++            if (autoSyncIntervalInput) {
++                autoSyncIntervalInput.value = autoSyncInterval;
++                const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
++                if (intervalGroup) {
++                    intervalGroup.style.display = autoSyncEnabled ? 'block' : 'none';
++                }
++            }
++
++            // 添加事件監聽器以切換間隔設置的顯示
++            if (enableAutoSyncCheckbox) {
++                enableAutoSyncCheckbox.addEventListener('change', (e) => {
++                    const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
++                    if (intervalGroup) {
++                        intervalGroup.style.display = e.target.checked ? 'block' : 'none';
++                    }
++                });
++            }
++        } catch (error) {
++            console.error('初始化自動同步設置失敗:', error);
++            this.showMessage('無法載入自動同步設置', 'warning');
+         }
+     }
+ 
+     /**
+      * 保存GitHub設置
+      */
+-    saveGitHubSettings() {
++    async saveGitHubSettings() {
+         const token = document.getElementById('githubToken').value.trim();
+         const repo = document.getElementById('githubRepo').value.trim();
+         const filePath = document.getElementById('githubFilePath').value.trim();
+         const enableAutoSync = document.getElementById('enableAutoSync').checked;
+         const autoSyncInterval
+         this.showMessage('書籍已刪除', 'success');
+         this.loadBooks();
+    }
+    
+    /**
+     * 匯入書籍數據
+     */
+    async importBooks() {
+        const file = this.importFile.files[0];
+        const filterDuplicates = this.filterDuplicates.checked;
+
+        if (!file) {
+            this.showMessage('請選擇要匯入的文件', 'warning');
+            return;
+        }
+
+        this.importStatus.textContent = '正在匯入...';
+        this.confirmImportBtn.disabled = true;
+
+        try {
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = new Uint8Array(e.target.result);
+                    const workbook = XLSX.read(data, { type: 'array' });
+                    const firstSheetName = workbook.SheetNames[0];
+                    const worksheet = workbook.Sheets[firstSheetName];
+                    const booksToImport = XLSX.utils.sheet_to_json(worksheet);
+
+                    if (!Array.isArray(booksToImport)) {
+                        throw new Error('無法解析文件中的書籍數據');
+                    }
+
+                    // 使用 DatabaseManager 的批量導入方法
+                    const result = await this.db.bulkImportBooks(booksToImport, filterDuplicates);
+
+                    this.importStatus.textContent = `匯入完成：新增 ${result.added} 筆，更新 ${result.updated} 筆，跳過 ${result.skipped} 筆，錯誤 ${result.errors} 筆。`;
+                    this.showMessage(`匯入完成：新增 ${result.added}，更新 ${result.updated}，跳過 ${result.skipped}`, 'success');
+                    await this.loadBooks(); // 重新載入數據
+                } catch (parseError) {
+                    console.error('解析或匯入文件失敗:', parseError);
+                    this.importStatus.textContent = `匯入失敗: ${parseError.message}`;
+                    this.showMessage(`匯入失敗: ${parseError.message}`, 'danger');
+                } finally {
+                    this.confirmImportBtn.disabled = false;
+                    this.importFile.value = ''; // 清空文件選擇
+                    // 關閉模態框
+                    const importModal = bootstrap.Modal.getInstance(document.getElementById('importModal'));
+                    if (importModal) {
+                        importModal.hide();
+                    }
+                }
+            };
+            reader.onerror = (error) => {
+                console.error('讀取文件失敗:', error);
+                this.importStatus.textContent = '讀取文件失敗';
+                this.showMessage('讀取文件失敗', 'danger');
+                this.confirmImportBtn.disabled = false;
+            };
+            reader.readAsArrayBuffer(file);
+        } catch (error) {
+            console.error('匯入操作失敗:', error);
+            this.importStatus.textContent = `匯入操作失敗: ${error.message}`;
+            this.showMessage(`匯入操作失敗: ${error.message}`, 'danger');
+            this.confirmImportBtn.disabled = false;
+        }
+    }
+
+    /**
+     * 匯出書籍數據為 Excel 文件
+     */
+    async exportBooks() {
+        try {
+            const books = await this.db.getAllBooks();
+            if (books.length === 0) {
+                this.showMessage('沒有書籍數據可供匯出', 'warning');
+                return;
+            }
+
+            // 準備工作表數據
+            const worksheetData = books.map(book => ({
+                '書名': book.title,
+                '作者': book.author,
+                '系列': book.series,
+                '分類': book.category,
+                '書櫃': book.cabinet,
+                '層號': book.row,
+                '出版社': book.publisher,
+                '描述': book.description,
+                'ISBN': book.isbn,
+                '備註': book.notes,
+                // 可以選擇性地添加 ID
+                // 'ID': book.id
+            }));
+
+            const worksheet = XLSX.utils.json_to_sheet(worksheetData);
+            const workbook = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(workbook, worksheet, '書籍列表');
+
+            // 生成 Excel 文件並觸發下載
+            const excelBuffer = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+            const dataBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8' });
+            saveAs(dataBlob, '書籍列表.xlsx'); // 需要引入 FileSaver.js
+
+            this.showMessage('書籍數據匯出成功', 'success');
+        } catch (error) {
+            console.error('匯出書籍數據失敗:', error);
+            this.showMessage(`匯出書籍數據失敗: ${error.message}`, 'danger');
+        }
+    }
+    
+    /**
+     * 切換備份選項
+     */
+    toggleBackupOptions() {
+        if (this.autoBackup.checked) {
+            this.autoBackupOptions.classList.remove('d-none');
+        } else {
+            this.autoBackupOptions.classList.add('d-none');
+        }
+    }
+    
+    /**
+     * 載入備份設定
+     */
+    loadBackupSettings() {
+        const settings = db.getBackupSettings();
+        
+        if (settings) {
+            this.backupEmail.value = settings.email || '';
+            
+            if (settings.type === 'auto') {
+                this.autoBackup.checked = true;
+                this.backupFrequency.value = settings.frequency || 'daily';
+                this.autoBackupOptions.classList.remove('d-none');
+            } else {
+                this.manualBackup.checked = true;
+                this.autoBackupOptions.classList.add('d-none');
+            }
+        }
+    }
+    
+    /**
+     * 初始化自動同步設置
+     */
+    async initAutoSyncSettings() {
+        try {
+            // 載入自動同步設置
+            const settings = await db.getAutoSyncSettings();
+            console.log('已載入自動同步設置:', settings);
+            
+            // 設置自動同步管理器
+            if (typeof db.autoSyncManager === 'undefined') {
+                console.log('初始化自動同步管理器...');
+                // 檢查是否有GitHubSync實例
+                if (typeof db.githubSync !== 'undefined') {
+                    // 創建AutoSyncManager實例
+                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    console.log('自動同步管理器已初始化');
+                } else {
+                    console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
+                }
+            }
+            
+            // 初始化自動同步設置界面
+            const autoSyncSettingsModal = document.getElementById('autoSyncSettingsModal');
+            if (autoSyncSettingsModal) {
+                this.initAutoSyncSettingsUI(settings);
+            }
+            
+            // 檢查是否為首次登入，如果是則立即執行數據同步
+            const isFirstLogin = !sessionStorage.getItem('hasLoggedIn');
+            if (isFirstLogin) {
+                console.log('檢測到首次登入，立即執行數據同步');
+                sessionStorage.setItem('hasLoggedIn', 'true');
+                // 立即執行數據同步，但使用靜默模式避免過多提示
+                this.checkForUpdates(true);
+            }
+        } catch (error) {
+            console.error('初始化自動同步設置失敗:', error);
+        }
+    }
+    
+    /**
+     * 初始化自動同步設置界面
+     * @param {Object} settings 自動同步設置
+     */
+    initAutoSyncSettingsUI(settings) {
+        // 獲取設置元素
+        const enableAutoSync = document.getElementById('enableAutoSync');
+        const syncInterval = document.getElementById('syncInterval');
+        const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+        const syncOnStartup = document.getElementById('syncOnStartup');
+        const silentSync = document.getElementById('silentSync');
+        const saveAutoSyncSettingsBtn = document.getElementById('saveAutoSyncSettingsBtn');
+        
+        if (enableAutoSync && syncInterval) {
+            // 設置初始值
+            enableAutoSync.checked = settings.enabled !== false;
+            syncInterval.value = settings.intervalMinutes || 30;
+            
+            if (syncOnNetworkReconnect) {
+                syncOnNetworkReconnect.checked = settings.syncOnNetworkReconnect !== false;
+            }
+            
+            if (syncOnStartup) {
+                syncOnStartup.checked = settings.syncOnStartup !== false;
+            }
+            
+            if (silentSync) {
+                silentSync.checked = settings.silentSync !== false;
+            }
+            
+            // 添加保存按鈕事件
+            if (saveAutoSyncSettingsBtn) {
+                saveAutoSyncSettingsBtn.addEventListener('click', () => this.saveAutoSyncSettings());
+            }
+        }
+    }
+    
+    /**
+     * 保存自動同步設置
+     */
+    async saveAutoSyncSettings() {
+        try {
+            // 獲取設置元素
+            const enableAutoSync = document.getElementById('enableAutoSync');
+            const syncInterval = document.getElementById('syncInterval');
+            const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+            const syncOnStartup = document.getElementById('syncOnStartup');
+            const silentSync = document.getElementById('silentSync');
+            
+            // 構建設置對象
+            const settings = {
+                enabled: enableAutoSync.checked,
+                intervalMinutes: parseInt(syncInterval.value) || 30,
+                syncOnNetworkReconnect: syncOnNetworkReconnect ? syncOnNetworkReconnect.checked : true,
+                syncOnStartup: syncOnStartup ? syncOnStartup.checked : true,
+                silentSync: silentSync ? silentSync.checked : true
+            };
+            
+            // 保存設置
+            await db.saveAutoSyncSettings(settings);
+            
+            // 顯示成功消息
+            this.showMessage('自動同步設置已保存', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoSyncSettingsModal'));
+            if (modal) {
+                modal.hide();
+            }
+        } catch (error) {
+            console.error('保存自動同步設置失敗:', error);
+            this.showMessage(`保存設置失敗: ${error.message}`, 'danger');
+        }
+    }
+    
+    /**
+     * 監聽GitHub同步事件
+     */
+    listenForGitHubSyncEvents() {
+-        // 監聽來自 database.js 的事件
+-        document.addEventListener('githubSyncStatus', (e) => {
+-            const { status, message, type } = e.detail;
+-            this.showMessage(message, type);
+-        });
++        // 現在通過 DatabaseManager 的事件監聽器處理
++        // document.addEventListener('syncStatusUpdate', ...);
++        // 保留此方法以備將來擴展，或移除
++        console.log('GitHub 同步事件監聽器設置（通過 DatabaseManager）');
+     }
+ 
+     /**
+      * 初始化自動同步設置
+      */
+-    initAutoSyncSettings() {
+-        const settings = db.getGitHubSettings();
+-        const autoSyncEnabled = settings.autoSync || false;
+-        const autoSyncInterval = settings.autoSyncInterval || 300; // 默認5分鐘
+-        
+-        const enableAutoSyncCheckbox = document.getElementById('enableAutoSync');
+-        const autoSyncIntervalInput = document.getElementById('autoSyncInterval');
+-        
+-        if (enableAutoSyncCheckbox) {
+-            enableAutoSyncCheckbox.checked = autoSyncEnabled;
+-        }
+-        if (autoSyncIntervalInput) {
+-            autoSyncIntervalInput.value = autoSyncInterval;
+-            // 根據是否啟用來顯示/隱藏間隔設置
+-            const intervalGroup = autoSyncIntervalInput.closest('.mb-3');
+-            if (intervalGroup) {
+-                intervalGroup.style.display = autoSyncEnabled ? 'block' : 'none';
+-            }
+-        }
+-        
+-        // 添加事件監聽器以切換間隔設置的顯示
+-        if (enableAutoSync
