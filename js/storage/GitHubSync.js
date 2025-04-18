@@ -124,10 +124,11 @@ class GitHubSync {
     /**
      * 從GitHub同步數據到本地
      * @param {boolean} forceRefresh 是否強制全量刷新
+     * @param {boolean} silent 是否靜默同步（不顯示通知）
      * @returns {Promise<Object>} 同步結果
      */
-    async syncFromGitHub(forceRefresh = false) {
-        console.log(`開始從GitHub同步數據${forceRefresh ? '(強制全量刷新)' : '(增量同步)'}...`);
+    async syncFromGitHub(forceRefresh = false, silent = false) {
+        console.log(`開始從GitHub同步數據${forceRefresh ? '(強制全量刷新)' : '(增量同步)'}${silent ? ' (靜默模式)' : ''}...`);
         
         try {
             // 獲取GitHub設置
@@ -146,30 +147,57 @@ class GitHubSync {
                 } else {
                     // 使用公共數據源
                     console.log('使用公共數據源獲取書籍數據...');
-                    return await this.syncFromPublicSource(forceRefresh);
+                    return await this.syncFromPublicSource(forceRefresh, silent);
                 }
             } else {
                 // 使用公共數據源
                 console.log('未找到GitHub設置，使用公共數據源...');
-                return await this.syncFromPublicSource(forceRefresh);
+                return await this.syncFromPublicSource(forceRefresh, silent);
             }
             
-            // 如果不是強制刷新，檢查上次同步時間
+            // 如果不是強制刷新，先檢查數據一致性
             if (!forceRefresh) {
-                const lastSync = await this.getLastSyncTime();
-                if (lastSync) {
-                    const lastSyncTime = new Date(lastSync).getTime();
-                    const currentTime = new Date().getTime();
-                    const timeDiff = currentTime - lastSyncTime;
-                    
-                    // 如果距離上次同步不到30分鐘，則跳過自動同步
-                    if (timeDiff < 30 * 60 * 1000) {
-                        console.log(`距離上次同步僅 ${Math.floor(timeDiff / 1000 / 60)} 分鐘，跳過同步`);
-                        return {
-                            status: 'skipped',
-                            message: '距離上次同步時間過短，已跳過',
-                            timeSinceLastSync: Math.floor(timeDiff / 1000 / 60)
-                        };
+                // 檢查數據一致性
+                const consistencyResult = await this.checkDataConsistency();
+                
+                // 如果數據一致，則跳過同步
+                if (consistencyResult.consistent) {
+                    console.log('數據已是最新，無需同步');
+                    return {
+                        status: 'skipped',
+                        message: '數據已是最新，無需同步',
+                        reason: 'consistent'
+                    };
+                }
+                
+                // 如果本地版本更高，且不是強制刷新，則跳過更新
+                if (consistencyResult.status === 'local-ahead' && !forceRefresh) {
+                    console.log(`本地數據版本更高，跳過更新`);
+                    return {
+                        status: 'skipped',
+                        message: '本地數據版本更高，已跳過更新',
+                        localVersion: consistencyResult.localVersion,
+                        remoteVersion: consistencyResult.remoteVersion
+                    };
+                }
+                
+                // 如果無法確定一致性狀態，檢查上次同步時間
+                if (consistencyResult.status === 'unknown') {
+                    const lastSync = await this.getLastSyncTime();
+                    if (lastSync) {
+                        const lastSyncTime = new Date(lastSync).getTime();
+                        const currentTime = new Date().getTime();
+                        const timeDiff = currentTime - lastSyncTime;
+                        
+                        // 如果距離上次同步不到30分鐘，則跳過自動同步
+                        if (timeDiff < 30 * 60 * 1000) {
+                            console.log(`距離上次同步僅 ${Math.floor(timeDiff / 1000 / 60)} 分鐘，跳過同步`);
+                            return {
+                                status: 'skipped',
+                                message: '距離上次同步時間過短，已跳過',
+                                timeSinceLastSync: Math.floor(timeDiff / 1000 / 60)
+                            };
+                        }
                     }
                 }
             }
@@ -197,41 +225,122 @@ class GitHubSync {
                 };
             }
             
-            // 更新本地數據
-            const books = data.books;
-            const result = await this.storage.bulkAddOrUpdateBooks(books);
+            // 如果版本相同且不是強制刷新，檢查是否有變更
+            if (remoteVersion === localVersion && !forceRefresh) {
+                // 獲取本地書籍
+                const localBooks = await this.storage.getAllBooks();
+                
+                // 如果數量相同，進行詳細比較
+                if (localBooks.length === data.books.length) {
+                    // 創建ID到書籍的映射
+                    const localBooksMap = new Map(localBooks.map(book => [book.id, book]));
+                    
+                    // 檢查是否有變更
+                    let hasChanges = false;
+                    for (const remoteBook of data.books) {
+                        const localBook = localBooksMap.get(remoteBook.id);
+                        
+                        // 如果本地沒有此書籍，或版本不一致
+                        if (!localBook || (remoteBook.version && localBook.version && remoteBook.version !== localBook.version)) {
+                            hasChanges = true;
+                            break;
+                        }
+                    }
+                    
+                    // 如果沒有變更，跳過更新
+                    if (!hasChanges) {
+                        console.log('數據無變更，跳過更新');
+                        return {
+                            status: 'skipped',
+                            message: '數據無變更，已跳過更新',
+                            localVersion,
+                            remoteVersion
+                        };
+                    }
+                }
+            }
             
-            // 更新數據版本和同步時間
-            await this.storage.saveSetting('dataVersion', remoteVersion);
-            await this.updateLastSyncTime();
+            // 執行增量同步
+            console.log(`執行增量同步，遠程版本: ${remoteVersion}, 本地版本: ${localVersion}`);
             
-            // 觸發數據更新事件
-            this.triggerDataLoadedEvent('github', books.length);
+            // 獲取上次同步後的本地操作記錄
+            const lastSyncTime = await this.getLastSyncTime();
+            const localOperations = await this.storage.getUnsyncedOperations(lastSyncTime);
             
-            // 觸發同步成功事件
-            this.triggerSyncEvent('success');
-            
-            console.log(`成功從GitHub同步 ${books.length} 筆書籍數據`);
-            return {
-                status: 'success',
-                message: '同步成功',
-                added: result.added,
-                updated: result.updated,
-                total: books.length,
-                version: remoteVersion
-            };
+            // 如果有本地操作且遠程版本更高，需要合併變更
+            if (localOperations.length > 0 && remoteVersion > localVersion) {
+                console.log(`檢測到本地有 ${localOperations.length} 個未同步操作，需要合併變更`);
+                
+                // 合併本地和遠程變更
+                const mergedData = this.mergeChanges(data.books, localOperations);
+                
+                // 更新本地數據
+                const result = await this.storage.bulkAddOrUpdateBooks(mergedData);
+                
+                // 更新數據版本和同步時間
+                const newVersion = remoteVersion + 1;
+                await this.storage.saveSetting('dataVersion', newVersion);
+                await this.updateLastSyncTime();
+                
+                // 觸發數據更新事件
+                this.triggerDataLoadedEvent('merged', mergedData.length);
+                
+                // 觸發同步成功事件
+                if (!silent) {
+                    this.triggerSyncEvent('success');
+                }
+                
+                console.log(`成功合併並同步 ${mergedData.length} 筆書籍數據，新版本: ${newVersion}`);
+                return {
+                    status: 'success',
+                    message: '合併同步成功',
+                    added: result.added,
+                    updated: result.updated,
+                    total: mergedData.length,
+                    version: newVersion,
+                    merged: true
+                };
+            } else {
+                // 直接更新本地數據
+                const books = data.books;
+                const result = await this.storage.bulkAddOrUpdateBooks(books);
+                
+                // 更新數據版本和同步時間
+                await this.storage.saveSetting('dataVersion', remoteVersion);
+                await this.updateLastSyncTime();
+                
+                // 觸發數據更新事件
+                this.triggerDataLoadedEvent('github', books.length);
+                
+                // 觸發同步成功事件
+                if (!silent) {
+                    this.triggerSyncEvent('success');
+                }
+                
+                console.log(`成功從GitHub同步 ${books.length} 筆書籍數據，版本: ${remoteVersion}`);
+                return {
+                    status: 'success',
+                    message: '同步成功',
+                    added: result.added,
+                    updated: result.updated,
+                    total: books.length,
+                    version: remoteVersion
+                };
+            }
         } catch (error) {
             console.error('從GitHub同步數據失敗:', error);
             
             // 觸發同步失敗事件
-            this.triggerSyncEvent('error', error);
+            if (!silent) {
+                this.triggerSyncEvent('error', error);
+            }
             
             // 如果是強制刷新，則拋出錯誤；否則嘗試從本地JSON文件載入
             if (forceRefresh) {
                 throw error;
             } else {
                 console.log('嘗試從本地JSON文件載入...');
-                return await this.syncFromPublicSource(true);
+                return await this.syncFromPublicSource(true, silent);
             }
         }
     }
@@ -591,6 +700,115 @@ class GitHubSync {
     }
     
     /**
+     * 合併本地和遠程變更
+     * @param {Array} remoteBooks 遠程書籍數據
+     * @param {Array} localOperations 本地操作記錄
+     * @returns {Array} 合併後的書籍數據
+     */
+    mergeChanges(remoteBooks, localOperations) {
+        console.log(`合併 ${remoteBooks.length} 筆遠程數據和 ${localOperations.length} 個本地操作...`);
+        
+        // 創建遠程書籍的副本
+        const mergedBooks = [...remoteBooks];
+        
+        // 創建ID到書籍的映射，以便快速查找
+        const bookMap = new Map();
+        mergedBooks.forEach((book, index) => {
+            bookMap.set(book.id, index);
+        });
+        
+        // 按時間戳排序操作，確保按正確順序應用
+        const sortedOperations = [...localOperations].sort((a, b) => {
+            return new Date(a.timestamp) - new Date(b.timestamp);
+        });
+        
+        // 應用每個本地操作
+        sortedOperations.forEach(op => {
+            switch (op.operation) {
+                case 'add':
+                    // 檢查書籍是否已存在
+                    if (bookMap.has(op.data.id)) {
+                        // 如果已存在，檢查版本和時間戳
+                        const existingIndex = bookMap.get(op.data.id);
+                        const existingBook = mergedBooks[existingIndex];
+                        const localTimestamp = new Date(op.timestamp);
+                        const remoteTimestamp = existingBook.updatedAt ? new Date(existingBook.updatedAt) : new Date(0);
+                        
+                        // 如果本地操作較新，則更新
+                        if (localTimestamp > remoteTimestamp) {
+                            // 保留遠程版本號，但使用本地數據
+                            const mergedBook = {
+                                ...op.data,
+                                version: Math.max(existingBook.version || 0, op.data.version || 0) + 1,
+                                updatedAt: new Date().toISOString()
+                            };
+                            mergedBooks[existingIndex] = mergedBook;
+                        }
+                    } else {
+                        // 添加新書籍
+                        mergedBooks.push({
+                            ...op.data,
+                            version: op.data.version || 1,
+                            updatedAt: new Date().toISOString()
+                        });
+                        bookMap.set(op.data.id, mergedBooks.length - 1);
+                    }
+                    break;
+                    
+                case 'update':
+                    // 檢查書籍是否存在
+                    if (bookMap.has(op.bookId)) {
+                        const existingIndex = bookMap.get(op.bookId);
+                        const existingBook = mergedBooks[existingIndex];
+                        const localTimestamp = new Date(op.timestamp);
+                        const remoteTimestamp = existingBook.updatedAt ? new Date(existingBook.updatedAt) : new Date(0);
+                        
+                        // 如果本地操作較新，則更新
+                        if (localTimestamp > remoteTimestamp) {
+                            // 保留遠程版本號，但使用本地數據
+                            const mergedBook = {
+                                ...op.data,
+                                version: Math.max(existingBook.version || 0, op.data.version || 0) + 1,
+                                updatedAt: new Date().toISOString()
+                            };
+                            mergedBooks[existingIndex] = mergedBook;
+                        }
+                    }
+                    break;
+                    
+                case 'delete':
+                    // 檢查書籍是否存在
+                    if (bookMap.has(op.bookId)) {
+                        const existingIndex = bookMap.get(op.bookId);
+                        const existingBook = mergedBooks[existingIndex];
+                        const localTimestamp = new Date(op.timestamp);
+                        const remoteTimestamp = existingBook.updatedAt ? new Date(existingBook.updatedAt) : new Date(0);
+                        
+                        // 如果本地操作較新，則刪除
+                        if (localTimestamp > remoteTimestamp) {
+                            // 刪除書籍
+                            mergedBooks.splice(existingIndex, 1);
+                            
+                            // 更新映射
+                            bookMap.delete(op.bookId);
+                            
+                            // 更新受影響書籍的索引
+                            bookMap.forEach((index, id) => {
+                                if (index > existingIndex) {
+                                    bookMap.set(id, index - 1);
+                                }
+                            });
+                        }
+                    }
+                    break;
+            }
+        });
+        
+        console.log(`合併完成，最終有 ${mergedBooks.length} 筆書籍數據`);
+        return mergedBooks;
+    }
+    
+    /**
      * 觸發數據載入完成事件
      * @param {string} source 數據來源
      * @param {number} count 數據數量
@@ -657,48 +875,172 @@ class GitHubSync {
                 };
             }
             
-            // 獲取GitHub上的數據
-            const githubData = await this.fetchFromGitHub(settings.repo, settings.path, settings.token);
-            const remoteBooks = githubData.books;
+            // 獲取上次同步時間
+            const lastSyncTime = await this.getLastSyncTime();
             
-            // 檢查數量是否一致
-            if (localBooks.length !== remoteBooks.length) {
-                return {
-                    status: 'inconsistent',
-                    message: `數據不一致: 本地 ${localBooks.length} 筆, 遠程 ${remoteBooks.length} 筆`,
-                    consistent: false,
-                    localCount: localBooks.length,
-                    remoteCount: remoteBooks.length
-                };
-            }
+            // 獲取本地數據版本
+            const localVersion = await this.storage.getSetting('dataVersion') || 0;
             
-            // 創建ID到書籍的映射
-            const localBooksMap = new Map(localBooks.map(book => [book.id, book]));
-            
-            // 檢查每本書籍
-            const inconsistentBooks = [];
-            
-            for (const remoteBook of remoteBooks) {
-                const localBook = localBooksMap.get(remoteBook.id);
+            try {
+                // 嘗試獲取GitHub上的數據元信息（不下載完整數據）
+                const metaInfo = await this.getGitHubFileMetaInfo(settings.repo, settings.path, settings.token);
                 
-                // 如果本地沒有此書籍，或版本不一致
-                if (!localBook || (remoteBook.version && localBook.version && remoteBook.version !== localBook.version)) {
-                    inconsistentBooks.push({
-                        id: remoteBook.id,
-                        title: remoteBook.title,
-                        localVersion: localBook ? localBook.version : null,
-                        remoteVersion: remoteBook.version
-                    });
+                // 檢查是否有遠程更新
+                if (lastSyncTime) {
+                    const lastSyncDate = new Date(lastSyncTime);
+                    const remoteUpdateDate = new Date(metaInfo.lastUpdated);
+                    
+                    // 如果遠程文件未更新，則數據一致
+                    if (remoteUpdateDate <= lastSyncDate) {
+                        console.log('遠程數據未更新，數據一致');
+                        return {
+                            status: 'consistent',
+                            message: '遠程數據未更新，數據一致',
+                            consistent: true,
+                            lastSyncTime: lastSyncTime
+                        };
+                    }
+                    
+                    console.log(`遠程數據已更新: ${remoteUpdateDate.toISOString()}`);
                 }
-            }
-            
-            if (inconsistentBooks.length > 0) {
+                
+                // 獲取GitHub上的完整數據
+                const githubData = await this.fetchFromGitHub(settings.repo, settings.path, settings.token);
+                const remoteBooks = githubData.books;
+                const remoteVersion = githubData.version || 0;
+                
+                // 檢查版本號
+                if (remoteVersion < localVersion) {
+                    console.log(`遠程版本 (${remoteVersion}) 低於本地版本 (${localVersion})，本地數據更新`);
+                    return {
+                        status: 'local-ahead',
+                        message: `本地數據版本更高: 本地 ${localVersion}, 遠程 ${remoteVersion}`,
+                        consistent: false,
+                        localVersion,
+                        remoteVersion
+                    };
+                }
+                
+                // 如果版本相同，進行詳細比較
+                if (remoteVersion === localVersion) {
+                    // 檢查數量是否一致
+                    if (localBooks.length !== remoteBooks.length) {
+                        return {
+                            status: 'inconsistent',
+                            message: `數據不一致: 本地 ${localBooks.length} 筆, 遠程 ${remoteBooks.length} 筆`,
+                            consistent: false,
+                            localCount: localBooks.length,
+                            remoteCount: remoteBooks.length
+                        };
+                    }
+                    
+                    // 創建ID到書籍的映射
+                    const localBooksMap = new Map(localBooks.map(book => [book.id, book]));
+                    
+                    // 檢查每本書籍
+                    const inconsistentBooks = [];
+                    
+                    for (const remoteBook of remoteBooks) {
+                        const localBook = localBooksMap.get(remoteBook.id);
+                        
+                        // 如果本地沒有此書籍，或版本不一致
+                        if (!localBook || (remoteBook.version && localBook.version && remoteBook.version !== localBook.version)) {
+                            inconsistentBooks.push({
+                                id: remoteBook.id,
+                                title: remoteBook.title,
+                                localVersion: localBook ? localBook.version : null,
+                                remoteVersion: remoteBook.version
+                            });
+                        }
+                    }
+                    
+                    if (inconsistentBooks.length > 0) {
+                        return {
+                            status: 'inconsistent',
+                            message: `發現 ${inconsistentBooks.length} 筆不一致的數據`,
+                            consistent: false,
+                            inconsistentBooks
+                        };
+                    }
+                    
+                    console.log('數據一致性檢查完成: 數據一致');
+                    return {
+                        status: 'consistent',
+                        message: '數據一致',
+                        consistent: true
+                    };
+                }
+                
+                // 如果遠程版本更高，需要同步
                 return {
-                    status: 'inconsistent',
-                    message: `發現 ${inconsistentBooks.length} 筆不一致的數據`,
+                    status: 'remote-ahead',
+                    message: `遠程數據版本更高: 本地 ${localVersion}, 遠程 ${remoteVersion}`,
                     consistent: false,
-                    inconsistentBooks
+                    localVersion,
+                    remoteVersion
+                };
+            } catch (error) {
+                console.error('獲取GitHub文件元信息失敗:', error);
+                
+                // 如果無法獲取元信息，嘗試完整同步
+                return {
+                    status: 'unknown',
+                    message: `無法檢查數據一致性: ${error.message}`,
+                    consistent: false,
+                    error: error.message
                 };
             }
-            
-            console.log('數據一致性檢查完成: 數
+        } catch (error) {
+            console.error('檢查數據一致性失敗:', error);
+            return {
+                status: 'error',
+                message: `檢查數據一致性失敗: ${error.message}`,
+                consistent: false,
+                error: error.message
+            };
+        }
+    }
+    
+    /**
+     * 獲取GitHub文件元信息
+     * @param {string} repo GitHub倉庫
+     * @param {string} path 文件路徑
+     * @param {string} token 訪問令牌
+     * @returns {Promise<Object>} 文件元信息
+     */
+    async getGitHubFileMetaInfo(repo, path, token) {
+        console.log(`獲取GitHub文件元信息: ${repo}/${path}`);
+        
+        // 構建API URL
+        const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
+        
+        // 設置請求頭
+        const headers = {
+            'Authorization': `token ${token}`,
+            'Accept': 'application/vnd.github.v3.json',
+            'Cache-Control': 'no-cache, no-store, must-revalidate'
+        };
+        
+        // 發送請求
+        const response = await fetch(apiUrl, { headers });
+        
+        // 檢查響應狀態
+        if (!response.ok) {
+            const errorText = await response.text();
+            console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
+            throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
+        }
+        
+        // 解析元信息
+        const fileInfo = await response.json();
+        
+        return {
+            sha: fileInfo.sha,
+            size: fileInfo.size,
+            lastUpdated: fileInfo.commit ? fileInfo.commit.committer.date : null,
+            url: fileInfo.url
+        };
+    }
+    
+    /**
+     * 檢查數

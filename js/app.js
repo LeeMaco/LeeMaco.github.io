@@ -1,5 +1,6 @@
 /**
  * 主應用模組 - 整合所有功能並處理用戶界面交互
+ * 優化首頁查詢書籍功能，實現自動檢查GitHub更新
  */
 
 class App {
@@ -18,6 +19,9 @@ class App {
         
         // 監聽GitHub同步事件
         this.listenForGitHubSyncEvents();
+        
+        // 初始化自動同步設置
+        this.initAutoSyncSettings();
     }
     
     /**
@@ -107,38 +111,266 @@ class App {
      */
     initEventListeners() {
         // 搜尋事件
-        this.searchBtn.addEventListener('click', this.searchBooks.bind(this));
-        this.resetBtn.addEventListener('click', this.resetSearch.bind(this));
-        this.searchInput.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') this.searchBooks();
-        });
+        if (this.searchBtn) {
+            this.searchBtn.addEventListener('click', () => this.searchBooks());
+        }
+        if (this.resetBtn) {
+            this.resetBtn.addEventListener('click', () => this.resetSearch());
+        }
+        if (this.searchInput) {
+            this.searchInput.addEventListener('keyup', (e) => {
+                if (e.key === 'Enter') this.searchBooks();
+            });
+            // 添加輸入延遲搜尋功能
+            let searchTimeout;
+            this.searchInput.addEventListener('input', () => {
+                clearTimeout(searchTimeout);
+                searchTimeout = setTimeout(() => {
+                    if (this.searchInput.value.trim().length >= 2) {
+                        this.searchBooks();
+                    }
+                }, 500); // 500毫秒延遲，避免頻繁搜尋
+            });
+        }
+        
+        // GitHub同步按鈕事件
+        const syncGitHubBtn = document.getElementById('syncGitHubBtn');
+        if (syncGitHubBtn) {
+            syncGitHubBtn.addEventListener('click', () => {
+                // 顯示同步中的狀態提示
+                this.showMessage('正在從GitHub同步數據...', 'info');
+                
+                // 嘗試從GitHub獲取最新數據
+                db.getAllBooks(true) // 傳入true表示強制刷新
+                    .then(books => {
+                        // 確保books是數組
+                        if (!Array.isArray(books)) {
+                            console.error('從GitHub同步數據時收到無效數據:', books);
+                            this.showMessage('從GitHub同步數據時收到無效數據格式', 'danger');
+                            return;
+                        }
+                        
+                        // 顯示同步成功的狀態提示
+                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                        
+                        // 更新顯示
+                        this.displayBooks(books);
+                    })
+                    .catch(error => {
+                        console.error('從GitHub同步數據時發生錯誤:', error);
+                        
+                        // 顯示同步失敗的狀態提示
+                        this.showMessage(`從GitHub同步數據時發生錯誤: ${error.message}`, 'danger');
+                    });
+            });
+        }
         
         // 書籍表單事件
+        this.bookForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveBook();
+        });
         this.saveBookBtn.addEventListener('click', () => this.saveBook());
         
         // 匯入/匯出事件
         this.confirmImportBtn.addEventListener('click', () => this.importBooks());
-        
-        // GitHub同步事件
-        document.addEventListener('githubSync', (event) => this.handleGitHubSyncEvent(event));
         this.exportBtn.addEventListener('click', () => this.exportBooks());
         
-        // 備份設定事件
-        this.manualBackup.addEventListener('change', () => this.toggleBackupOptions());
-        this.autoBackup.addEventListener('change', () => this.toggleBackupOptions());
-        this.manualBackupBtn.addEventListener('click', () => this.performBackup());
+        // 備份事件
+        this.autoBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
+        this.manualBackup.addEventListener('change', () => this.toggleAutoBackupOptions());
         this.saveBackupSettingsBtn.addEventListener('click', () => this.saveBackupSettings());
+        this.manualBackupBtn.addEventListener('click', () => this.performBackup());
         
-        // 載入備份設定
-        this.loadBackupSettings();
+        // EmailJS設定事件
+        const saveEmailJSSettingsBtn = document.getElementById('saveEmailJSSettingsBtn');
+        if (saveEmailJSSettingsBtn) {
+            saveEmailJSSettingsBtn.addEventListener('click', () => this.saveEmailJSSettings());
+        }
+        
+        const testEmailJSBtn = document.getElementById('testEmailJSBtn');
+        if (testEmailJSBtn) {
+            testEmailJSBtn.addEventListener('click', () => this.testEmailJSConnection());
+        }
+        
+        // 監聽模態框事件
+        document.getElementById('bookModal').addEventListener('show.bs.modal', (e) => {
+            const button = e.relatedTarget;
+            if (button && button.getAttribute('data-book-id')) {
+                this.loadBookForEdit(button.getAttribute('data-book-id'));
+            } else {
+                this.resetBookForm();
+            }
+        });
+        
+        // 監聽備份模態框事件
+        document.getElementById('backupModal').addEventListener('show.bs.modal', () => {
+            this.loadBackupSettings();
+        });
+        
+        // 監聽GitHub設置模態框事件
+        document.getElementById('githubSettingsModal').addEventListener('show.bs.modal', () => {
+            this.loadGitHubSettings();
+        });
+        
+        // 監聽EmailJS設置模態框事件
+        const emailJSSettingsModal = document.getElementById('emailJSSettingsModal');
+        if (emailJSSettingsModal) {
+            emailJSSettingsModal.addEventListener('show.bs.modal', () => {
+                this.loadEmailJSSettings();
+            });
+        }
+        
+        // 監聽刪除確認事件
+        this.confirmDeleteBtn.addEventListener('click', () => {
+            const bookId = this.confirmDeleteBtn.getAttribute('data-book-id');
+            if (bookId) this.deleteBook(bookId);
+        });
     }
     
     /**
      * 載入書籍數據
+     * @param {boolean} checkForUpdates 是否檢查更新
      */
-    loadBooks() {
-        const books = db.getAllBooks();
-        this.displayBooks(books);
+    loadBooks(checkForUpdates = true) {
+        // 顯示載入中的狀態提示
+        this.showMessage('正在載入書籍數據...', 'info');
+        
+        // 使用Promise方式獲取書籍數據
+        db.getAllBooks()
+            .then(books => {
+                // 確保books是數組
+                if (!Array.isArray(books)) {
+                    console.error('載入書籍數據時收到無效數據:', books);
+                    this.showMessage('載入書籍數據時收到無效數據格式', 'danger');
+                    this.displayBooks([]);
+                    return;
+                }
+                this.displayBooks(books);
+                // REMOVED: this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+                
+                // 檢查更新
+                if (checkForUpdates) {
+                    this.checkForUpdates(true);
+                }
+            })
+            .catch(error => {
+                console.error('載入書籍數據時發生錯誤:', error);
+                this.showMessage(`載入書籍數據時發生錯誤: ${error.message}`, 'danger');
+                this.displayBooks([]);
+            });
+    }
+    
+    /**
+     * 檢查GitHub更新
+     * @param {boolean} silent 是否靜默同步 (此參數不再影響成功訊息的顯示)
+     */
+    checkForUpdates(silent = false) { // Note: silent parameter description updated
+        try {
+            // 使用getAllBooks方法進行同步，而不是直接調用syncFromGitHub
+            // 因為在新的模塊化結構中，syncFromGitHub已移至DatabaseManager.js
+            db.getAllBooks(true) // 傳入true表示強制刷新
+                .then(books => {
+                    // 始終更新顯示，確保首次登入時能看到數據
+                    this.displayBooks(books);
+                    
+                    // 總是顯示成功消息
+                    // REMOVED: if (!silent) { 
+                    this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                    // REMOVED: }
+                })
+                .catch(error => {
+                    // 只在非靜默模式下顯示錯誤消息，避免初始載入時的潛在錯誤干擾用戶
+                    if (!silent) {
+                        console.error('檢查更新時發生錯誤:', error);
+                        this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
+                    }
+                });
+        } catch (error) {
+             // 只在非靜默模式下顯示錯誤消息
+            if (!silent) {
+                console.error('檢查更新時發生錯誤:', error);
+                this.showMessage(`檢查更新時發生錯誤: ${error.message}`, 'danger');
+            }
+        }
+    }
+    
+    /**
+     * 優化數據緩存策略
+     * 確保在網絡不穩定情況下也能提供良好的查詢體驗
+     */
+    setupCacheStrategy() {
+        // 實現本地緩存策略
+        const cacheBooks = async (books) => {
+            if (!books || !Array.isArray(books) || books.length === 0) return;
+            
+            try {
+                // 緩存書籍數據到sessionStorage
+                // 使用sessionStorage而非localStorage，避免長期占用存儲空間
+                sessionStorage.setItem('cachedBooks', JSON.stringify({
+                    timestamp: new Date().getTime(),
+                    data: books
+                }));
+                console.log(`已緩存 ${books.length} 筆書籍數據到sessionStorage`);
+            } catch (error) {
+                console.warn('緩存書籍數據失敗:', error);
+            }
+        };
+        
+        // 從緩存獲取書籍數據
+        const getCachedBooks = () => {
+            try {
+                const cachedData = sessionStorage.getItem('cachedBooks');
+                if (!cachedData) return null;
+                
+                const parsed = JSON.parse(cachedData);
+                const now = new Date().getTime();
+                const cacheAge = now - parsed.timestamp;
+                
+                // 緩存有效期為30分鐘
+                if (cacheAge > 30 * 60 * 1000) {
+                    console.log('緩存數據已過期');
+                    return null;
+                }
+                
+                console.log(`從緩存獲取 ${parsed.data.length} 筆書籍數據，緩存時間: ${Math.round(cacheAge / 1000 / 60)} 分鐘前`);
+                return parsed.data;
+            } catch (error) {
+                console.warn('獲取緩存數據失敗:', error);
+                return null;
+            }
+        };
+        
+        // 覆蓋原有的書籍顯示方法，添加緩存功能
+        const originalDisplayBooks = this.displayBooks;
+        this.displayBooks = (books) => {
+            // 顯示書籍
+            originalDisplayBooks.call(this, books);
+            
+            // 緩存書籍數據
+            cacheBooks(books);
+        };
+        
+        // 覆蓋原有的載入書籍方法，添加緩存功能
+        const originalLoadBooks = this.loadBooks;
+        this.loadBooks = (checkForUpdates = true) => {
+            // 嘗試從緩存獲取數據
+            const cachedBooks = getCachedBooks();
+            
+            if (cachedBooks) {
+                // 如果有緩存數據，先顯示緩存數據
+                this.displayBooks(cachedBooks);
+                this.showMessage(`已從緩存載入 ${cachedBooks.length} 筆書籍數據`, 'info');
+                
+                // 然後在背景檢查更新
+                if (checkForUpdates) {
+                    setTimeout(() => this.checkForUpdates(true), 1000);
+                }
+            } else {
+                // 如果沒有緩存數據，使用原方法載入
+                originalLoadBooks.call(this, checkForUpdates);
+            }
+        };
     }
     
     /**
@@ -146,9 +378,15 @@ class App {
      * 注意：類別篩選功能已移除，此函數保留用於其他可能的用途
      */
     loadCategories() {
-        // 獲取所有類別（可能用於其他功能）
-        const categories = db.getAllCategories();
-        // 類別篩選下拉框已移除，不再需要填充選項
+        // 使用Promise方式獲取所有類別
+        db.getAllCategories()
+            .then(categories => {
+                console.log('成功載入類別:', categories);
+                // 類別篩選下拉框已移除，不再需要填充選項
+            })
+            .catch(error => {
+                console.error('載入類別時發生錯誤:', error);
+            });
     }
     
     /**
@@ -158,6 +396,21 @@ class App {
     displayBooks(books) {
         // 清空表格
         this.booksTableBody.innerHTML = '';
+        
+        // 確保books是數組
+        if (!books || !Array.isArray(books)) {
+            console.error('顯示書籍時收到無效數據:', books);
+            // 顯示錯誤提示
+            this.resultCount.textContent = '0 筆資料';
+            this.resultCount.className = 'badge bg-danger';
+            
+            if (this.noResults) {
+                this.noResults.classList.remove('d-none');
+                this.noResults.innerHTML = '<div class="alert alert-danger"><i class="fas fa-exclamation-triangle me-2"></i>搜尋時發生錯誤：數據庫返回無效數據</div>';
+            }
+            this.booksTable.classList.add('d-none');
+            return;
+        }
         
         // 更新結果計數
         this.resultCount.textContent = `${books.length} 筆資料`;
@@ -265,41 +518,122 @@ class App {
             // 顯示搜尋中的狀態提示
             this.showMessage('正在搜尋...', 'info');
             
-            let results = db.getAllBooks();
+            // 檢查搜尋輸入是否為空
+            if (query === '') {
+                this.showMessage('請輸入搜尋關鍵字', 'info');
+                this.loadBooks(); // 顯示所有書籍
+                return;
+            }
             
-            // 檢查數據庫是否返回有效數據
-            if (!Array.isArray(results)) {
-                throw new Error('數據庫返回無效數據');
+            // 使用Promise方式獲取書籍數據
+            db.getAllBooks()
+                .then(results => {
+                    // 檢查數據庫是否返回有效數據
+                    if (!Array.isArray(results)) {
+                        throw new Error('數據庫返回無效數據');
+                    }
+                    
+                    // 檢查數據庫是否為空
+                    if (results.length === 0) {
+                        this.showMessage('數據庫中沒有書籍資料', 'warning');
+                        this.displayBooks([]);
+                        return;
+                    }
+                    
+                    // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
+                    const filteredResults = results.filter(book => {
+                        // 安全地檢查每個屬性是否存在且為字符串類型
+                        const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
+                        const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
+                        const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
+                        const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
+                        const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
+                        const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
+                        const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
+                        const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
+                        const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
+                        const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
+                        
+                        // 返回任一屬性匹配的結果
+                        return titleMatch || authorMatch || descriptionMatch || notesMatch || 
+                               publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
+                               cabinetMatch || rowMatch;
+                    });
+                    
+                    // 顯示搜尋結果和狀態提示
+                    this.displayBooks(filteredResults);
+                    
+                    // 顯示搜尋條件的狀態提示
+                    const resultMessage = `搜尋關鍵字「${query}」，找到 ${filteredResults.length} 筆資料`;
+                    this.showMessage(resultMessage, filteredResults.length > 0 ? 'info' : 'warning');
+                    
+                    // 如果沒有結果，在noResults區域顯示更友好的提示
+                    if (filteredResults.length === 0 && this.noResults) {
+                        this.noResults.classList.remove('d-none');
+                        this.noResults.innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合「${query}」的書籍資料，請嘗試其他關鍵字</div>`;
+                    }
+                })
+                .catch(error => {
+                    console.error('搜尋錯誤:', error);
+                    this.showMessage(`搜尋時發生錯誤: ${error.message}`, 'danger');
+                    
+                    // 顯示錯誤提示在noResults區域
+                    if (this.noResults) {
+                        this.noResults.classList.remove('d-none');
+                        this.noResults.innerHTML = `<div class="alert alert-danger"><i class="fas fa-exclamation-circle me-2"></i>搜尋時發生錯誤: ${error.message}</div>`;
+                    }
+                    
+                    // 隱藏表格
+                    if (this.booksTable) {
+                        this.booksTable.classList.add('d-none');
+                    }
+                    
+                    // 更新結果計數
+                    this.resultCount.textContent = '0 筆資料';
+                    this.resultCount.className = 'badge bg-danger';
+                });
+                
+            return; // 提前返回，因為後續處理在Promise中進行
+            
+            
+            // 檢查數據庫是否為空
+            if (results.length === 0) {
+                this.showMessage('數據庫中沒有書籍資料', 'warning');
+                this.displayBooks([]);
+                return;
             }
             
             // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
-            if (query) {
-                results = results.filter(book => {
-                    // 安全地檢查每個屬性是否存在且為字符串類型
-                    const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
-                    const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
-                    const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
-                    const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
-                    const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
-                    const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
-                    const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
-                    const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
-                    const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
-                    const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
-                    
-                    // 返回任一屬性匹配的結果
-                    return titleMatch || authorMatch || descriptionMatch || notesMatch || 
-                           publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
-                           cabinetMatch || rowMatch;
-                });
-            }
+            results = results.filter(book => {
+                // 安全地檢查每個屬性是否存在且為字符串類型
+                const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
+                const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
+                const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
+                const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
+                const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
+                const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
+                const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
+                const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
+                const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
+                const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
+                
+                // 返回任一屬性匹配的結果
+                return titleMatch || authorMatch || descriptionMatch || notesMatch || 
+                       publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
+                       cabinetMatch || rowMatch;
+            });
             
             // 顯示搜尋結果和狀態提示
             this.displayBooks(results);
             
             // 顯示搜尋條件的狀態提示
-            if (query) {
-                this.showMessage(`搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`, results.length > 0 ? 'info' : 'warning');
+            const resultMessage = `搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`;
+            this.showMessage(resultMessage, results.length > 0 ? 'info' : 'warning');
+            
+            // 如果沒有結果，在noResults區域顯示更友好的提示
+            if (results.length === 0 && this.noResults) {
+                this.noResults.classList.remove('d-none');
+                this.noResults.innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合「${query}」的書籍資料，請嘗試其他關鍵字</div>`;
             }
         } catch (error) {
             console.error('搜尋錯誤:', error);
@@ -316,6 +650,25 @@ class App {
                 this.booksTable.classList.add('d-none');
             }
         }
+    }
+    
+    /**
+     * 從GitHub同步數據
+     */
+    syncFromGitHub() {
+        // 顯示同步中的狀態提示
+        this.showMessage('正在從GitHub同步數據...', 'info');
+        
+        // 強制從GitHub刷新數據
+        db.getAllBooks(true)
+            .then(books => {
+                this.displayBooks(books);
+                this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+            })
+            .catch(error => {
+                console.error('從GitHub同步數據時發生錯誤:', error);
+                this.showMessage(`從GitHub同步數據失敗: ${error.message}`, 'danger');
+            });
     }
     
     /**
@@ -642,6 +995,122 @@ class App {
     }
     
     /**
+     * 初始化自動同步設置
+     */
+    async initAutoSyncSettings() {
+        try {
+            // 載入自動同步設置
+            const settings = await db.getAutoSyncSettings();
+            console.log('已載入自動同步設置:', settings);
+            
+            // 設置自動同步管理器
+            if (typeof db.autoSyncManager === 'undefined') {
+                console.log('初始化自動同步管理器...');
+                // 檢查是否有GitHubSync實例
+                if (typeof db.githubSync !== 'undefined') {
+                    // 創建AutoSyncManager實例
+                    db.autoSyncManager = new AutoSyncManager(db.githubSync, db.storage);
+                    console.log('自動同步管理器已初始化');
+                } else {
+                    console.warn('GitHubSync實例不存在，無法初始化自動同步管理器');
+                }
+            }
+            
+            // 初始化自動同步設置界面
+            const autoSyncSettingsModal = document.getElementById('autoSyncSettingsModal');
+            if (autoSyncSettingsModal) {
+                this.initAutoSyncSettingsUI(settings);
+            }
+            
+            // 檢查是否為首次登入，如果是則立即執行數據同步
+            const isFirstLogin = !sessionStorage.getItem('hasLoggedIn');
+            if (isFirstLogin) {
+                console.log('檢測到首次登入，立即執行數據同步');
+                sessionStorage.setItem('hasLoggedIn', 'true');
+                // 立即執行數據同步，但使用靜默模式避免過多提示
+                this.checkForUpdates(true);
+            }
+        } catch (error) {
+            console.error('初始化自動同步設置失敗:', error);
+        }
+    }
+    
+    /**
+     * 初始化自動同步設置界面
+     * @param {Object} settings 自動同步設置
+     */
+    initAutoSyncSettingsUI(settings) {
+        // 獲取設置元素
+        const enableAutoSync = document.getElementById('enableAutoSync');
+        const syncInterval = document.getElementById('syncInterval');
+        const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+        const syncOnStartup = document.getElementById('syncOnStartup');
+        const silentSync = document.getElementById('silentSync');
+        const saveAutoSyncSettingsBtn = document.getElementById('saveAutoSyncSettingsBtn');
+        
+        if (enableAutoSync && syncInterval) {
+            // 設置初始值
+            enableAutoSync.checked = settings.enabled !== false;
+            syncInterval.value = settings.intervalMinutes || 30;
+            
+            if (syncOnNetworkReconnect) {
+                syncOnNetworkReconnect.checked = settings.syncOnNetworkReconnect !== false;
+            }
+            
+            if (syncOnStartup) {
+                syncOnStartup.checked = settings.syncOnStartup !== false;
+            }
+            
+            if (silentSync) {
+                silentSync.checked = settings.silentSync !== false;
+            }
+            
+            // 添加保存按鈕事件
+            if (saveAutoSyncSettingsBtn) {
+                saveAutoSyncSettingsBtn.addEventListener('click', () => this.saveAutoSyncSettings());
+            }
+        }
+    }
+    
+    /**
+     * 保存自動同步設置
+     */
+    async saveAutoSyncSettings() {
+        try {
+            // 獲取設置元素
+            const enableAutoSync = document.getElementById('enableAutoSync');
+            const syncInterval = document.getElementById('syncInterval');
+            const syncOnNetworkReconnect = document.getElementById('syncOnNetworkReconnect');
+            const syncOnStartup = document.getElementById('syncOnStartup');
+            const silentSync = document.getElementById('silentSync');
+            
+            // 構建設置對象
+            const settings = {
+                enabled: enableAutoSync.checked,
+                intervalMinutes: parseInt(syncInterval.value) || 30,
+                syncOnNetworkReconnect: syncOnNetworkReconnect ? syncOnNetworkReconnect.checked : true,
+                syncOnStartup: syncOnStartup ? syncOnStartup.checked : true,
+                silentSync: silentSync ? silentSync.checked : true
+            };
+            
+            // 保存設置
+            await db.saveAutoSyncSettings(settings);
+            
+            // 顯示成功消息
+            this.showMessage('自動同步設置已保存', 'success');
+            
+            // 關閉模態框
+            const modal = bootstrap.Modal.getInstance(document.getElementById('autoSyncSettingsModal'));
+            if (modal) {
+                modal.hide();
+            }
+        } catch (error) {
+            console.error('保存自動同步設置失敗:', error);
+            this.showMessage(`保存設置失敗: ${error.message}`, 'danger');
+        }
+    }
+    
+    /**
      * 監聽GitHub同步事件
      */
     listenForGitHubSyncEvents() {
@@ -653,11 +1122,54 @@ class App {
      * @param {CustomEvent} event 同步事件
      */
     handleGitHubSyncEvent(event) {
-        const { status, timestamp, error } = event.detail;
+        const { status, timestamp, error, source } = event.detail;
+        
+        // 如果是靜默同步且成功，不顯示通知
+        if (source === 'autoSync' && status === 'success') {
+            const autoSyncSettings = db.getAutoSyncSettings();
+            if (autoSyncSettings && autoSyncSettings.silentSync) {
+                console.log('靜默同步成功，不顯示通知');
+                return;
+            }
+        }
+        
+        // 選擇通知類型和圖標
+        let toastClass = '';
+        let icon = '';
+        let message = '';
+        let detailMessage = '';
+        
+        if (status === 'success') {
+            toastClass = 'text-bg-success';
+            icon = '<i class="fas fa-check-circle me-2"></i>';
+            message = '數據已成功同步到GitHub';
+            detailMessage = `同步時間: ${new Date(timestamp).toLocaleString()}`;
+        } else {
+            toastClass = 'text-bg-danger';
+            icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+            message = '同步失敗';
+            
+            // 提供更詳細的錯誤信息
+            if (error) {
+                if (error.message.includes('網絡連接失敗')) {
+                    detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
+                } else if (error.message.includes('授權失敗')) {
+                    detailMessage = '請檢查您的GitHub訪問令牌是否有效';
+                } else if (error.message.includes('權限不足')) {
+                    detailMessage = '請確保您的令牌有足夠的權限操作此倉庫';
+                } else if (error.message.includes('請求超時')) {
+                    detailMessage = '連接GitHub服務器超時，請稍後再試';
+                } else {
+                    detailMessage = error.message || '未知錯誤';
+                }
+            } else {
+                detailMessage = '發生未知錯誤，請稍後再試';
+            }
+        }
         
         // 創建通知元素
         const toast = document.createElement('div');
-        toast.className = `toast align-items-center ${status === 'success' ? 'text-bg-success' : 'text-bg-danger'}`;
+        toast.className = `toast align-items-center ${toastClass} border-0`;
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
         toast.setAttribute('aria-atomic', 'true');
@@ -666,11 +1178,10 @@ class App {
         toast.innerHTML = `
             <div class="d-flex">
                 <div class="toast-body">
-                    ${status === 'success' 
-                        ? '數據已成功同步到GitHub' 
-                        : `同步失敗: ${error ? error.message : '未知錯誤'}`}
+                    ${icon}${message}
+                    ${detailMessage ? `<div class="small mt-1">${detailMessage}</div>` : ''}
                 </div>
-                <button type="button" class="btn-close me-2 m-auto" data-bs-dismiss="toast"></button>
+                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
             </div>
         `;
         
@@ -678,7 +1189,7 @@ class App {
         this.syncStatus.appendChild(toast);
         
         // 顯示通知
-        const bsToast = new bootstrap.Toast(toast);
+        const bsToast = new bootstrap.Toast(toast, { delay: 6000 }); // 延長顯示時間
         bsToast.show();
         
         // 自動移除通知
@@ -689,6 +1200,31 @@ class App {
         // 如果同步成功，重新載入書籍列表
         if (status === 'success') {
             this.loadBooks();
+        }
+        
+        // 如果同步失敗，顯示重試按鈕
+        if (status === 'error' && error) {
+            const retryBtn = document.createElement('button');
+            retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
+            retryBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>重試同步';
+            retryBtn.onclick = () => {
+                // 移除當前通知
+                bsToast.hide();
+                // 顯示新的進度通知
+                this.showMessage('正在重新嘗試同步...', 'info');
+                // 觸發重新同步
+                setTimeout(() => {
+                    const books = db.getAllBooks();
+                    admin.uploadToGitHub({ books: books })
+                        .catch(err => console.error('重試同步失敗:', err));
+                }, 1000);
+            };
+            
+            // 將重試按鈕添加到通知中
+            const toastBody = toast.querySelector('.toast-body');
+            if (toastBody && !toastBody.querySelector('.btn-warning')) {
+                toastBody.appendChild(retryBtn);
+            }
         }
     }
     
@@ -753,7 +1289,21 @@ class App {
         }
         
         if (!emailjsSettings || !emailjsSettings.userID || !emailjsSettings.serviceID || !emailjsSettings.templateID) {
-            this.showBackupStatus('請先完成EmailJS設定', 'danger');
+            this.showBackupStatus('請先完成EmailJS設定 <button class="btn btn-sm btn-primary ms-2" id="openEmailJSSettingsBtn">設定EmailJS</button>', 'danger');
+            
+            // 添加按鈕點擊事件
+            document.getElementById('openEmailJSSettingsBtn').addEventListener('click', () => {
+                // 關閉備份模態框
+                const backupModal = bootstrap.Modal.getInstance(document.getElementById('backupModal'));
+                backupModal.hide();
+                
+                // 打開EmailJS設定模態框
+                setTimeout(() => {
+                    const emailJSModal = new bootstrap.Modal(document.getElementById('emailJSSettingsModal'));
+                    emailJSModal.show();
+                }, 500);
+            });
+            
             return;
         }
         
@@ -776,27 +1326,102 @@ class App {
             const fileName = dataProcessor.generateTimestampFileName('書籍資料_備份');
             
             // 匯出Excel檔案
-            XLSX.writeFile(workbook, fileName);
+            try {
+                XLSX.writeFile(workbook, fileName);
+                this.showBackupStatus(`檔案已生成 (${fileName})，正在發送郵件...`, 'info');
+            } catch (fileError) {
+                console.error('檔案生成錯誤:', fileError);
+                this.showBackupStatus(`Excel檔案生成失敗：${fileError.message}，嘗試繼續發送郵件備份...`, 'warning');
+            }
             
-            // 更新狀態
-            this.showBackupStatus(`檔案已生成 (${fileName})，正在發送郵件...`, 'info');
+            // 顯示備份進度
+            const progressStatus = document.createElement('div');
+            progressStatus.className = 'progress mt-2';
+            progressStatus.innerHTML = `
+                <div class="progress-bar progress-bar-striped progress-bar-animated" 
+                     role="progressbar" style="width: 25%" 
+                     aria-valuenow="25" aria-valuemin="0" aria-valuemax="100">
+                    準備發送中...
+                </div>
+            `;
+            this.backupStatus.appendChild(progressStatus);
+            
+            // 更新進度條
+            const progressBar = progressStatus.querySelector('.progress-bar');
+            progressBar.style.width = '50%';
+            progressBar.textContent = '正在發送郵件...';
             
             // 使用郵件服務發送備份
             emailService.sendBackupEmail(settings.email, books, fileName, emailjsSettings)
                 .then((result) => {
-                    if (result) {
-                        this.showBackupStatus(`備份已完成，檔案已下載 (${fileName})。備份將發送至 ${settings.email}`, 'success');
-                    } else {
-                        this.showBackupStatus(`備份檔案已生成 (${fileName})，但郵件發送失敗。請檢查網絡連接或稍後再試。`, 'warning');
-                    }
+                    // 更新進度條
+                    progressBar.style.width = '100%';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-success');
+                    progressBar.textContent = '備份完成！';
+                    
+                    // 顯示詳細信息
+                    const details = result.details || {};
+                    const recordCount = details.recordCount || books.length;
+                    const sizeKB = details.sizeKB || '未知';
+                    
+                    // 顯示成功信息
+                    this.showBackupStatus(`
+                        <div class="d-flex align-items-center">
+                            <i class="fas fa-check-circle text-success me-2 fs-4"></i>
+                            <div>
+                                <strong>備份成功！</strong><br>
+                                檔案已下載 (${fileName})<br>
+                                備份已發送至 ${settings.email}<br>
+                                共 ${recordCount} 筆記錄，大小約 ${sizeKB}KB
+                                <div class="text-muted small">備份時間: ${new Date().toLocaleString()}</div>
+                            </div>
+                        </div>
+                    `, 'success');
+                    
+                    // 顯示全局通知
+                    this.showMessage('備份已成功完成並發送至您的郵箱', 'success');
                 })
                 .catch(error => {
                     console.error('備份錯誤:', error);
-                    this.showBackupStatus(`備份檔案已生成 (${fileName})，但郵件發送失敗：${error.message}`, 'warning');
+                    
+                    // 更新進度條
+                    progressBar.style.width = '100%';
+                    progressBar.classList.remove('progress-bar-animated');
+                    progressBar.classList.add('bg-danger');
+                    progressBar.textContent = '發送失敗';
+                    
+                    // 顯示錯誤信息
+                    this.showBackupStatus(`
+                        <div class="alert alert-warning">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            <strong>部分備份成功</strong><br>
+                            Excel檔案已生成 (${fileName})，但郵件發送失敗：<br>
+                            ${error.message}<br>
+                            <div class="mt-2">
+                                <button class="btn btn-sm btn-outline-primary retry-backup-btn">
+                                    <i class="fas fa-redo me-1"></i> 重試發送
+                                </button>
+                            </div>
+                        </div>
+                    `, 'warning');
+                    
+                    // 添加重試按鈕事件
+                    const retryBtn = this.backupStatus.querySelector('.retry-backup-btn');
+                    if (retryBtn) {
+                        retryBtn.addEventListener('click', () => this.performBackup());
+                    }
                 });
         } catch (error) {
             console.error('備份生成錯誤:', error);
-            this.showBackupStatus(`備份過程中發生錯誤：${error.message}`, 'danger');
+            this.showBackupStatus(`
+                <div class="alert alert-danger">
+                    <i class="fas fa-exclamation-circle me-2"></i>
+                    <strong>備份失敗</strong><br>
+                    備份過程中發生錯誤：${error.message}<br>
+                    <div class="text-muted small mt-1">錯誤類型: ${error.name || '未知'}</div>
+                </div>
+            `, 'danger');
         }
     }
     
@@ -833,6 +1458,117 @@ class App {
         // 如果是錯誤或警告，滾動到狀態消息位置
         if (type === 'danger' || type === 'warning') {
             this.backupStatus.scrollIntoView({ behavior: 'smooth' });
+        }
+    }
+    
+    /**
+     * 顯示EmailJS設定狀態
+     * @param {string} message 訊息
+     * @param {string} type 類型 (success, danger, warning, info)
+     */
+    showEmailJSStatus(message, type) {
+        const emailjsStatus = document.getElementById('emailjsStatus');
+        if (!emailjsStatus) return;
+        
+        // 根據類型選擇圖標
+        let icon = '';
+        switch(type) {
+            case 'success':
+                icon = '<i class="fas fa-check-circle me-2"></i>';
+                break;
+            case 'danger':
+                icon = '<i class="fas fa-exclamation-circle me-2"></i>';
+                break;
+            case 'warning':
+                icon = '<i class="fas fa-exclamation-triangle me-2"></i>';
+                break;
+            case 'info':
+            default:
+                icon = '<i class="fas fa-info-circle me-2"></i>';
+                break;
+        }
+        
+        emailjsStatus.innerHTML = icon + message;
+        emailjsStatus.className = `alert alert-${type}`;
+        emailjsStatus.classList.remove('d-none');
+    }
+    
+    /**
+     * 加載EmailJS設定
+     */
+    loadEmailJSSettings() {
+        const settings = db.getEmailJSSettings();
+        if (!settings) return;
+        
+        // 填充表單
+        document.getElementById('emailjsUserID').value = settings.userID || '';
+        document.getElementById('emailjsServiceID').value = settings.serviceID || '';
+        document.getElementById('emailjsTemplateID').value = settings.templateID || '';
+    }
+    
+    /**
+     * 保存EmailJS設定
+     */
+    saveEmailJSSettings() {
+        const userID = document.getElementById('emailjsUserID').value.trim();
+        const serviceID = document.getElementById('emailjsServiceID').value.trim();
+        const templateID = document.getElementById('emailjsTemplateID').value.trim();
+        
+        if (!userID || !serviceID || !templateID) {
+            this.showEmailJSStatus('請填寫所有必要欄位', 'danger');
+            return;
+        }
+        
+        // 構建設定對象
+        const settings = {
+            userID: userID,
+            serviceID: serviceID,
+            templateID: templateID
+        };
+        
+        // 儲存設定
+        db.saveEmailJSSettings(settings);
+        this.showEmailJSStatus('EmailJS設定已儲存', 'success');
+    }
+    
+    /**
+     * 測試EmailJS連接
+     */
+    testEmailJSConnection() {
+        const settings = db.getEmailJSSettings();
+        
+        if (!settings || !settings.userID || !settings.serviceID || !settings.templateID) {
+            this.showEmailJSStatus('請先保存完整的EmailJS設定', 'danger');
+            return;
+        }
+        
+        this.showEmailJSStatus('正在測試連接...', 'info');
+        
+        try {
+            // 初始化EmailJS
+            emailjs.init(settings.userID);
+            
+            // 準備測試參數
+            const templateParams = {
+                to_email: 'test@example.com',
+                from_name: '書籍查詢管理系統',
+                message: '這是一個測試訊息，請忽略',
+                file_name: '測試檔案.xlsx',
+                data_json: JSON.stringify({test: 'data'})
+            };
+            
+            // 使用EmailJS發送測試郵件
+            emailjs.send(settings.serviceID, settings.templateID, templateParams)
+                .then(() => {
+                    this.showEmailJSStatus('連接測試成功！EmailJS設定正確', 'success');
+                })
+                .catch((error) => {
+                    console.error('EmailJS測試失敗:', error);
+                    this.showEmailJSStatus(`連接測試失敗：${error.text || error.message}`, 'danger');
+                });
+        } catch (error) {
+            console.error('EmailJS初始化失敗:', error);
+            this.showEmailJSStatus(`連接測試失敗：${error.message}`, 'danger');
         }
     }
     

@@ -50,6 +50,9 @@
                             <button id="resetBtn" class="btn btn-secondary ms-2">
                                 <i class="fas fa-redo"></i> 重置
                             </button>
+                            <button id="syncGitHubBtn" class="btn btn-info ms-2" title="從GitHub同步最新數據">
+                                <i class="fab fa-github"></i> 同步
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -288,6 +291,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-info" id="openEmailJSSettingsBtn" data-bs-toggle="modal" data-bs-target="#emailJSSettingsModal">EmailJS設定</button>
                     <button type="button" class="btn btn-success" id="manualBackupBtn">立即備份</button>
                     <button type="button" class="btn btn-primary" id="saveBackupSettingsBtn">儲存設定</button>
                 </div>
@@ -306,8 +310,8 @@
                 <div class="modal-body">
                     <div class="mb-3">
                         <label for="githubToken" class="form-label">個人訪問令牌 (PAT)</label>
-                        <input type="password" class="form-control" id="githubToken" placeholder="ghp_xxxxxxxxxxxx">
-                        <div class="form-text">用於授權訪問您的GitHub倉庫</div>
+                        <input type="password" class="form-control" id="githubToken" placeholder="ghp_xxxxxxxxxxxx 或 github_pat_xxxxxxxxxxxx">
+                        <div class="form-text">用於授權訪問您的GitHub倉庫，支持傳統格式(ghp_)和新格式(github_pat_)</div>
                     </div>
                     <div class="mb-3">
                         <label for="githubRepo" class="form-label">倉庫名稱</label>
@@ -322,11 +326,97 @@
                         <label for="githubPath" class="form-label">檔案路徑</label>
                         <input type="text" class="form-control" id="githubPath" placeholder="books-data.json" value="books-data.json">
                     </div>
+                    <div class="d-grid gap-2 mt-3">
+                        <button type="button" class="btn btn-outline-primary" data-bs-toggle="modal" data-bs-target="#autoSyncSettingsModal">
+                            <i class="fas fa-sync-alt me-1"></i> 自動同步設置
+                        </button>
+                    </div>
                     <div id="githubStatus" class="alert d-none"></div>
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
                     <button type="button" class="btn btn-primary" id="saveGitHubSettingsBtn">儲存設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 自動同步設置模態框 -->
+    <div class="modal fade" id="autoSyncSettingsModal" tabindex="-1" aria-labelledby="autoSyncSettingsModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="autoSyncSettingsModalLabel">自動同步設置</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="關閉"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="autoSyncSettingsForm">
+                        <div class="form-check form-switch mb-3">
+                            <input class="form-check-input" type="checkbox" id="enableAutoSync" checked>
+                            <label class="form-check-label" for="enableAutoSync">啟用自動同步</label>
+                        </div>
+                        <div class="mb-3">
+                            <label for="syncInterval" class="form-label">檢查間隔 (分鐘)</label>
+                            <input type="number" class="form-control" id="syncInterval" min="5" max="1440" value="30">
+                            <div class="form-text">設置自動檢查GitHub更新的時間間隔，建議不少於5分鐘。</div>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="syncOnStartup" checked>
+                            <label class="form-check-label" for="syncOnStartup">應用啟動時同步</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="syncOnNetworkReconnect" checked>
+                            <label class="form-check-label" for="syncOnNetworkReconnect">網絡恢復時同步</label>
+                        </div>
+                        <div class="form-check mb-3">
+                            <input class="form-check-input" type="checkbox" id="silentSync" checked>
+                            <label class="form-check-label" for="silentSync">靜默同步 (不顯示通知)</label>
+                            <div class="form-text">啟用後，自動同步成功時不會顯示通知，避免打擾用戶。</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveAutoSyncSettingsBtn">保存設置</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- EmailJS設定彈窗 -->
+    <div class="modal fade" id="emailJSSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">EmailJS設定</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        請先在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板，以啟用郵件備份功能。
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsUserID" class="form-label">User ID</label>
+                        <input type="text" class="form-control" id="emailjsUserID" placeholder="user_xxxxxxxxxxxxxxxxxx">
+                        <div class="form-text">在EmailJS帳號設定中獲取</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsServiceID" class="form-label">Service ID</label>
+                        <input type="text" class="form-control" id="emailjsServiceID" placeholder="service_xxxxxxxxxx">
+                        <div class="form-text">在EmailJS服務設定中獲取</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsTemplateID" class="form-label">Template ID</label>
+                        <input type="text" class="form-control" id="emailjsTemplateID" placeholder="template_xxxxxxxxxx">
+                        <div class="form-text">在EmailJS模板設定中獲取</div>
+                    </div>
+                    <div id="emailjsStatus" class="alert d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveEmailJSSettingsBtn">儲存設定</button>
+                    <button type="button" class="btn btn-success" id="testEmailJSBtn">測試連接</button>
                 </div>
             </div>
         </div>

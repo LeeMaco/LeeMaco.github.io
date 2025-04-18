@@ -9,6 +9,16 @@ class IndexedDBStorage {
         this.dbVersion = 1;
         this.db = null;
         this.isInitialized = false;
+        this.initPromise = null;
+        
+        // 緩存設置
+        this.cacheEnabled = true;
+        this.cacheTimeout = 30 * 60 * 1000; // 30分鐘緩存超時
+        this.memoryCache = {
+            books: null,
+            categories: null,
+            timestamp: null
+        };
         
         // 初始化數據庫
         this.init();
@@ -71,25 +81,61 @@ class IndexedDBStorage {
     
     /**
      * 獲取所有書籍
+     * @param {boolean} forceRefresh 是否強制刷新緩存
      * @returns {Promise<Array>} 書籍數組的Promise
      */
-    async getAllBooks() {
+    async getAllBooks(forceRefresh = false) {
         await this.ensureInitialized();
         
-        return new Promise((resolve, reject) => {
-            const transaction = this.db.transaction(['books'], 'readonly');
-            const store = transaction.objectStore('books');
-            const request = store.getAll();
+        // 檢查緩存是否可用
+        if (this.cacheEnabled && !forceRefresh && this.memoryCache.books) {
+            const now = Date.now();
+            const cacheAge = now - (this.memoryCache.timestamp || 0);
             
-            request.onsuccess = () => {
-                resolve(request.result);
-            };
+            // 如果緩存未過期，直接返回緩存數據
+            if (cacheAge < this.cacheTimeout) {
+                console.log(`從緩存獲取 ${this.memoryCache.books.length} 筆書籍數據，緩存時間: ${Math.round(cacheAge / 1000 / 60)} 分鐘前`);
+                return [...this.memoryCache.books]; // 返回深拷貝，避免修改緩存
+            } else {
+                console.log('緩存已過期，重新獲取數據');
+            }
+        }
+        
+        try {
+            const books = await new Promise((resolve, reject) => {
+                const transaction = this.db.transaction(['books'], 'readonly');
+                const store = transaction.objectStore('books');
+                const request = store.getAll();
+                
+                request.onsuccess = () => {
+                    resolve(request.result);
+                };
+                
+                request.onerror = (event) => {
+                    console.error('獲取所有書籍失敗:', event.target.error);
+                    reject(event.target.error);
+                };
+            });
             
-            request.onerror = (event) => {
-                console.error('獲取所有書籍失敗:', event.target.error);
-                reject(event.target.error);
-            };
-        });
+            // 更新緩存
+            if (this.cacheEnabled) {
+                this.memoryCache.books = [...books]; // 存儲深拷貝
+                this.memoryCache.timestamp = Date.now();
+                console.log(`已緩存 ${books.length} 筆書籍數據`);
+            }
+            
+            return books;
+        } catch (error) {
+            console.error('獲取書籍數據失敗:', error);
+            
+            // 如果有緩存數據，在出錯時返回緩存數據
+            if (this.cacheEnabled && this.memoryCache.books) {
+                console.warn('使用過期緩存數據作為備用');
+                return [...this.memoryCache.books];
+            }
+            
+            throw error;
+        }
     }
     
     /**
@@ -288,6 +334,47 @@ class IndexedDBStorage {
     async bulkAddOrUpdateBooks(books) {
         await this.ensureInitialized();
         
+        // 驗證輸入
+        if (!Array.isArray(books) || books.length === 0) {
+            console.warn('批量添加或更新書籍: 無效的輸入數據');
+            return { added: 0, updated: 0, errors: 0 };
+        }
+        
+        // 最大重試次數
+        const maxRetries = 3;
+        let currentRetry = 0;
+        
+        while (currentRetry < maxRetries) {
+            try {
+                const result = await this._executeBulkOperation(books);
+                
+                // 操作成功，清除緩存以確保數據一致性
+                if (this.cacheEnabled) {
+                    this.clearCache();
+                }
+                
+                return result;
+            } catch (error) {
+                currentRetry++;
+                console.error(`批量操作失敗 (嘗試 ${currentRetry}/${maxRetries}):`, error);
+                
+                if (currentRetry >= maxRetries) {
+                    throw error;
+                }
+                
+                // 等待一段時間後重試
+                await new Promise(resolve => setTimeout(resolve, 1000 * currentRetry));
+            }
+        }
+    }
+    
+    /**
+     * 執行批量操作
+     * @private
+     * @param {Array} books 書籍數組
+     * @returns {Promise<Object>} 操作結果的Promise
+     */
+    async _executeBulkOperation(books) {
         return new Promise((resolve, reject) => {
             const transaction = this.db.transaction(['books', 'syncRecords'], 'readwrite');
             const store = transaction.objectStore('books');
@@ -296,76 +383,137 @@ class IndexedDBStorage {
             let addedCount = 0;
             let updatedCount = 0;
             let errorCount = 0;
+            let processedCount = 0;
+            const totalCount = books.length;
+            
+            // 設置超時處理，避免事務卡住
+            const transactionTimeout = setTimeout(() => {
+                console.error('批量操作超時，可能是事務卡住');
+                reject(new Error('批量操作超時'));
+            }, 30000); // 30秒超時
             
             // 批量處理每本書籍
             books.forEach(book => {
+                // 確保書籍有ID
+                if (!book.id) {
+                    console.error('書籍缺少ID，跳過處理');
+                    errorCount++;
+                    processedCount++;
+                    checkCompletion();
+                    return;
+                }
+                
                 // 檢查是否已存在
                 const getRequest = store.get(book.id);
                 
                 getRequest.onsuccess = () => {
                     const existingBook = getRequest.result;
                     
-                    if (existingBook) {
-                        // 更新現有書籍
-                        book.createdAt = existingBook.createdAt;
-                        book.updatedAt = new Date().toISOString();
-                        book.version = (existingBook.version || 0) + 1;
-                        
-                        const updateRequest = store.put(book);
-                        
-                        updateRequest.onsuccess = () => {
-                            updatedCount++;
+                    try {
+                        if (existingBook) {
+                            // 更新現有書籍
+                            book.createdAt = existingBook.createdAt;
+                            book.updatedAt = new Date().toISOString();
+                            book.version = (existingBook.version || 0) + 1;
                             
-                            // 記錄同步操作
-                            syncStore.add({
-                                operation: 'update',
-                                bookId: book.id,
-                                timestamp: new Date().toISOString(),
-                                data: book,
-                                previousVersion: existingBook.version || 0
-                            });
-                        };
-                        
-                        updateRequest.onerror = () => errorCount++;
-                    } else {
-                        // 添加新書籍
-                        book.createdAt = new Date().toISOString();
-                        book.updatedAt = new Date().toISOString();
-                        book.version = 1;
-                        
-                        const addRequest = store.add(book);
-                        
-                        addRequest.onsuccess = () => {
-                            addedCount++;
+                            const updateRequest = store.put(book);
                             
-                            // 記錄同步操作
-                            syncStore.add({
-                                operation: 'add',
-                                bookId: book.id,
-                                timestamp: new Date().toISOString(),
-                                data: book
-                            });
-                        };
-                        
-                        addRequest.onerror = () => errorCount++;
+                            updateRequest.onsuccess = () => {
+                                updatedCount++;
+                                
+                                // 記錄同步操作
+                                syncStore.add({
+                                    operation: 'update',
+                                    bookId: book.id,
+                                    timestamp: new Date().toISOString(),
+                                    data: book,
+                                    previousVersion: existingBook.version || 0
+                                });
+                                
+                                processedCount++;
+                                checkCompletion();
+                            };
+                            
+                            updateRequest.onerror = (event) => {
+                                console.error(`更新書籍 ID:${book.id} 失敗:`, event.target.error);
+                                errorCount++;
+                                processedCount++;
+                                checkCompletion();
+                            };
+                        } else {
+                            // 添加新書籍
+                            book.createdAt = new Date().toISOString();
+                            book.updatedAt = new Date().toISOString();
+                            book.version = 1;
+                            
+                            const addRequest = store.add(book);
+                            
+                            addRequest.onsuccess = () => {
+                                addedCount++;
+                                
+                                // 記錄同步操作
+                                syncStore.add({
+                                    operation: 'add',
+                                    bookId: book.id,
+                                    timestamp: new Date().toISOString(),
+                                    data: book
+                                });
+                                
+                                processedCount++;
+                                checkCompletion();
+                            };
+                            
+                            addRequest.onerror = (event) => {
+                                console.error(`添加書籍 ID:${book.id} 失敗:`, event.target.error);
+                                errorCount++;
+                                processedCount++;
+                                checkCompletion();
+                            };
+                        }
+                    } catch (error) {
+                        console.error(`處理書籍 ID:${book.id} 時發生錯誤:`, error);
+                        errorCount++;
+                        processedCount++;
+                        checkCompletion();
                     }
                 };
                 
-                getRequest.onerror = () => errorCount++;
+                getRequest.onerror = (event) => {
+                    console.error(`獲取書籍 ID:${book.id} 失敗:`, event.target.error);
+                    errorCount++;
+                    processedCount++;
+                    checkCompletion();
+                };
             });
             
+            // 檢查是否所有書籍都已處理完成
+            function checkCompletion() {
+                if (processedCount === totalCount) {
+                    console.log(`批量操作進度: ${processedCount}/${totalCount} 完成`);
+                }
+            }
+            
             transaction.oncomplete = () => {
+                clearTimeout(transactionTimeout);
                 console.log(`批量操作完成: 添加 ${addedCount}, 更新 ${updatedCount}, 錯誤 ${errorCount}`);
                 resolve({
                     added: addedCount,
                     updated: updatedCount,
-                    errors: errorCount
+                    errors: errorCount,
+                    total: totalCount
                 });
             };
             
             transaction.onerror = (event) => {
+                clearTimeout(transactionTimeout);
                 console.error('批量操作失敗:', event.target.error);
                 reject(event.target.error);
+            };
+            
+            transaction.onabort = (event) => {
+                clearTimeout(transactionTimeout);
+                console.error('批量操作被中止:', event.target.error);
+                reject(new Error('批量操作被中止'));
             };
         });
     }
@@ -507,9 +655,51 @@ class IndexedDBStorage {
      */
     async ensureInitialized() {
         if (!this.isInitialized) {
-            return this.init();
+            try {
+                await this.init();
+            } catch (error) {
+                console.error('數據庫初始化失敗，嘗試重新初始化:', error);
+                // 重置初始化狀態
+                this.isInitialized = false;
+                this.initPromise = null;
+                // 重試一次
+                await this.init();
+            }
         }
-        return Promise.resolve(this.db);
+        return this.db;
+    }
+    
+    /**
+     * 清除緩存
+     */
+    clearCache() {
+        console.log('清除緩存數據');
+        this.memoryCache.books = null;
+        this.memoryCache.categories = null;
+        this.memoryCache.timestamp = null;
+    }
+    
+    /**
+     * 設置緩存配置
+     * @param {Object} config 緩存配置
+     * @param {boolean} config.enabled 是否啟用緩存
+     * @param {number} config.timeout 緩存超時時間（毫秒）
+     */
+    setCacheConfig(config) {
+        if (config.enabled !== undefined) {
+            this.cacheEnabled = config.enabled;
+            console.log(`${this.cacheEnabled ? '啟用' : '禁用'}緩存`);
+        }
+        
+        if (config.timeout !== undefined && config.timeout > 0) {
+            this.cacheTimeout = config.timeout;
+            console.log(`設置緩存超時時間為 ${this.cacheTimeout / 1000 / 60} 分鐘`);
+        }
+        
+        // 如果禁用緩存，清除現有緩存
+        if (!this.cacheEnabled) {
+            this.clearCache();
+        }
     }
     
     /**

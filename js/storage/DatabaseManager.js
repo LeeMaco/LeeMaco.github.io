@@ -5,12 +5,14 @@
 
 import IndexedDBStorage from './IndexedDBStorage.js';
 import GitHubSync from './GitHubSync.js';
+import AutoSyncManager from './AutoSyncManager.js';
 
 class DatabaseManager {
     constructor() {
         // 初始化存儲和同步模塊
         this.storage = new IndexedDBStorage();
         this.githubSync = new GitHubSync(this.storage);
+        this.autoSyncManager = new AutoSyncManager(this.githubSync, this.storage);
         
         // 錯誤處理策略
         this.errorHandlers = new Map();
@@ -122,13 +124,15 @@ class DatabaseManager {
     
     /**
      * 自動從GitHub同步最新數據
+     * @param {boolean} forceSilent 是否強制靜默同步
+     * @returns {Promise<Object>} 同步結果
      */
-    async autoSyncFromGitHub() {
+    async autoSyncFromGitHub(forceSilent = false) {
         try {
             console.log('嘗試自動從GitHub同步最新數據...');
             
-            // 使用GitHubSync模塊進行同步
-            const result = await this.githubSync.syncFromGitHub(false);
+            // 使用AutoSyncManager進行增量同步
+            const result = await this.autoSyncManager.checkForUpdates(forceSilent);
             
             if (result.status === 'success') {
                 console.log(`自動同步完成: 添加 ${result.added}, 更新 ${result.updated}, 共 ${result.total} 筆數據`);
@@ -348,11 +352,18 @@ class DatabaseManager {
     /**
      * 從GitHub同步數據
      * @param {boolean} forceRefresh 是否強制刷新
+     * @param {boolean} silent 是否靜默同步（不顯示通知）
      * @returns {Promise<Object>} 同步結果
      */
-    async syncFromGitHub(forceRefresh = false) {
+    async syncFromGitHub(forceRefresh = false, silent = false) {
         try {
-            return await this.githubSync.syncFromGitHub(forceRefresh);
+            if (forceRefresh) {
+                // 強制刷新時直接使用GitHubSync
+                return await this.githubSync.syncFromGitHub(forceRefresh);
+            } else {
+                // 非強制刷新時使用AutoSyncManager進行增量同步
+                return await this.autoSyncManager.checkForUpdates(silent);
+            }
         } catch (error) {
             console.error('從GitHub同步失敗:', error);
             this.handleError('syncFromGitHub', error);
@@ -382,6 +393,42 @@ class DatabaseManager {
                 consistent: false,
                 error: error.message
             };
+        }
+    }
+    
+    /**
+     * 獲取自動同步設置
+     * @returns {Promise<Object>} 自動同步設置
+     */
+    async getAutoSyncSettings() {
+        try {
+            return await this.autoSyncManager.loadSyncSettings();
+        } catch (error) {
+            console.error('獲取自動同步設置失敗:', error);
+            this.handleError('getAutoSyncSettings', error);
+            return {
+                enabled: true,
+                intervalMinutes: 30,
+                syncOnNetworkReconnect: true,
+                syncOnStartup: true,
+                silentSync: true
+            };
+        }
+    }
+    
+    /**
+     * 保存自動同步設置
+     * @param {Object} settings 自動同步設置
+     * @returns {Promise<boolean>} 是否成功
+     */
+    async saveAutoSyncSettings(settings) {
+        try {
+            await this.autoSyncManager.saveSyncSettings(settings);
+            return true;
+        } catch (error) {
+            console.error('保存自動同步設置失敗:', error);
+            this.handleError('saveAutoSyncSettings', error);
+            return false;
         }
     }
     
