@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍查詢管理系統</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container-fluid p-0">
+        <!-- 導航欄 -->
+        <nav class="navbar navbar-expand-lg navbar-dark bg-primary">
+            <div class="container">
+                <a class="navbar-brand" href="#">書籍查詢管理系統</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" href="index.html">首頁</a>
+                        </li>
+                    </ul>
+                    <div class="d-flex">
+                        <button id="loginBtn" class="btn btn-light" data-bs-toggle="modal" data-bs-target="#loginModal">管理員登入</button>
+                        <button id="logoutBtn" class="btn btn-light ms-2 d-none">登出</button>
+                    </div>
+                </div>
+            </div>
+        </nav>
+
+        <!-- 主要內容 -->
+        <div class="container mt-4">
+            <!-- 搜尋區域 -->
+            <div class="card mb-4">
+                <div class="card-header bg-light">
+                    <h5 class="mb-0">書籍查詢</h5>
+                </div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-8">
+                            <input type="text" id="searchInput" class="form-control" placeholder="輸入任何關鍵字進行全面搜尋...">
+                        </div>
+                        <div class="col-md-4">
+                            <button id="searchBtn" class="btn btn-primary">
+                                <i class="fas fa-search"></i> 搜尋
+                            </button>
+                            <button id="resetBtn" class="btn btn-secondary ms-2">
+                                <i class="fas fa-redo"></i> 重置
+                            </button>
+                            <button id="syncGitHubBtn" class="btn btn-info ms-2" title="從GitHub同步最新數據">
+                                <i class="fab fa-github"></i> 同步
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 管理員功能區 (初始隱藏) -->
+            <div id="adminPanel" class="card mb-4 d-none">
+                <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">管理員功能</h5>
+                    <div>
+                        <button id="addBookBtn" class="btn btn-light btn-sm" data-bs-toggle="modal" data-bs-target="#bookModal">
+                            <i class="fas fa-plus"></i> 新增書籍
+                        </button>
+                        <button id="importBtn" class="btn btn-light btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#importModal">
+                            <i class="fas fa-file-import"></i> 匯入資料
+                        </button>
+                        <button id="exportBtn" class="btn btn-light btn-sm ms-2">
+                            <i class="fas fa-file-export"></i> 匯出資料
+                        </button>
+                        <button id="backupSettingsBtn" class="btn btn-light btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#backupModal">
+                            <i class="fas fa-cog"></i> 備份設定
+                        </button>
+                        <button id="githubSettingsBtn" class="btn btn-light btn-sm ms-2" data-bs-toggle="modal" data-bs-target="#githubSettingsModal">
+                            <i class="fab fa-github"></i> GitHub設置
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 結果顯示區域 -->
+            <div class="card">
+                <div class="card-header bg-light d-flex justify-content-between align-items-center">
+                    <h5 class="mb-0">查詢結果</h5>
+                    <span id="resultCount" class="badge bg-primary">0 筆資料</span>
+                </div>
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table id="booksTable" class="table table-striped table-hover mb-0">
+                            <thead class="table-light">
+                                <tr>
+                                    <th>書名</th>
+                                    <th>作者</th>
+                                    <th>集數</th>
+                                    <th>類別</th>
+                                    <th>櫃號</th>
+                                    <th>行號</th>
+                                    <th>出版社</th>
+                                    <th>ISBN</th>
+                                    <th id="actionHeader" class="d-none">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="booksTableBody">
+                                <!-- 書籍資料將由JavaScript動態生成 -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div id="noResults" class="text-center py-4 d-none">
+                        <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                        <p class="lead">沒有找到符合條件的書籍</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 頁腳 -->
+        <footer class="bg-light text-center text-muted py-3 mt-5">
+            <div class="container">
+                <p class="mb-0">© 2023 書籍查詢管理系統 - 使用 GitHub Pages 託管</p>
+            </div>
+        </footer>
+    </div>
+
+    <!-- 登入彈窗 -->
+    <div class="modal fade" id="loginModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">管理員登入</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="loginForm">
+                        <div class="mb-3">
+                            <label for="username" class="form-label">用戶名</label>
+                            <input type="text" class="form-control" id="username" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="password" class="form-label">密碼</label>
+                            <input type="password" class="form-control" id="password" required>
+                        </div>
+                        <div id="loginError" class="alert alert-danger d-none"></div>
+                        <div class="d-grid">
+                            <button type="submit" class="btn btn-primary">登入</button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 書籍表單彈窗 -->
+    <div class="modal fade" id="bookModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="bookModalTitle">新增書籍</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="bookForm">
+                        <input type="hidden" id="bookId">
+                        <div class="row g-3">
+                            <div class="col-md-6">
+                                <label for="bookTitle" class="form-label">書名</label>
+                                <input type="text" class="form-control" id="bookTitle" required>
+                            </div>
+                            <div class="col-md-6">
+                                <label for="bookAuthor" class="form-label">作者</label>
+                                <input type="text" class="form-control" id="bookAuthor" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="bookSeries" class="form-label">集數</label>
+                                <input type="text" class="form-control" id="bookSeries">
+                            </div>
+                            <div class="col-md-4">
+                                <label for="bookCategory" class="form-label">類別</label>
+                                <input type="text" class="form-control" id="bookCategory" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="bookISBN" class="form-label">ISBN號</label>
+                                <input type="text" class="form-control" id="bookISBN">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="bookCabinet" class="form-label">櫃號</label>
+                                <input type="text" class="form-control" id="bookCabinet">
+                            </div>
+                            <div class="col-md-3">
+                                <label for="bookRow" class="form-label">行號</label>
+                                <input type="text" class="form-control" id="bookRow">
+                            </div>
+                            <div class="col-md-6">
+                                <label for="bookPublisher" class="form-label">出版社</label>
+                                <input type="text" class="form-control" id="bookPublisher">
+                            </div>
+                            <div class="col-12">
+                                <label for="bookDescription" class="form-label">描述</label>
+                                <textarea class="form-control" id="bookDescription" rows="3"></textarea>
+                            </div>
+                            <div class="col-12">
+                                <label for="bookNotes" class="form-label">備註</label>
+                                <textarea class="form-control" id="bookNotes" rows="2"></textarea>
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveBookBtn">儲存</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 匯入彈窗 -->
+    <div class="modal fade" id="importModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">匯入書籍資料</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="importFile" class="form-label">選擇Excel檔案</label>
+                        <input type="file" class="form-control" id="importFile" accept=".xlsx, .xls">
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="filterDuplicates" checked>
+                        <label class="form-check-label" for="filterDuplicates">
+                            自動過濾重複資料
+                        </label>
+                    </div>
+                    <div class="form-check mb-3">
+                        <input class="form-check-input" type="checkbox" id="autoUploadGitHub">
+                        <label class="form-check-label" for="autoUploadGitHub">
+                            自動上傳到GitHub
+                        </label>
+                    </div>
+                    <div id="importStatus" class="alert d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="confirmImportBtn">匯入</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 備份設定彈窗 -->
+    <div class="modal fade" id="backupModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">備份設定</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="backupEmail" class="form-label">備份接收Email</label>
+                        <input type="email" class="form-control" id="backupEmail" placeholder="example@gmail.com">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">備份方式</label>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backupType" id="manualBackup" value="manual" checked>
+                            <label class="form-check-label" for="manualBackup">
+                                手動備份
+                            </label>
+                        </div>
+                        <div class="form-check">
+                            <input class="form-check-input" type="radio" name="backupType" id="autoBackup" value="auto">
+                            <label class="form-check-label" for="autoBackup">
+                                自動備份
+                            </label>
+                        </div>
+                    </div>
+                    <div id="autoBackupOptions" class="mb-3 d-none">
+                        <label for="backupFrequency" class="form-label">備份頻率</label>
+                        <select class="form-select" id="backupFrequency">
+                            <option value="daily">每天</option>
+                            <option value="weekly">每週</option>
+                            <option value="monthly">每月</option>
+                        </select>
+                    </div>
+                    <div id="backupStatus" class="alert d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-info" id="openEmailJSSettingsBtn" data-bs-toggle="modal" data-bs-target="#emailJSSettingsModal">EmailJS設定</button>
+                    <button type="button" class="btn btn-success" id="manualBackupBtn">立即備份</button>
+                    <button type="button" class="btn btn-primary" id="saveBackupSettingsBtn">儲存設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub設置彈窗 -->
+    <div class="modal fade" id="githubSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">GitHub設置</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label for="githubToken" class="form-label">個人訪問令牌 (PAT)</label>
+                        <input type="password" class="form-control" id="githubToken" placeholder="ghp_xxxxxxxxxxxx 或 github_pat_xxxxxxxxxxxx">
+                        <div class="form-text">用於授權訪問您的GitHub倉庫，支持傳統格式(ghp_)和新格式(github_pat_)</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="githubRepo" class="form-label">倉庫名稱</label>
+                        <input type="text" class="form-control" id="githubRepo" placeholder="username/repository">
+                        <div class="form-text">格式：用戶名/倉庫名</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="githubBranch" class="form-label">分支名稱</label>
+                        <input type="text" class="form-control" id="githubBranch" placeholder="main" value="main">
+                    </div>
+                    <div class="mb-3">
+                        <label for="githubPath" class="form-label">檔案路徑</label>
+                        <input type="text" class="form-control" id="githubPath" placeholder="books-data.json" value="books-data.json">
+                    </div>
+                    <div id="githubStatus" class="alert d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveGitHubSettingsBtn">儲存設定</button>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- EmailJS設定彈窗 -->
+    <div class="modal fade" id="emailJSSettingsModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title">EmailJS設定</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="alert alert-info">
+                        <i class="fas fa-info-circle me-2"></i>
+                        請先在 <a href="https://www.emailjs.com/" target="_blank">EmailJS</a> 註冊帳號並創建服務和模板，以啟用郵件備份功能。
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsUserID" class="form-label">User ID</label>
+                        <input type="text" class="form-control" id="emailjsUserID" placeholder="user_xxxxxxxxxxxxxxxxxx">
+                        <div class="form-text">在EmailJS帳號設定中獲取</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsServiceID" class="form-label">Service ID</label>
+                        <input type="text" class="form-control" id="emailjsServiceID" placeholder="service_xxxxxxxxxx">
+                        <div class="form-text">在EmailJS服務設定中獲取</div>
+                    </div>
+                    <div class="mb-3">
+                        <label for="emailjsTemplateID" class="form-label">Template ID</label>
+                        <input type="text" class="form-control" id="emailjsTemplateID" placeholder="template_xxxxxxxxxx">
+                        <div class="form-text">在EmailJS模板設定中獲取</div>
+                    </div>
+                    <div id="emailjsStatus" class="alert d-none"></div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-primary" id="saveEmailJSSettingsBtn">儲存設定</button>
+                    <button type="button" class="btn btn-success" id="testEmailJSBtn">測試連接</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 書籍詳情彈窗 -->
+    <div class="modal fade" id="bookDetailsModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title" id="bookDetailsTitle">書籍詳情</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong>作者：</strong> <span id="detailAuthor"></span></p>
+                            <p><strong>集數：</strong> <span id="detailSeries"></span></p>
+                            <p><strong>類別：</strong> <span id="detailCategory"></span></p>
+                            <p><strong>ISBN：</strong> <span id="detailISBN"></span></p>
+                            <p><strong>出版社：</strong> <span id="detailPublisher"></span></p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong>櫃號：</strong> <span id="detailCabinet"></span></p>
+                            <p><strong>行號：</strong> <span id="detailRow"></span></p>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <h6>描述</h6>
+                            <p id="detailDescription" class="border p-2 rounded bg-light"></p>
+                        </div>
+                        <div class="col-12 mt-3">
+                            <h6>備註</h6>
+                            <p id="detailNotes" class="border p-2 rounded bg-light"></p>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">關閉</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 確認刪除彈窗 -->
+    <div class="modal fade" id="deleteConfirmModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title">確認刪除</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <p>確定要刪除「<span id="deleteBookTitle"></span>」嗎？此操作無法復原。</p>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                    <button type="button" class="btn btn-danger" id="confirmDeleteBtn">確認刪除</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- JavaScript 引用 -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@emailjs/browser@3/dist/email.min.js"></script>
+    <script src="js/auth.js"></script>
+    <script src="js/database.js"></script>
+    <script src="js/dataProcessor.js"></script>
+    <script src="js/emailService.js"></script>
+    <script src="js/admin.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
