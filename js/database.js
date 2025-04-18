@@ -1,7 +1,6 @@
 /**
  * 數據庫模組 - 處理書籍數據的存儲和管理
  * 由於GitHub Pages是靜態網站，使用LocalStorage作為數據存儲
- * 同時支持從GitHub獲取最新數據
  */
 
 class Database {
@@ -17,28 +16,6 @@ class Database {
         // 檢查是否已有書籍數據
         if (!localStorage.getItem('books')) {
             localStorage.setItem('books', JSON.stringify([]));
-            
-            // 嘗試從GitHub獲取數據
-            this.fetchBooksFromGitHub()
-                .then(data => {
-                    if (data && data.books && Array.isArray(data.books)) {
-                        localStorage.setItem('books', JSON.stringify(data.books));
-                        console.log('已從GitHub載入數據');
-                        // 觸發數據載入完成事件
-                        this.handleDataLoaded('github', data.books.length);
-                    } else {
-                        // 如果GitHub沒有數據，嘗試從本地JSON文件載入
-                        this.loadBooksFromLocalFile();
-                    }
-                })
-                .catch(error => {
-                    console.error('從GitHub載入數據失敗:', error);
-                    // 如果GitHub載入失敗，嘗試從本地JSON文件載入
-                    this.loadBooksFromLocalFile();
-                });
-        } else {
-            // 即使已有書籍數據，也嘗試自動從GitHub同步最新數據
-            this.autoSyncFromGitHub();
         }
         
         // 檢查是否已有備份設定
@@ -49,436 +26,22 @@ class Database {
                 frequency: 'daily'
             }));
         }
-        
-        // 檢查是否已有EmailJS設定
-        if (!localStorage.getItem('emailJSSettings')) {
-            localStorage.setItem('emailJSSettings', JSON.stringify({
-                userID: '',
-                serviceID: '',
-                templateID: ''
-            }));
-        }
-    }
-    
-    /**
-     * 從本地JSON文件載入書籍數據
-     */
-    loadBooksFromLocalFile() {
-        try {
-            // 嘗試從books.json載入示例數據
-            fetch('data/books.json')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error(`載入失敗: ${response.status} ${response.statusText}`);
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    // 檢查數據格式
-                    if (Array.isArray(data)) {
-                        localStorage.setItem('books', JSON.stringify(data));
-                        console.log(`已從books.json載入示例數據，共 ${data.length} 筆`);
-                        // 觸發數據載入完成事件
-                        this.handleDataLoaded('local', data.length);
-                    } else if (data && typeof data === 'object') {
-                        // 如果是對象但不是數組，嘗試轉換
-                        const booksArray = data.books && Array.isArray(data.books) ? data.books : [data];
-                        localStorage.setItem('books', JSON.stringify(booksArray));
-                        console.log(`已從books.json載入並轉換數據，共 ${booksArray.length} 筆`);
-                        this.handleDataLoaded('local', booksArray.length);
-                    } else {
-                        // 數據格式完全不符合預期
-                        console.error('books.json數據格式無效');
-                        localStorage.setItem('books', JSON.stringify([]));
-                        this.handleDataLoaded('empty', 0, new Error('數據格式無效'));
-                    }
-                })
-                .catch(error => {
-                    console.error('載入示例數據失敗:', error);
-                    // 如果載入失敗，設置空數組
-                    localStorage.setItem('books', JSON.stringify([]));
-                    // 觸發數據載入完成事件（空數據）
-                    this.handleDataLoaded('empty', 0, error);
-                });
-        } catch (error) {
-            console.error('初始化數據庫時發生錯誤:', error);
-            // 確保即使出錯也設置一個空數組
-            localStorage.setItem('books', JSON.stringify([]));
-            // 觸發數據載入完成事件（錯誤）
-            this.handleDataLoaded('error', 0, error);
-        }
-    }
-    
-    /**
-     * 處理數據載入完成事件
-     * @param {string} source 數據來源 ('github', 'local', 'empty', 'error')
-     * @param {number} count 數據數量
-     * @param {Error} error 錯誤對象（如果有）
-     */
-    handleDataLoaded(source, count, error = null) {
-        // 創建自定義事件
-        const event = new CustomEvent('booksLoaded', {
-            detail: {
-                source: source,
-                count: count,
-                timestamp: new Date().toISOString(),
-                error: error
-            }
-        });
-        
-        // 分發事件
-        document.dispatchEvent(event);
-        
-        console.log(`數據載入完成 [來源: ${source}, 數量: ${count}]`);
     }
     
     /**
      * 獲取所有書籍
-     * @param {boolean} forceRefresh 是否強制從GitHub刷新數據
-     * @returns {Promise<Array>} 書籍數組的Promise
-     */
-    async getAllBooks(forceRefresh = false) {
-        try {
-            // 如果強制刷新，嘗試從GitHub獲取最新數據
-            if (forceRefresh) {
-                try {
-                    console.log('正在從GitHub獲取最新數據...');
-                    const data = await this.fetchBooksFromGitHub();
-                    
-                    // 確保data.books是有效的數組
-                    if (data && data.books && Array.isArray(data.books)) {
-                        // 更新本地存儲
-                        localStorage.setItem('books', JSON.stringify(data.books));
-                        console.log(`成功從GitHub載入 ${data.books.length} 筆書籍數據`);
-                        
-                        // 觸發數據更新事件
-                        this.handleDataLoaded('github', data.books.length);
-                        
-                        return data.books;
-                    } else {
-                        console.warn('從GitHub獲取的數據格式無效');
-                        // 觸發錯誤事件
-                        this.handleDataLoaded('error', 0, new Error('數據格式無效'));
-                        
-                        // 嘗試從本地獲取數據作為備選
-                        console.log('嘗試從本地存儲獲取數據作為備選...');
-                        const localBooks = this.getLocalBooks();
-                        if (localBooks && localBooks.length > 0) {
-                            return localBooks;
-                        }
-                        
-                        throw new Error('從GitHub獲取的數據格式無效');
-                    }
-                } catch (error) {
-                    console.error('從GitHub獲取數據失敗，將使用本地數據:', error);
-                    // 觸發錯誤事件
-                    this.handleDataLoaded('error', 0, error);
-                    
-                    // 嘗試從本地獲取數據作為備選
-                    const localBooks = this.getLocalBooks();
-                    if (localBooks && localBooks.length > 0) {
-                        return localBooks;
-                    }
-                    
-                    throw error; // 將錯誤向上傳遞，以便UI層可以顯示適當的錯誤信息
-                }
-            }
-            
-            // 從localStorage獲取數據
-            const booksData = localStorage.getItem('books');
-            
-            // 檢查數據是否存在
-            if (!booksData) {
-                console.warn('localStorage中沒有找到書籍數據');
-                // 嘗試重新初始化數據庫
-                this.initDatabase();
-                return [];
-            }
-            
-            // 嘗試解析JSON數據
-            let books;
-            try {
-                books = JSON.parse(booksData);
-            } catch (parseError) {
-                console.error('解析書籍數據時發生錯誤:', parseError);
-                return [];
-            }
-            
-            // 檢查解析後的數據是否為數組
-            if (!Array.isArray(books)) {
-                console.error('書籍數據格式無效，應為數組');
-                // 重置為空數組
-                localStorage.setItem('books', JSON.stringify([]));
-                return [];
-            }
-            
-            console.log(`成功載入 ${books.length} 筆書籍數據 (來源: 本地存儲)`);
-            return books;
-        } catch (error) {
-            console.error('獲取書籍數據時發生錯誤:', error);
-            // 發生錯誤時返回空數組
-            return [];
-        }
-    }
-    
-    /**
-     * 從本地存儲獲取書籍數據（作為備選方案）
      * @returns {Array} 書籍數組
      */
-    getLocalBooks() {
-        try {
-            const booksData = localStorage.getItem('books');
-            if (!booksData) {
-                console.warn('本地存儲中沒有書籍數據');
-                return [];
-            }
-            
-            const books = JSON.parse(booksData);
-            if (!Array.isArray(books)) {
-                console.warn('本地存儲中的書籍數據格式無效');
-                return [];
-            }
-            
-            console.log(`從本地存儲獲取到 ${books.length} 筆書籍數據`);
-            return books;
-        } catch (error) {
-            console.error('從本地存儲獲取書籍數據時發生錯誤:', error);
-            return [];
-        }
-    }
-    
-    /**
-     * 自動從GitHub同步最新數據
-     * 在用戶進入首頁時自動調用，不影響用戶體驗
-     */
-    autoSyncFromGitHub() {
-        console.log('嘗試自動從GitHub同步最新數據...');
-        
-        // 檢查上次同步時間，避免頻繁同步
-        const lastSync = localStorage.getItem('lastGitHubSync');
-        if (lastSync) {
-            const lastSyncTime = new Date(lastSync).getTime();
-            const currentTime = new Date().getTime();
-            const timeDiff = currentTime - lastSyncTime;
-            
-            // 如果距離上次同步不到30分鐘，則跳過自動同步
-            if (timeDiff < 30 * 60 * 1000) {
-                console.log(`距離上次同步僅 ${Math.floor(timeDiff / 1000 / 60)} 分鐘，跳過自動同步`);
-                return;
-            }
-        }
-        
-        // 嘗試從GitHub獲取最新數據
-        this.fetchBooksFromGitHub()
-            .then(data => {
-                if (data && data.books && Array.isArray(data.books)) {
-                    // 檢查數據是否為空
-                    if (data.books.length === 0) {
-                        console.log('從GitHub獲取的數據為空數組，保留現有數據');
-                        // 不更新本地存儲，但仍記錄同步時間
-                        localStorage.setItem('lastGitHubSync', new Date().toISOString());
-                        return;
-                    }
-                    
-                    // 更新本地存儲
-                    localStorage.setItem('books', JSON.stringify(data.books));
-                    console.log(`自動同步完成：成功從GitHub載入 ${data.books.length} 筆書籍數據`);
-                    
-                    // 觸發數據更新事件
-                    this.handleDataLoaded('github', data.books.length);
-                    
-                    // 觸發同步成功事件
-                    this.triggerSyncEvent('success');
-                } else {
-                    console.warn('自動同步獲取的數據格式無效，保留現有數據');
-                }
-            })
-            .catch(error => {
-                console.warn('自動同步失敗:', error.message);
-                // 自動同步失敗不顯示錯誤通知，避免影響用戶體驗
-                // 觸發同步失敗事件，但不顯示給用戶
-                this.triggerSyncEvent('error', error);
-            });
-    }
-    
-    /**
-     * 觸發同步事件
-     * @param {string} status 同步狀態 ('success' 或 'error')
-     * @param {Error} error 錯誤對象（如果有）
-     */
-    triggerSyncEvent(status, error = null) {
-        // 創建自定義事件
-        const event = new CustomEvent('githubSync', {
-            detail: {
-                status: status,
-                timestamp: new Date().toISOString(),
-                error: error
-            }
-        });
-        
-        // 分發事件
-        document.dispatchEvent(event);
-        
-        console.log(`GitHub同步事件已觸發 [狀態: ${status}]`);
-    }
-    
-    /**
-     * 從GitHub獲取書籍數據
-     * @returns {Promise<Object>} 包含書籍數據的Promise
-     */
-    async fetchBooksFromGitHub() {
-        // 嘗試獲取GitHub設置（如果有）
-        const settings = localStorage.getItem('githubSettings');
-        let repo, path, token;
-        
-        // 檢查是否有GitHub設置
-        if (settings) {
-            try {
-                const parsedSettings = JSON.parse(settings);
-                repo = parsedSettings.repo;
-                path = parsedSettings.path;
-                token = parsedSettings.token;
-                
-                // 如果用戶已登入且設置完整，使用用戶的GitHub設置
-                if (typeof auth !== 'undefined' && auth.isLoggedIn() && token && repo) {
-                    console.log(`使用用戶設置從GitHub倉庫 ${repo} 獲取數據...`);
-                    return this.fetchFromGitHubWithAuth(repo, path, token);
-                }
-            } catch (error) {
-                console.warn('解析GitHub設置時發生錯誤:', error);
-            }
-        }
-        
-        // 如果沒有用戶設置或用戶未登入，使用公共數據源
-        console.log('使用公共數據源獲取書籍數據...');
-        
-        // 使用公共數據源URL（例如，從data目錄獲取books.json）
-        const publicDataUrl = 'data/books.json';
-        
-        try {
-            // 添加緩存破壞參數，確保獲取最新數據
-            const cacheBuster = `?timestamp=${Date.now()}`;
-            const url = `${publicDataUrl}${cacheBuster}`;
-            
-            console.log(`正在從公共數據源獲取數據: ${url}`);
-            
-            // 發送請求
-            const response = await fetch(url);
-            
-            // 檢查響應狀態
-            if (!response.ok) {
-                throw new Error(`獲取數據失敗: ${response.status} ${response.statusText}`);
-            }
-            
-            // 解析數據
-            const data = await response.json();
-            
-            // 存儲最後同步時間
-            localStorage.setItem('lastGitHubSync', new Date().toISOString());
-            
-            console.log('成功獲取書籍數據', data);
-            
-            // 處理不同的數據格式
-            if (Array.isArray(data)) {
-                // 如果數據本身就是數組，直接返回
-                if (data.length === 0) {
-                    console.log('從GitHub獲取的數據為空數組');
-                }
-                return { books: data };
-            } else if (data && typeof data === 'object') {
-                // 如果數據是對象，檢查是否有books屬性
-                if (data.books && Array.isArray(data.books)) {
-                    return data;
-                } else {
-                    // 如果是其他格式的對象，將其包裝在books屬性中
-                    console.log('數據格式不包含books屬性，進行自動轉換');
-                    return { books: [data] };
-                }
-            } else if (data === null || data === undefined) {
-                // 處理空數據情況
-                console.warn('從GitHub獲取的數據為空');
-                return { books: [] };
-            } else {
-                // 如果數據格式完全不符合預期，拋出錯誤
-                console.error('獲取的數據格式無效:', typeof data);
-                throw new Error('獲取的數據格式無效');
-            }
-        } catch (error) {
-            console.error('獲取書籍數據時發生錯誤:', error);
-            throw error;
-        }
-    }
-    
-    /**
-     * 使用認證從GitHub獲取書籍數據（管理員用戶使用）
-     * @param {string} repo GitHub倉庫
-     * @param {string} path 文件路徑
-     * @param {string} token 訪問令牌
-     * @returns {Promise<Object>} 包含書籍數據的Promise
-     */
-    async fetchFromGitHubWithAuth(repo, path, token) {
-        console.log(`正在從GitHub倉庫 ${repo} 獲取數據...`);
-        
-        // 添加緩存破壞參數，確保獲取最新數據
-        const cacheBuster = `?timestamp=${Date.now()}`;
-        
-        // 構建API URL
-        const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}${cacheBuster}`;
-        
-        try {
-            // 設置請求頭
-            const headers = {
-                'Authorization': `token ${token}`,
-                'Accept': 'application/vnd.github.v3.raw',
-                'Cache-Control': 'no-cache, no-store, must-revalidate'
-            };
-            
-            // 發送請求
-            const response = await fetch(apiUrl, { headers });
-            
-            // 檢查響應狀態
-            if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
-                throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
-            }
-            
-            // 解析數據
-            const data = await response.json();
-            
-            // 存儲最後同步時間
-            localStorage.setItem('lastGitHubSync', new Date().toISOString());
-            
-            console.log('成功從GitHub獲取數據', data);
-            
-            // 處理不同的數據格式
-            if (Array.isArray(data)) {
-                // 如果數據本身就是數組，直接返回
-                return { books: data };
-            } else if (data && typeof data === 'object') {
-                // 如果數據是對象，檢查是否有books屬性
-                if (data.books && Array.isArray(data.books)) {
-                    return data;
-                } else {
-                    // 如果是其他格式的對象，將其包裝在books屬性中
-                    return { books: [data] };
-                }
-            } else {
-                // 如果數據格式完全不符合預期，拋出錯誤
-                throw new Error('從GitHub獲取的數據格式無效');
-            }
-        } catch (error) {
-            console.error('從GitHub獲取數據時發生錯誤:', error);
-            throw error;
-        }
+    getAllBooks() {
+        return JSON.parse(localStorage.getItem('books')) || [];
     }
     
     /**
      * 獲取所有類別
-     * @returns {Promise<Array>} 類別數組的Promise
+     * @returns {Array} 類別數組
      */
-    async getAllCategories() {
-        const books = await this.getAllBooks();
+    getAllCategories() {
+        const books = this.getAllBooks();
         const categories = new Set();
         
         books.forEach(book => {
@@ -501,20 +64,20 @@ class Database {
     /**
      * 根據ID獲取書籍
      * @param {string} id 書籍ID
-     * @returns {Promise<Object|null>} 書籍對象或null的Promise
+     * @returns {Object|null} 書籍對象或null
      */
-    async getBookById(id) {
-        const books = await this.getAllBooks();
+    getBookById(id) {
+        const books = this.getAllBooks();
         return books.find(book => book.id === id) || null;
     }
     
     /**
      * 添加書籍
      * @param {Object} book 書籍對象
-     * @returns {Promise<Object>} 添加後的書籍對象的Promise
+     * @returns {Object} 添加後的書籍對象
      */
-    async addBook(book) {
-        const books = await this.getAllBooks();
+    addBook(book) {
+        const books = this.getAllBooks();
         
         // 生成唯一ID
         book.id = this.generateId();
@@ -538,10 +101,10 @@ class Database {
     /**
      * 更新書籍
      * @param {Object} updatedBook 更新後的書籍對象
-     * @returns {Promise<Object|null>} 更新後的書籍對象或null的Promise
+     * @returns {Object|null} 更新後的書籍對象或null
      */
-    async updateBook(updatedBook) {
-        const books = await this.getAllBooks();
+    updateBook(updatedBook) {
+        const books = this.getAllBooks();
         const index = books.findIndex(book => book.id === updatedBook.id);
         
         if (index === -1) {
@@ -569,10 +132,10 @@ class Database {
     /**
      * 刪除書籍
      * @param {string} id 書籍ID
-     * @returns {Promise<boolean>} 是否成功刪除的Promise
+     * @returns {boolean} 是否成功刪除
      */
-    async deleteBook(id) {
-        const books = await this.getAllBooks();
+    deleteBook(id) {
+        const books = this.getAllBooks();
         const filteredBooks = books.filter(book => book.id !== id);
         
         if (filteredBooks.length === books.length) {
@@ -592,10 +155,10 @@ class Database {
      * 匯入書籍
      * @param {Array} books 書籍數組
      * @param {boolean} filterDuplicates 是否過濾重複
-     * @returns {Promise<Object>} 匯入結果的Promise
+     * @returns {Object} 匯入結果
      */
-    async importBooks(books, filterDuplicates = true) {
-        const existingBooks = await this.getAllBooks();
+    importBooks(books, filterDuplicates = true) {
+        const existingBooks = this.getAllBooks();
         let importedCount = 0;
         let filteredCount = 0;
         let updatedCount = 0;
@@ -694,22 +257,6 @@ class Database {
      */
     saveBackupSettings(settings) {
         localStorage.setItem('backupSettings', JSON.stringify(settings));
-    }
-    
-    /**
-     * 獲取EmailJS設定
-     * @returns {Object} EmailJS設定
-     */
-    getEmailJSSettings() {
-        return JSON.parse(localStorage.getItem('emailJSSettings')) || null;
-    }
-    
-    /**
-     * 保存EmailJS設定
-     * @param {Object} settings EmailJS設定
-     */
-    saveEmailJSSettings(settings) {
-        localStorage.setItem('emailJSSettings', JSON.stringify(settings));
     }
     
     /**
