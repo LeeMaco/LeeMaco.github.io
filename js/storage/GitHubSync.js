@@ -98,8 +98,8 @@ class GitHubSync {
             const now = new Date().toISOString();
             await this.storage.clearSyncedOperations(now);
             
-            // 觸發同步成功事件
-            this.triggerSyncEvent('success');
+            // 觸發同步成功事件，並標明來源
+            this.triggerSyncEvent('success', null, 'syncToGitHub');
             
             console.log('增量同步到GitHub完成');
             return {

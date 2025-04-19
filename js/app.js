@@ -903,18 +903,39 @@ class App {
                 this.showImportStatus(errorMsg, 'danger');
                 this.showMessage(errorMsg, 'danger');
             });
+    } // End of importBooks method
+
+    /**
+     * 顯示匯入狀態
+     * @param {string} message 狀態訊息
+     * @param {string} type 訊息類型 (success, danger, warning, info)
+     */
+    showImportStatus(message, type) {
+        this.importStatus.textContent = message;
+        this.importStatus.className = `alert alert-${type}`;
+        this.importStatus.classList.remove('d-none');
+    }
+
+    /**
+     * 匯出書籍
+     */
+    exportBooks() {
+        db.getAllBooks()
+            .then(books => {
+                if (books.length === 0) {
+                    this.showMessage('沒有書籍資料可匯出', 'warning');
+                    return;
+                }
+                dataProcessor.exportToExcel(books, '書籍清單');
+                this.showMessage('書籍已成功匯出', 'success');
+            })
+            .catch(error => {
+                console.error('匯出書籍時發生錯誤:', error);
+                this.showMessage(`匯出書籍失敗: ${error.message}`, 'danger');
+            });
     }
     
     /**
-     * 顯示匯入狀態
-     * @param {string} message 訊息
-     * @param {string} type 類型 (success, danger, warning, info)
-     */
-    showImportStatus(message, type) {
-        if (!this.importStatus) return;
-        
-        // 根據類型選擇圖標
-        let icon = '';
         switch(type) {
             case 'success':
                 icon = '<i class="fas fa-check-circle me-2"></i>';
