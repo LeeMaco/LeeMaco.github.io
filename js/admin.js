@@ -362,18 +362,16 @@ class Admin {
                 }
 
                 // 確保即使在 fetch 失敗後也能更新進度
-                if (!progressContainer.querySelector('.alert-danger')) {
+                const progressContainer = document.getElementById('githubProgressContainer');
+                if (progressContainer && !progressContainer.querySelector('.alert-danger')) {
                     this.updateProgress(100, errorMessage, 'danger',
                         '請檢查您的網絡連接、GitHub設置和權限');
                 }
-
-                // 觸發錯誤事件
-                this.triggerSyncEvent('error', error, { message: errorMessage });
                 
                 this.updateProgress(100, `錯誤：${userFriendlyMessage}`, 'danger', detailedMessage);
                 
-                // 觸發同步失敗事件
-                this.triggerSyncEvent('error', error);
+                // 只觸發一次錯誤事件，包含完整的錯誤信息
+                this.triggerSyncEvent('error', error, { message: errorMessage });
                 
                 // 顯示重試按鈕
                 const progressContainer = document.getElementById('githubProgressContainer');
