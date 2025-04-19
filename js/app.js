@@ -847,20 +847,27 @@ class App {
                     
                     return admin.importFromExcel(books, true)
                         .then(result => {
-                            // 顯示匯入結果
-                            let statusMsg = `成功匯入 ${result.imported} 筆資料`;
-                            if (result.updated > 0) {
-                                statusMsg += `，更新 ${result.updated} 筆資料`;
-                            }
+                            // 顯示本地匯入結果
+                            let localStatusMsg = `本地操作：成功匯入 ${result.imported} 筆，更新 ${result.updated} 筆`;
                             if (filterDuplicates && result.filtered > 0) {
-                                statusMsg += `，過濾 ${result.filtered} 筆重複資料`;
-                            }
-                            if (autoUploadGitHub) {
-                                statusMsg += '，並已上傳到GitHub';
+                                localStatusMsg += `，過濾 ${result.filtered} 筆重複資料`;
                             }
                             
-                            this.showImportStatus(statusMsg, 'success');
-                            this.showMessage(statusMsg, 'success');
+                            let finalStatusMsg = localStatusMsg;
+                            let messageType = 'success';
+
+                            if (autoUploadGitHub) {
+                                // 由於 admin.importFromExcel 在成功或失敗時都會 resolve(result)，
+                                // 我們無法直接從這裡判斷 GitHub 上傳是否真的成功。
+                                // 但我們可以告知用戶已觸發上傳操作。
+                                // 更精確的狀態需要修改 admin.js 或監聽 githubSync 事件。
+                                finalStatusMsg += '。已觸發將目前所有書籍資料上傳到 GitHub 的操作。';
+                                // 注意：這裡假設上傳操作已觸發，但不保證成功。
+                                // 如果上傳失敗，admin.js 內部會 resolve，但會觸發 error 事件。
+                            }
+                            
+                            this.showImportStatus(finalStatusMsg, messageType);
+                            this.showMessage(finalStatusMsg, messageType);
                             
                             // 重新載入書籍和類別
                             this.loadBooks();

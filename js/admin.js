@@ -315,20 +315,21 @@ class Admin {
             })
             .then(data => {
                 console.log('上傳成功:', data);
-                
+
                 // 獲取提交URL和文件URL
                 const commitUrl = data.commit?.html_url || '';
                 const fileUrl = data.content?.html_url || '';
-                
+
+                const successMessage = `成功上傳 ${recordCount} 筆記錄到 GitHub`;
                 // 顯示成功信息和鏈接
-                this.updateProgress(100, '上傳完成！', 'success', 
+                this.updateProgress(100, successMessage, 'success',
                     `文件已成功${data.content?.sha ? '更新' : '創建'}<br>
                     ${commitUrl ? `<a href="${commitUrl}" target="_blank" class="text-success">查看提交</a>` : ''}
                     ${fileUrl ? ` | <a href="${fileUrl}" target="_blank" class="text-success">查看文件</a>` : ''}`);
-                
-                // 觸發同步成功事件
-                this.triggerSyncEvent('success');
-                
+
+                // 觸發成功事件，包含上傳的記錄數
+                this.triggerSyncEvent('success', null, { message: successMessage, count: recordCount });
+
                 // 5秒後隱藏進度條
                 setTimeout(() => {
                     const progressContainer = document.getElementById('githubProgressContainer');
@@ -336,16 +337,17 @@ class Admin {
                         progressContainer.classList.add('d-none');
                     }
                 }, 5000);
-                
-                resolve(data);
+
+                resolve({ status: 'success', message: successMessage, count: recordCount });
             })
             .catch(error => {
                 console.error('上傳錯誤:', error);
-                
+
                 // 提供更友好的錯誤訊息
                 let userFriendlyMessage = error.message;
                 let detailedMessage = '';
-                
+                const errorMessage = `上傳失敗: ${error.message}`;
+
                 if (error.message.includes('Failed to fetch') || error.message.includes('Network Error')) {
                     userFriendlyMessage = '網絡連接失敗';
                     detailedMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
@@ -358,6 +360,15 @@ class Admin {
                 } else {
                     detailedMessage = error.message;
                 }
+
+                // 確保即使在 fetch 失敗後也能更新進度
+                if (!progressContainer.querySelector('.alert-danger')) {
+                    this.updateProgress(100, errorMessage, 'danger',
+                        '請檢查您的網絡連接、GitHub設置和權限');
+                }
+
+                // 觸發錯誤事件
+                this.triggerSyncEvent('error', error, { message: errorMessage });
                 
                 this.updateProgress(100, `錯誤：${userFriendlyMessage}`, 'danger', detailedMessage);
                 
@@ -500,16 +511,17 @@ class Admin {
                 
                 // 上傳到GitHub
                 this.uploadToGitHub(syncData)
-                    .then(() => {
-                        // 觸發同步成功事件
-                        this.triggerSyncEvent('success');
-                        resolve(result);
+                    .then((uploadResult) => { // uploadToGitHub 應返回包含狀態和訊息的結果
+                        // uploadToGitHub 內部會觸發事件，這裡只需 resolve
+                        console.log('GitHub upload promise resolved in importFromExcel:', uploadResult);
+                        resolve(result); // Resolve with local import result
                     })
                     .catch(error => {
-                        // 觸發同步失敗事件
-                        this.triggerSyncEvent('error', error);
+                        // uploadToGitHub 內部已觸發錯誤事件
+                        console.error('GitHub upload promise rejected in importFromExcel:', error);
                         // 仍然返回導入結果，因為本地導入已成功
-                        resolve(result);
+                        // 但可能需要通知用戶上傳失敗
+                        resolve(result); // Resolve with local import result despite upload error
                     });
             } else {
                 // 不需要上傳，直接返回結果
@@ -522,15 +534,25 @@ class Admin {
      * 觸發同步事件
      * @param {string} status 同步狀態
      * @param {Error} error 錯誤對象（如果有）
+     * @param {Object} detailPayload 額外要附加到 detail 的數據
      */
-    triggerSyncEvent(status, error = null) {
+    triggerSyncEvent(status, error = null, detailPayload = {}) {
         // 創建自定義事件
+        const detail = {
+            status: status,
+            timestamp: new Date().toISOString(),
+            error: error,
+            source: 'admin', // 標識事件來源
+            ...detailPayload // 合併額外數據
+        };
+        
+        // 清理 undefined 或 null 的 error
+        if (!error) {
+            delete detail.error;
+        }
+        
         const event = new CustomEvent('githubSync', {
-            detail: {
-                status: status,
-                timestamp: new Date().toISOString(),
-                error: error
-            }
+            detail: detail
         });
         
         // 分發事件
