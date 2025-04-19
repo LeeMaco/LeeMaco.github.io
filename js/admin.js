@@ -122,9 +122,22 @@ class Admin {
     /**
      * 上傳數據到GitHub
      * @param {Object} data 要上傳的數據
+     * @param {Object} options 上傳選項
+     * @param {number} options.retryCount 重試次數
+     * @param {number} options.maxRetries 最大重試次數
+     * @param {number} options.retryDelay 重試延遲（毫秒）
+     * @param {boolean} options.checkConsistency 是否檢查數據一致性
      * @returns {Promise} 上傳結果
      */
-    uploadToGitHub(data) {
+    uploadToGitHub(data, options = {}) {
+        // 設置默認選項
+        const {
+            retryCount = 0,
+            maxRetries = 3,
+            retryDelay = 2000,
+            checkConsistency = true
+        } = options;
+        
         return new Promise((resolve, reject) => {
             // 創建或獲取進度條元素
             const progressContainer = document.getElementById('githubProgressContainer') || this.createProgressContainer();
@@ -172,229 +185,439 @@ class Admin {
             this.updateProgress(5, `準備上傳數據...`, 'info', 
                 `記錄數量: ${recordCount} 筆<br>數據大小: ${dataSize.toFixed(1)}KB<br>目標倉庫: ${this.githubSettings.repo}`);
             
-            // 更新進度
-            this.updateProgress(10, '正在連接GitHub API...', 'info', '正在檢查文件狀態...');
+            // 如果啟用了數據一致性檢查
+            if (checkConsistency && retryCount === 0) {
+                this.updateProgress(8, '正在檢查數據一致性...', 'info', '確保本地數據與遠程數據同步');
+                this.checkDataConsistency(data)
+                    .then(consistencyResult => {
+                        if (consistencyResult.needsSync) {
+                            this.updateProgress(9, '檢測到數據不一致', 'warning', 
+                                `本地數據與遠程數據不一致，正在嘗試同步...<br>差異: ${consistencyResult.differences} 項`);
+                            // 繼續上傳，但標記已檢查一致性
+                            this.continueUpload(apiUrl, data, jsonData, recordCount, resolve, reject, {
+                                ...options,
+                                checkConsistency: false
+                            });
+                        } else {
+                            this.updateProgress(9, '數據一致性檢查通過', 'info', '本地數據與遠程數據一致');
+                            // 繼續上傳流程
+                            this.continueUpload(apiUrl, data, jsonData, recordCount, resolve, reject, options);
+                        }
+                    })
+                    .catch(error => {
+                        console.warn('數據一致性檢查失敗，繼續上傳:', error);
+                        this.updateProgress(9, '數據一致性檢查失敗', 'warning', 
+                            `無法完成數據一致性檢查: ${error.message}<br>繼續上傳...`);
+                        // 即使一致性檢查失敗，也繼續上傳
+                        this.continueUpload(apiUrl, data, jsonData, recordCount, resolve, reject, options);
+                    });
+            } else {
+                // 跳過一致性檢查，直接上傳
+                this.continueUpload(apiUrl, data, jsonData, recordCount, resolve, reject, options);
+            }
+        });
+    }
+    
+    /**
+     * 繼續上傳流程（從數據一致性檢查後）
+     * @private
+     */
+    continueUpload(apiUrl, data, jsonData, recordCount, resolve, reject, options) {
+        const { retryCount = 0, maxRetries = 3, retryDelay = 2000 } = options;
+        
+        // 更新進度
+        this.updateProgress(10, '正在連接GitHub API...', 'info', '正在檢查文件狀態...');
+        
+        // 添加網絡超時處理
+        const timeoutId = setTimeout(() => {
+            this.updateProgress(10, '連接超時，請檢查網絡連接', 'warning', 
+                '連接GitHub API超過10秒，可能是網絡問題或GitHub服務暫時不可用');
+        }, 10000); // 10秒超時
+        
+        // 首先獲取文件信息（如果存在）
+        fetch(apiUrl, {
+            headers: {
+                'Authorization': `token ${this.githubSettings.token}`,
+                'Accept': 'application/vnd.github.v3+json'
+            },
+            signal: AbortSignal.timeout(30000) // 30秒超時
+        })
+        .then(response => {
+            // 清除超時計時器
+            clearTimeout(timeoutId);
             
-            // 添加網絡超時處理
-            const timeoutId = setTimeout(() => {
-                this.updateProgress(10, '連接超時，請檢查網絡連接', 'warning', 
-                    '連接GitHub API超過10秒，可能是網絡問題或GitHub服務暫時不可用');
-            }, 10000); // 10秒超時
+            if (response.status === 404) {
+                // 文件不存在，創建新文件
+                this.updateProgress(30, '準備創建新文件...', 'info', 
+                    `路徑: ${this.githubSettings.path}<br>分支: ${this.githubSettings.branch}`);
+                return { sha: null };
+            } else if (response.status === 401) {
+                this.updateProgress(30, '錯誤：GitHub授權失敗', 'danger', 
+                    '請檢查您的訪問令牌是否有效，或令牌是否已過期');
+                throw new Error('GitHub授權失敗，請檢查您的個人訪問令牌是否有效');
+            } else if (response.status === 403) {
+                this.updateProgress(30, '錯誤：權限不足', 'danger', 
+                    '請確保您的令牌有足夠的權限操作此倉庫，需要 repo 或 public_repo 權限');
+                throw new Error('權限不足，請確保您的令牌有足夠的權限操作此倉庫');
+            } else if (!response.ok) {
+                this.updateProgress(30, `錯誤：GitHub API返回 ${response.status}`, 'danger', 
+                    `${response.statusText}<br>請檢查您的設置和網絡連接`);
+                throw new Error(`GitHub API錯誤: ${response.status} - ${response.statusText}`);
+            }
+            this.updateProgress(30, '正在準備更新文件...', 'info', '文件已存在，準備更新內容');
+            return response.json();
+        })
+        .then(fileInfo => {
+            // 準備上傳數據
+            this.updateProgress(50, '正在處理數據...', 'info', '準備編碼和上傳');
             
-            // 首先獲取文件信息（如果存在）
+            try {
+                // 計算數據大小
+                const dataSizeKB = Math.round(jsonData.length / 1024);
+                
+                // 顯示數據大小信息
+                this.updateProgress(55, `正在進行Base64編碼...`, 'info', 
+                    `數據大小: ${dataSizeKB}KB<br>記錄數量: ${recordCount} 筆`);
+                
+                // 檢查數據大小
+                if (dataSizeKB > 1000) { // 如果大於1MB
+                    this.updateProgress(55, `處理大型數據...`, 'warning', 
+                        `數據較大 (${dataSizeKB}KB)，上傳可能需要較長時間<br>請耐心等待`);
+                }
+                
+                // Base64編碼
+                const content = btoa(jsonData);
+                
+                // 準備請求體
+                const requestBody = {
+                    message: `更新書籍數據 (${new Date().toLocaleString()})`,
+                    content: content,
+                    branch: this.githubSettings.branch
+                };
+                
+                // 如果文件已存在，添加SHA
+                if (fileInfo.sha) {
+                    requestBody.sha = fileInfo.sha;
+                    this.updateProgress(60, '準備更新現有檔案...', 'info', 
+                        `文件路徑: ${this.githubSettings.path}<br>SHA: ${fileInfo.sha.substring(0, 7)}...`);
+                } else {
+                    this.updateProgress(60, '準備創建新檔案...', 'info', 
+                        `文件路徑: ${this.githubSettings.path}<br>分支: ${this.githubSettings.branch}`);
+                }
+                
+                this.updateProgress(70, '正在上傳到GitHub...', 'info', '數據傳輸中，請稍候...');
+                
+                // 發送PUT請求更新或創建文件
+                return fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${this.githubSettings.token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/vnd.github.v3+json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: AbortSignal.timeout(60000) // 60秒超時
+                });
+            } catch (encodingError) {
+                this.updateProgress(55, `編碼錯誤`, 'danger', 
+                    `數據編碼失敗：${encodingError.message}<br>請檢查數據格式或嘗試減少數據量`);
+                throw new Error(`數據編碼失敗：${encodingError.message}`);
+            }
+        })
+        .then(response => {
+            if (!response.ok) {
+                const errorMsg = `上傳失敗: ${response.status} - ${response.statusText}`;
+                let detailedMsg = '';
+                let errorType = 'general';
+                
+                // 根據HTTP狀態碼分類錯誤
+                if (response.status >= 500) {
+                    errorType = 'server';
+                    detailedMsg = 'GitHub伺服器暫時不可用，請稍後再試';
+                } else if (response.status === 422) {
+                    errorType = 'validation';
+                    detailedMsg = '數據驗證失敗，可能是文件已被修改';
+                } else if (response.status === 429) {
+                    errorType = 'ratelimit';
+                    detailedMsg = '已達到GitHub API請求限制，請稍後再試';
+                } else if (response.status === 409) {
+                    errorType = 'conflict';
+                    detailedMsg = '檔案內容衝突，可能是遠程倉庫已被修改';
+                } else if (response.status >= 400 && response.status < 500) {
+                    errorType = 'client';
+                    detailedMsg = '請求參數錯誤，請檢查您的設置';
+                }
+                
+                this.updateProgress(70, `上傳失敗: ${response.status}`, 'danger', 
+                    `${detailedMsg}<br>${response.statusText}`);
+                
+                // 檢查是否可以重試
+                if (['server', 'ratelimit', 'conflict'].includes(errorType) && retryCount < maxRetries) {
+                    // 計算退避時間 (指數退避策略)
+                    const backoffTime = retryDelay * Math.pow(2, retryCount);
+                    const maxBackoff = 30000; // 最大30秒
+                    const actualDelay = Math.min(backoffTime, maxBackoff);
+                    
+                    this.updateProgress(75, `準備重試上傳 (${retryCount + 1}/${maxRetries})...`, 'warning', 
+                        `將在 ${actualDelay/1000} 秒後重試<br>錯誤類型: ${errorType}`);
+                    
+                    // 延遲後重試
+                    setTimeout(() => {
+                        this.uploadToGitHub(data, {
+                            ...options,
+                            retryCount: retryCount + 1,
+                            checkConsistency: false // 重試時不再檢查一致性
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                    }, actualDelay);
+                    
+                    return; // 中斷當前Promise鏈，等待重試
+                }
+                
+                // 無法重試或已達到最大重試次數
+                const error = new Error(errorMsg);
+                error.type = errorType;
+                error.status = response.status;
+                error.details = detailedMsg;
+                
+                // 觸發同步失敗事件
+                this.triggerSyncEvent('error', error, {
+                    errorType: errorType,
+                    retryCount: retryCount,
+                    maxRetries: maxRetries
+                });
+                
+                throw error;
+                
+                // 根據HTTP狀態碼分類錯誤
+                if (response.status >= 500) {
+                    errorType = 'server';
+                    detailedMsg = 'GitHub伺服器暫時不可用，請稍後再試';
+                } else if (response.status === 422) {
+                    errorType = 'validation';
+                    detailedMsg = '數據驗證失敗，可能是文件已被修改';
+                } else if (response.status === 429) {
+                    errorType = 'ratelimit';
+                    detailedMsg = '已達到GitHub API請求限制，請稍後再試';
+                } else if (response.status === 409) {
+                    errorType = 'conflict';
+                    detailedMsg = '檔案內容衝突，可能是遠程倉庫已被修改';
+                } else if (response.status >= 400 && response.status < 500) {
+                    errorType = 'client';
+                    detailedMsg = '請求參數錯誤，請檢查您的設置';
+                }
+                
+                this.updateProgress(70, `上傳失敗: ${response.status}`, 'danger', 
+                    `${detailedMsg}<br>${response.statusText}`);
+                
+                // 檢查是否可以重試
+                if (['server', 'ratelimit', 'conflict'].includes(errorType) && retryCount < maxRetries) {
+                    // 計算退避時間 (指數退避策略)
+                    const backoffTime = retryDelay * Math.pow(2, retryCount);
+                    const maxBackoff = 30000; // 最大30秒
+                    const actualDelay = Math.min(backoffTime, maxBackoff);
+                    
+                    this.updateProgress(75, `準備重試上傳 (${retryCount + 1}/${maxRetries})...`, 'warning', 
+                        `將在 ${actualDelay/1000} 秒後重試<br>錯誤類型: ${errorType}`);
+                    
+                    // 延遲後重試
+                    setTimeout(() => {
+                        this.uploadToGitHub(data, {
+                            ...options,
+                            retryCount: retryCount + 1,
+                            checkConsistency: false // 重試時不再檢查一致性
+                        })
+                        .then(resolve)
+                        .catch(reject);
+                    }, actualDelay);
+                    
+                    return; // 中斷當前Promise鏈，等待重試
+                }
+                
+                // 無法重試或已達到最大重試次數
+                const error = new Error(errorMsg);
+                error.type = errorType;
+                error.status = response.status;
+                error.details = detailedMsg;
+                
+                // 觸發同步失敗事件
+                this.triggerSyncEvent('error', error, {
+                    errorType: errorType,
+                    retryCount: retryCount,
+                    maxRetries: maxRetries
+                });
+                
+                throw error;
+            }
+            
+            return response.json();
+        })
+        .then(result => {
+            // 上傳成功
+            this.updateProgress(100, '上傳成功！', 'success', 
+                `文件已成功${result.content.sha ? '更新' : '創建'}<br>SHA: ${result.content.sha.substring(0, 7)}...`);
+            
+            // 觸發同步成功事件
+            this.triggerSyncEvent('success', null, {
+                sha: result.content.sha,
+                url: result.content.html_url
+            });
+            
+            // 返回結果
+            resolve({
+                status: 'success',
+                message: '上傳成功',
+                sha: result.content.sha,
+                url: result.content.html_url
+            });
+        })
+        .catch(error => {
+            // 如果是已處理的重試錯誤，直接返回
+            if (error.type && ['server', 'ratelimit', 'conflict'].includes(error.type) && retryCount < maxRetries) {
+                return;
+            }
+            
+            // 其他未處理的錯誤
+            console.error('上傳到GitHub時發生錯誤:', error);
+            
+            // 更新進度條顯示錯誤
+            this.updateProgress(100, '上傳失敗', 'danger', 
+                `錯誤: ${error.message || '未知錯誤'}<br>請檢查網絡連接和GitHub設置`);
+            
+            // 觸發同步失敗事件（如果尚未觸發）
+            if (!error.type) {
+                this.triggerSyncEvent('error', error);
+            }
+            
+            // 拒絕Promise
+            reject(error);
+        });
+    }
+    
+    /**
+     * 檢查數據一致性
+     * @param {Object} localData 本地數據
+     * @returns {Promise<Object>} 一致性檢查結果
+     */
+    checkDataConsistency(localData) {
+        return new Promise((resolve, reject) => {
+            // 準備API請求URL
+            const apiUrl = `https://api.github.com/repos/${this.githubSettings.repo}/contents/${this.githubSettings.path}`;
+            
+            // 獲取遠程數據
             fetch(apiUrl, {
                 headers: {
                     'Authorization': `token ${this.githubSettings.token}`,
                     'Accept': 'application/vnd.github.v3+json'
                 },
-                signal: AbortSignal.timeout(30000) // 30秒超時
+                signal: AbortSignal.timeout(20000) // 20秒超時
             })
             .then(response => {
-                // 清除超時計時器
-                clearTimeout(timeoutId);
-                
                 if (response.status === 404) {
-                    // 文件不存在，創建新文件
-                    this.updateProgress(30, '準備創建新文件...', 'info', 
-                        `路徑: ${this.githubSettings.path}<br>分支: ${this.githubSettings.branch}`);
-                    return { sha: null };
-                } else if (response.status === 401) {
-                    this.updateProgress(30, '錯誤：GitHub授權失敗', 'danger', 
-                        '請檢查您的訪問令牌是否有效，或令牌是否已過期');
-                    throw new Error('GitHub授權失敗，請檢查您的個人訪問令牌是否有效');
-                } else if (response.status === 403) {
-                    this.updateProgress(30, '錯誤：權限不足', 'danger', 
-                        '請確保您的令牌有足夠的權限操作此倉庫，需要 repo 或 public_repo 權限');
-                    throw new Error('權限不足，請確保您的令牌有足夠的權限操作此倉庫');
+                    // 文件不存在，不需要檢查一致性
+                    return resolve({
+                        needsSync: false,
+                        differences: 0,
+                        message: '遠程文件不存在，將創建新文件'
+                    });
                 } else if (!response.ok) {
-                    this.updateProgress(30, `錯誤：GitHub API返回 ${response.status}`, 'danger', 
-                        `${response.statusText}<br>請檢查您的設置和網絡連接`);
-                    throw new Error(`GitHub API錯誤: ${response.status} - ${response.statusText}`);
+                    throw new Error(`獲取遠程數據失敗: ${response.status} - ${response.statusText}`);
                 }
-                this.updateProgress(30, '正在準備更新文件...', 'info', '文件已存在，準備更新內容');
                 return response.json();
             })
             .then(fileInfo => {
-                // 準備上傳數據
-                this.updateProgress(50, '正在處理數據...', 'info', '準備編碼和上傳');
+                if (!fileInfo || !fileInfo.content) {
+                    throw new Error('無法獲取遠程文件內容');
+                }
                 
                 try {
-                    // 計算數據大小
-                    const dataSizeKB = Math.round(jsonData.length / 1024);
+                    // 解碼Base64內容
+                    const content = atob(fileInfo.content.replace(/\n/g, ''));
+                    const remoteData = JSON.parse(content);
                     
-                    // 顯示數據大小信息
-                    this.updateProgress(55, `正在進行Base64編碼...`, 'info', 
-                        `數據大小: ${dataSizeKB}KB<br>記錄數量: ${recordCount} 筆`);
+                    // 比較本地和遠程數據
+                    const differences = this.compareData(localData, remoteData);
                     
-                    // 檢查數據大小
-                    if (dataSizeKB > 1000) { // 如果大於1MB
-                        this.updateProgress(55, `處理大型數據...`, 'warning', 
-                            `數據較大 (${dataSizeKB}KB)，上傳可能需要較長時間<br>請耐心等待`);
-                    }
-                    
-                    // Base64編碼
-                    const content = btoa(jsonData);
-                    
-                    // 準備請求體
-                    const requestBody = {
-                        message: `更新書籍數據 (${new Date().toLocaleString()})`,
-                        content: content,
-                        branch: this.githubSettings.branch
-                    };
-                    
-                    // 如果文件已存在，添加SHA
-                    if (fileInfo.sha) {
-                        requestBody.sha = fileInfo.sha;
-                        this.updateProgress(60, '準備更新現有檔案...', 'info', 
-                            `文件路徑: ${this.githubSettings.path}<br>SHA: ${fileInfo.sha.substring(0, 7)}...`);
-                    } else {
-                        this.updateProgress(60, '準備創建新檔案...', 'info', 
-                            `文件路徑: ${this.githubSettings.path}<br>分支: ${this.githubSettings.branch}`);
-                    }
-                    
-                    this.updateProgress(70, '正在上傳到GitHub...', 'info', '數據傳輸中，請稍候...');
-                    
-                    // 發送PUT請求更新或創建文件
-                    return fetch(apiUrl, {
-                        method: 'PUT',
-                        headers: {
-                            'Authorization': `token ${this.githubSettings.token}`,
-                            'Content-Type': 'application/json',
-                            'Accept': 'application/vnd.github.v3+json'
-                        },
-                        body: JSON.stringify(requestBody),
-                        signal: AbortSignal.timeout(60000) // 60秒超時
+                    resolve({
+                        needsSync: differences > 0,
+                        differences: differences,
+                        message: differences > 0 ? `發現 ${differences} 項差異` : '數據一致',
+                        remoteData: remoteData,
+                        sha: fileInfo.sha
                     });
-                } catch (encodingError) {
-                    this.updateProgress(55, `編碼錯誤`, 'danger', 
-                        `數據編碼失敗：${encodingError.message}<br>請檢查數據格式或嘗試減少數據量`);
-                    throw new Error(`數據編碼失敗：${encodingError.message}`);
+                } catch (error) {
+                    throw new Error(`解析遠程數據失敗: ${error.message}`);
                 }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    const errorMsg = `上傳失敗: ${response.status} - ${response.statusText}`;
-                    let detailedMsg = '';
-                    
-                    // 提供更詳細的錯誤信息
-                    if (response.status === 401) {
-                        detailedMsg = '授權失敗：請檢查您的GitHub個人訪問令牌是否有效或已過期';
-                    } else if (response.status === 403) {
-                        detailedMsg = '權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)';
-                    } else if (response.status === 404) {
-                        detailedMsg = '找不到資源：請檢查倉庫名稱和路徑是否正確';
-                    } else if (response.status === 422) {
-                        detailedMsg = '請求無效：可能是提交訊息或內容格式有問題';
-                    } else if (response.status === 409) {
-                        detailedMsg = '衝突：遠程倉庫已被修改，請先同步最新版本';
-                    } else if (response.status === 429) {
-                        detailedMsg = '請求過多：已超過GitHub API速率限制，請稍後再試';
-                    } else {
-                        detailedMsg = `${response.status} - ${response.statusText}`;
-                    }
-                    
-                    this.updateProgress(80, `錯誤：上傳失敗`, 'danger', detailedMsg);
-                    throw new Error(detailedMsg);
-                }
-                this.updateProgress(90, '上傳成功，正在完成...', 'info', '正在處理GitHub的響應...');
-                return response.json();
             })
             .catch(error => {
-                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
-                    console.error('網絡連接錯誤:', error);
-                    this.updateProgress(80, '錯誤：網絡連接失敗', 'danger', 
-                        '無法連接到GitHub服務器，請檢查您的網絡連接或稍後再試');
-                    throw new Error('網絡連接失敗，請檢查您的網絡連接');
-                } else if (error.name === 'AbortError') {
-                    console.error('請求超時:', error);
-                    this.updateProgress(80, '錯誤：請求超時', 'danger', 
-                        '連接GitHub服務器超時，可能是網絡問題或GitHub服務暫時不可用');
-                    throw new Error('請求超時，請稍後再試');
-                }
-                throw error;
-            })
-            .then(data => {
-                console.log('上傳成功:', data);
-
-                // 獲取提交URL和文件URL
-                const commitUrl = data.commit?.html_url || '';
-                const fileUrl = data.content?.html_url || '';
-
-                const successMessage = `成功上傳 ${recordCount} 筆記錄到 GitHub`;
-                // 顯示成功信息和鏈接
-                this.updateProgress(100, successMessage, 'success',
-                    `文件已成功${data.content?.sha ? '更新' : '創建'}<br>
-                    ${commitUrl ? `<a href="${commitUrl}" target="_blank" class="text-success">查看提交</a>` : ''}
-                    ${fileUrl ? ` | <a href="${fileUrl}" target="_blank" class="text-success">查看文件</a>` : ''}`);
-
-                // 觸發成功事件，包含上傳的記錄數
-                this.triggerSyncEvent('success', null, { message: successMessage, count: recordCount });
-
-                // 5秒後隱藏進度條
-                setTimeout(() => {
-                    const progressContainer = document.getElementById('githubProgressContainer');
-                    if (progressContainer) {
-                        progressContainer.classList.add('d-none');
-                    }
-                }, 5000);
-
-                resolve({ status: 'success', message: successMessage, count: recordCount });
-            })
-            .catch(error => {
-                console.error('上傳錯誤:', error);
-
-                // 提供更友好的錯誤訊息
-                let userFriendlyMessage = error.message;
-                let detailedMessage = '';
-                const errorMessage = `上傳失敗: ${error.message}`;
-
-                if (error.message.includes('Failed to fetch') || error.message.includes('Network Error')) {
-                    userFriendlyMessage = '網絡連接失敗';
-                    detailedMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
-                } else if (error.message.includes('timeout')) {
-                    userFriendlyMessage = '請求超時';
-                    detailedMessage = '連接GitHub服務器超時，請稍後再試';
-                } else if (error.message.includes('JSON')) {
-                    userFriendlyMessage = 'API響應格式錯誤';
-                    detailedMessage = 'GitHub API返回了無效的數據格式';
-                } else {
-                    detailedMessage = error.message;
-                }
-
-                // 確保即使在 fetch 失敗後也能更新進度
-                const progressContainer = document.getElementById('githubProgressContainer');
-                if (progressContainer && !progressContainer.querySelector('.alert-danger')) {
-                    this.updateProgress(100, errorMessage, 'danger',
-                        '請檢查您的網絡連接、GitHub設置和權限');
-                }
-                
-                this.updateProgress(100, `錯誤：${userFriendlyMessage}`, 'danger', detailedMessage);
-                
-                // 只觸發一次錯誤事件，包含完整的錯誤信息
-                this.triggerSyncEvent('error', error, { message: errorMessage });
-                
-                // 顯示重試按鈕
-                const progressContainer = document.getElementById('githubProgressContainer');
-                const statusBody = progressContainer?.querySelector('.status-body');
-                
-                if (statusBody && !statusBody.querySelector('.retry-btn')) {
-                    const retryBtn = document.createElement('button');
-                    retryBtn.className = 'btn btn-warning btn-sm retry-btn mt-2';
-                    retryBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>重試上傳';
-                    retryBtn.onclick = () => {
-                        // 移除重試按鈕
-                        retryBtn.remove();
-                        // 重置進度條
-                        this.updateProgress(0, '準備重新上傳...', 'info', '正在重新初始化上傳程序...');
-                        // 重新嘗試上傳
-                        setTimeout(() => this.uploadToGitHub(data).then(resolve).catch(reject), 1000);
-                    };
-                    statusBody.appendChild(retryBtn);
-                }
-                
-                reject(error);
+                // 一致性檢查失敗，但不阻止上傳
+                console.warn('數據一致性檢查失敗:', error);
+                resolve({
+                    needsSync: true,
+                    differences: -1,
+                    message: `一致性檢查失敗: ${error.message}`,
+                    error: error
+                });
             });
         });
+    }
+    
+    /**
+     * 比較本地和遠程數據
+     * @param {Object} localData 本地數據
+     * @param {Object} remoteData 遠程數據
+     * @returns {number} 差異數量
+     */
+    compareData(localData, remoteData) {
+        // 如果沒有書籍數據，返回最大差異
+        if (!localData.books || !remoteData.books) {
+            return Number.MAX_SAFE_INTEGER;
+        }
+        
+        let differences = 0;
+        
+        // 檢查版本
+        if (localData.version !== remoteData.version) {
+            differences++;
+        }
+        
+        // 檢查書籍數量
+        if (localData.books.length !== remoteData.books.length) {
+            differences += Math.abs(localData.books.length - remoteData.books.length);
+        }
+        
+        // 創建遠程書籍ID映射，用於快速查找
+        const remoteBooks = new Map();
+        remoteData.books.forEach(book => {
+            remoteBooks.set(book.id, book);
+        });
+        
+        // 檢查每本本地書籍
+        localData.books.forEach(localBook => {
+            const remoteBook = remoteBooks.get(localBook.id);
+            
+            // 如果遠程沒有此書，計為一個差異
+            if (!remoteBook) {
+                differences++;
+                return;
+            }
+            
+            // 比較書籍屬性
+            const localKeys = Object.keys(localBook);
+            for (const key of localKeys) {
+                // 跳過特定屬性
+                if (['lastModified', 'createdAt'].includes(key)) continue;
+                
+                // 比較屬性值
+                if (JSON.stringify(localBook[key]) !== JSON.stringify(remoteBook[key])) {
+                    differences++;
+                    break; // 一本書只計一次差異
+                }
+            }
+        });
+        
+        return differences;
     }
     
     /**
