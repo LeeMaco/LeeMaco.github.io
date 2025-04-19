@@ -1123,21 +1123,128 @@ class App {
      */
     handleGitHubSyncEvent(event) {
         const { status, timestamp, error, source, message: syncMessage } = event.detail; // Added syncMessage
-        
+
         // 如果是靜默同步且成功，不顯示通知
-        if (source === 'autoSync' && status === 'success') {
-            const autoSyncSettings = db.getAutoSyncSettings();
-            if (autoSyncSettings && autoSyncSettings.silentSync) {
-                console.log('靜默同步成功，不顯示通知');
+        const autoSyncSettings = db.getAutoSyncSettings ? db.getAutoSyncSettings() : { silentSync: true }; // Handle potential undefined db
+        if (source === 'autoSync' && status === 'success' && autoSyncSettings && autoSyncSettings.silentSync) {
+            console.log('靜默同步成功，不顯示通知');
+            return;
+        }
+
+        let message = '';
+        let type = 'info'; // Default type
+        let dismissible = false; // Default dismissibility
+
+        switch (status) {
+            case 'success':
+                // Avoid duplicate success messages if triggered by button click
+                if (source !== 'manual') {
+                    message = syncMessage || 'GitHub同步成功';
+                    type = 'success';
+                } else {
+                    // For manual sync, rely on the message shown before the sync started
+                    console.log('手動GitHub同步成功事件接收');
+                    return; // Don't show another message
+                }
+                break;
+            case 'error':
+                console.error('GitHub同步失敗:', error);
+                if (error && error.name === 'GitHubPermissionError') {
+                    message = `權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)`;
+                } else {
+                    message = `GitHub同步失敗: ${error ? error.message : '未知錯誤'}`;
+                }
+                type = 'danger';
+                dismissible = true; // Make errors dismissible
+                break;
+            case 'conflict':
+                console.warn('GitHub同步衝突:', error);
+                message = syncMessage || `同步衝突：遠程倉庫已被修改，請先同步最新版本`;
+                type = 'danger'; // Use danger to highlight conflict
+                dismissible = true; // Make conflicts dismissible
+                break;
+            case 'skipped':
+                console.log('GitHub同步已跳過:', syncMessage);
+                // Optionally show a less intrusive message for skipped syncs
+                // message = `同步已跳過: ${syncMessage}`;
+                // type = 'info';
+                return; // Usually no need to notify user for skipped syncs
+            default:
+                console.log(`未知的GitHub同步狀態: ${status}`);
                 return;
+        }
+
+        // Display the message using the updated showMessage logic
+        if (message) {
+            this.showMessage(message, type, dismissible);
+        }
+
+        // Reload books on successful sync or resolved conflict (if applicable)
+        if (status === 'success') {
+            // Reload books to reflect synced changes
+            this.loadBooks(false); // Pass false to avoid triggering another check for updates
+        }
+
+        // Note: The retry button logic previously here is removed as showMessage handles dismissibility
+        // and specific error messages guide the user better.
+    }
+
+    /**
+     * 顯示狀態消息
+     * @param {string} message 要顯示的消息
+     * @param {string} type 消息類型 (success, info, warning, danger)
+     * @param {boolean} dismissible 是否可手動關閉
+     */
+    showMessage(message, type = 'info', dismissible = false) {
+        // 清除之前的自動消失超時
+        if (this.messageTimeout) {
+            clearTimeout(this.messageTimeout);
+            this.messageTimeout = null;
+        }
+
+        // 移除現有的相同類型的消息，避免堆疊
+        const existingAlert = this.syncStatus.querySelector(`.alert-${type}`);
+        if (existingAlert) {
+            // Allow multiple danger/warning messages if they are dismissible
+            if (!dismissible || type === 'success' || type === 'info') {
+                 existingAlert.remove();
             }
         }
-        
-        // 選擇通知類型和圖標
-        let toastClass = '';
-        let icon = '';
-        let message = '';
-        let detailMessage = '';
+
+        // 創建通知元素
+        const alertElement = document.createElement('div');
+        alertElement.className = `alert alert-${type} fade show ${dismissible ? 'alert-dismissible' : ''}`;
+        alertElement.setAttribute('role', 'alert'); // Use setAttribute for role
+
+        let innerHTML = message;
+        if (dismissible) {
+            innerHTML += `
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+        }
+        alertElement.innerHTML = innerHTML;
+
+        // 添加新消息
+        this.syncStatus.appendChild(alertElement);
+
+        // 如果不可手動關閉，則5秒後自動消失
+        if (!dismissible) {
+            this.messageTimeout = setTimeout(() => {
+                // Check if the element still exists before trying to remove
+                if (alertElement.parentNode === this.syncStatus) {
+                    const bsAlert = bootstrap.Alert.getInstance(alertElement);
+                    if (bsAlert) {
+                        bsAlert.close(); // Use Bootstrap's method to close
+                    } else {
+                        // Fallback if instance not found (should not happen)
+                        alertElement.remove();
+                    }
+                }
+            }, 5000); // 5秒後自動消失
+        }
+    }
+
+    /**
         
         if (status === 'success') {
             toastClass = 'text-bg-success';

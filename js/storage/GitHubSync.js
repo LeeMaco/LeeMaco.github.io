@@ -602,13 +602,26 @@ class GitHubSync {
             // 檢查響應狀態
             if (!putResponse.ok) {
                 const errorText = await putResponse.text();
+                const status = putResponse.status;
+
+                // 檢查是否為權限錯誤 (401 Unauthorized, 403 Forbidden)
+                if (status === 401 || status === 403) {
+                    const permissionError = new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
+                    permissionError.name = 'GitHubPermissionError';
+                    permissionError.status = status;
+                    throw permissionError;
+                }
+
                 // 檢查是否為衝突錯誤 (409 Conflict)
-                if (putResponse.status === 409) {
-                    const conflictError = new Error('遠程倉庫已被修改，請先同步最新版本');
+                if (status === 409) {
+                    const conflictError = new Error('同步衝突：遠程倉庫已被修改，請先同步最新版本');
                     conflictError.name = 'GitHubConflictError';
+                    conflictError.status = status;
                     throw conflictError;
                 }
-                throw new Error(`上傳失敗: ${putResponse.status} ${errorText}`);
+
+                // 其他錯誤
+                throw new Error(`上傳失敗: ${status} ${errorText}`);
             }
             
             const result = await putResponse.json();
@@ -621,11 +634,12 @@ class GitHubSync {
             };
         } catch (error) {
             console.error('上傳數據到GitHub失敗:', error);
-            // 如果不是已定義的衝突錯誤，則重新拋出
-            if (error.name !== 'GitHubConflictError') {
-                 throw new Error(`上傳數據到GitHub時發生錯誤: ${error.message}`);
+            // 重新拋出特定錯誤或通用錯誤
+            if (error.name === 'GitHubPermissionError' || error.name === 'GitHubConflictError') {
+                throw error; // 重新拋出已識別的特定錯誤
             }
-            throw error; // 重新拋出原始錯誤（包括衝突錯誤）
+            // 對於其他未識別的錯誤，包裝成通用錯誤
+            throw new Error(`上傳數據到GitHub時發生錯誤: ${error.message}`);
         }
     }
     
