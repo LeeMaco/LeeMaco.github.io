@@ -51,10 +51,11 @@ class GitHubSync {
     
     /**
      * 執行增量同步到GitHub
+     * @param {number} retryCount 當前重試次數
      * @returns {Promise<Object>} 同步結果
      */
-    async syncToGitHub() {
-        console.log('開始執行增量同步到GitHub...');
+    async syncToGitHub(retryCount = 0) {
+        console.log(`開始執行增量同步到GitHub... (嘗試次數: ${retryCount + 1})`);
         
         try {
             // 檢查是否已登入
@@ -112,7 +113,44 @@ class GitHubSync {
             
             // 觸發同步失敗事件
             this.triggerSyncEvent('error', error);
+
+            // 檢查是否為衝突錯誤
+            if (error.name === 'GitHubConflictError') {
+                if (retryCount < this.retryLimit) {
+                    console.warn(`檢測到同步衝突，正在嘗試自動解決 (重試 ${retryCount + 1}/${this.retryLimit})...`);
+                    try {
+                        // 1. 嘗試正常的從 GitHub 同步 (靜默模式)，讓內建合併邏輯處理
+                        console.log('嘗試執行標準 syncFromGitHub 來解決衝突...');
+                        await this.syncFromGitHub(false, true); // Use false for forceRefresh initially
+                        console.log('標準 syncFromGitHub 完成，將重試 syncToGitHub。');
+
+                        // 2. 延遲一小段時間，確保 IndexedDB 操作完成
+                        await new Promise(resolve => setTimeout(resolve, 500));
+
+                        // 3. 再次嘗試同步到 GitHub
+                        console.log('正在重試同步到GitHub...');
+                        return await this.syncToGitHub(retryCount + 1); // 遞歸調用並增加重試次數
+                    } catch (resolveError) {
+                        console.error('自動解決衝突失敗:', resolveError);
+                        // 如果自動解決失敗，返回原始衝突錯誤
+                        return {
+                            status: 'conflict',
+                            message: `自動解決衝突失敗: ${resolveError.message}. 原始錯誤: ${error.message || '遠程倉庫已被修改，請先同步最新版本'}`, 
+                            error: error.message
+                        };
+                    }
+                } else {
+                    console.error(`同步衝突，已達到最大重試次數 (${this.retryLimit})`);
+                    // 達到重試上限，返回衝突錯誤
+                    return {
+                        status: 'conflict',
+                        message: error.message || `遠程倉庫已被修改，且自動重試 (${this.retryLimit}次) 失敗，請手動同步最新版本`, 
+                        error: error.message
+                    };
+                }
+            }
             
+            // 其他非衝突錯誤
             return {
                 status: 'error',
                 message: `同步失敗: ${error.message}`,
@@ -564,6 +602,12 @@ class GitHubSync {
             // 檢查響應狀態
             if (!putResponse.ok) {
                 const errorText = await putResponse.text();
+                // 檢查是否為衝突錯誤 (409 Conflict)
+                if (putResponse.status === 409) {
+                    const conflictError = new Error('遠程倉庫已被修改，請先同步最新版本');
+                    conflictError.name = 'GitHubConflictError';
+                    throw conflictError;
+                }
                 throw new Error(`上傳失敗: ${putResponse.status} ${errorText}`);
             }
             
@@ -577,7 +621,11 @@ class GitHubSync {
             };
         } catch (error) {
             console.error('上傳數據到GitHub失敗:', error);
-            throw error;
+            // 如果不是已定義的衝突錯誤，則重新拋出
+            if (error.name !== 'GitHubConflictError') {
+                 throw new Error(`上傳數據到GitHub時發生錯誤: ${error.message}`);
+            }
+            throw error; // 重新拋出原始錯誤（包括衝突錯誤）
         }
     }
     

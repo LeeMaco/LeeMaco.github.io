@@ -191,11 +191,26 @@ class DatabaseModule {
     async syncToGitHub() {
         try {
             const result = await this.dbManager.syncToGitHub();
+            // 如果同步成功或沒有變化，通知觀察者
+            if (result.status === 'success' || result.status === 'skipped') {
+                this.notifyObservers('syncSuccess', { type: 'syncToGitHub', result });
+            } else if (result.status === 'conflict') {
+                // 如果發生衝突，通知觀察者特定的衝突錯誤
+                console.warn('同步到GitHub時發生衝突:', result.message);
+                this.notifyObservers('error', { type: 'syncConflict', error: new Error(result.message) });
+            } else {
+                // 其他錯誤情況
+                console.error('同步到GitHub失敗:', result.message);
+                this.notifyObservers('error', { type: 'syncToGitHub', error: new Error(result.message) });
+            }
             return result;
         } catch (error) {
-            console.error('同步到GitHub失敗:', error);
+            console.error('同步到GitHub時發生未預期的錯誤:', error);
             this.notifyObservers('error', { type: 'syncToGitHub', error });
-            throw error;
+            // 根據錯誤類型決定是否重新拋出
+            // 如果是網絡錯誤或GitHub API錯誤，可能需要通知用戶
+            // 如果是內部邏輯錯誤，可能需要記錄並拋出
+            throw error; // 暫時重新拋出所有未捕獲的錯誤
         }
     }
     

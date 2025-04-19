@@ -1122,7 +1122,7 @@ class App {
      * @param {CustomEvent} event 同步事件
      */
     handleGitHubSyncEvent(event) {
-        const { status, timestamp, error, source } = event.detail;
+        const { status, timestamp, error, source, message: syncMessage } = event.detail; // Added syncMessage
         
         // 如果是靜默同步且成功，不顯示通知
         if (source === 'autoSync' && status === 'success') {
@@ -1144,27 +1144,16 @@ class App {
             icon = '<i class="fas fa-check-circle me-2"></i>';
             message = '數據已成功同步到GitHub';
             detailMessage = `同步時間: ${new Date(timestamp).toLocaleString()}`;
-        } else {
+        } else if (status === 'conflict') { // Added specific handling for conflict
+            toastClass = 'text-bg-danger';
+            icon = '<i class="fas fa-exclamation-triangle me-2"></i>'; // Changed icon for conflict
+            message = '同步失敗';
+            detailMessage = syncMessage || '衝突：遠程倉庫已被修改，請先同步最新版本'; // Use message from event or default
+        } else { // Existing error handling
             toastClass = 'text-bg-danger';
             icon = '<i class="fas fa-exclamation-circle me-2"></i>';
             message = '同步失敗';
-            
-            // 提供更詳細的錯誤信息
-            if (error) {
-                if (error.message.includes('網絡連接失敗')) {
-                    detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
-                } else if (error.message.includes('授權失敗')) {
-                    detailMessage = '請檢查您的GitHub訪問令牌是否有效';
-                } else if (error.message.includes('權限不足')) {
-                    detailMessage = '請確保您的令牌有足夠的權限操作此倉庫';
-                } else if (error.message.includes('請求超時')) {
-                    detailMessage = '連接GitHub服務器超時，請稍後再試';
-                } else {
-                    detailMessage = error.message || '未知錯誤';
-                }
-            } else {
-                detailMessage = '發生未知錯誤，請稍後再試';
-            }
+            detailMessage = error ? error.message || '發生未知錯誤' : '發生未知錯誤';
         }
         
         // 創建通知元素
@@ -1212,7 +1201,7 @@ class App {
                 bsToast.hide();
                 // 顯示新的進度通知
                 this.showMessage('正在重新嘗試同步...', 'info');
-                // 觸發重新同步
+                // 嘗試重新同步
                 setTimeout(() => {
                     const books = db.getAllBooks();
                     admin.uploadToGitHub({ books: books })
