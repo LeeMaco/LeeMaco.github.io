@@ -68,6 +68,20 @@ class GitHubSync {
                 throw new Error('GitHub設置不完整，請先完成設置');
             }
             
+            // 檢查遠程倉庫是否有更新
+            try {
+                // 先檢查數據一致性
+                const consistencyCheck = await this.checkDataConsistency();
+                if (consistencyCheck.status === 'inconsistent') {
+                    console.warn('檢測到遠程數據與本地不一致，嘗試先同步遠程數據...');
+                    // 先從GitHub同步最新數據
+                    await this.syncFromGitHub(true);
+                }
+            } catch (checkError) {
+                console.warn('數據一致性檢查失敗，繼續嘗試同步:', checkError);
+                // 即使檢查失敗，也繼續嘗試同步
+            }
+            
             // 獲取上次同步時間
             const lastSyncTime = await this.getLastSyncTime();
             
@@ -88,25 +102,52 @@ class GitHubSync {
             const updatedData = this.applyIncrementalChanges(currentData, unsyncedOperations);
             
             // 上傳更新後的數據到GitHub
-            const result = await this.uploadToGitHub(settings.repo, settings.path, settings.token, updatedData);
-            
-            // 更新同步時間
-            await this.updateLastSyncTime();
-            
-            // 清除已同步的操作記錄
-            const now = new Date().toISOString();
-            await this.storage.clearSyncedOperations(now);
-            
-            // 觸發同步成功事件
-            this.triggerSyncEvent('success');
-            
-            console.log('增量同步到GitHub完成');
-            return {
-                status: 'success',
-                message: '同步成功',
-                changes: unsyncedOperations.length,
-                timestamp: now
-            };
+            try {
+                const result = await this.uploadToGitHub(settings.repo, settings.path, settings.token, updatedData);
+                
+                // 更新同步時間
+                await this.updateLastSyncTime();
+                
+                // 清除已同步的操作記錄
+                const now = new Date().toISOString();
+                await this.storage.clearSyncedOperations(now);
+                
+                // 觸發同步成功事件
+                this.triggerSyncEvent('success');
+                
+                console.log('增量同步到GitHub完成');
+                return {
+                    status: 'success',
+                    message: '同步成功',
+                    changes: unsyncedOperations.length,
+                    timestamp: now
+                };
+            } catch (uploadError) {
+                // 處理上傳過程中的特定錯誤
+                if (uploadError.message.includes('衝突')) {
+                    console.warn('檢測到遠程倉庫衝突，嘗試先同步最新版本...');
+                    // 觸發同步失敗事件，但提供特定的錯誤信息
+                    this.triggerSyncEvent('conflict', uploadError);
+                    
+                    return {
+                        status: 'conflict',
+                        message: '衝突：遠程倉庫已被修改，請先同步最新版本',
+                        error: uploadError.message
+                    };
+                } else if (uploadError.message.includes('權限不足')) {
+                    // 權限問題
+                    this.triggerSyncEvent('permission', uploadError);
+                    
+                    return {
+                        status: 'permission',
+                        message: '權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)',
+                        error: uploadError.message
+                    };
+                }
+                
+                // 其他錯誤，重新拋出
+                throw uploadError;
+            }
         } catch (error) {
             console.error('同步到GitHub失敗:', error);
             
@@ -410,6 +451,26 @@ class GitHubSync {
         const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
         
         try {
+            // 檢查權限
+            try {
+                const repoCheckUrl = `https://api.github.com/repos/${repo}`;
+                const repoResponse = await fetch(repoCheckUrl, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3.json'
+                    }
+                });
+                
+                if (repoResponse.status === 401 || repoResponse.status === 403) {
+                    throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
+                } else if (!repoResponse.ok) {
+                    throw new Error(`無法訪問倉庫: ${repoResponse.status} ${repoResponse.statusText}`);
+                }
+            } catch (permError) {
+                console.error('權限檢查失敗:', permError);
+                throw permError;
+            }
+            
             // 先獲取文件的SHA
             const getResponse = await fetch(apiUrl, {
                 headers: {
@@ -455,7 +516,15 @@ class GitHubSync {
             // 檢查響應狀態
             if (!putResponse.ok) {
                 const errorText = await putResponse.text();
-                throw new Error(`上傳失敗: ${putResponse.status} ${errorText}`);
+                
+                // 處理常見錯誤
+                if (putResponse.status === 409) {
+                    throw new Error('衝突：遠程倉庫已被修改，請先同步最新版本');
+                } else if (putResponse.status === 401 || putResponse.status === 403) {
+                    throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
+                } else {
+                    throw new Error(`上傳失敗: ${putResponse.status} ${errorText}`);
+                }
             }
             
             const result = await putResponse.json();
@@ -701,4 +770,21 @@ class GitHubSync {
                 };
             }
             
-            console.log('數據一致性檢查完成: 數
+            console.log('數據一致性檢查完成: 數據一致');
+            
+            return {
+                status: 'consistent',
+                message: '數據一致性檢查完成: 數據一致',
+                consistent: true
+            };
+        } catch (error) {
+            console.error('數據一致性檢查失敗:', error);
+            
+            return {
+                status: 'error',
+                message: `數據一致性檢查失敗: ${error.message}`,
+                error: error.message,
+                consistent: false
+            };
+        }
+    }
