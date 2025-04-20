@@ -447,6 +447,29 @@ class GitHubSync {
             'Cache-Control': 'no-cache, no-store, must-revalidate'
         };
         
+        // 獲取文件元數據以檢查SHA
+        let fileSha = null;
+        try {
+            const metadataResponse = await fetch(apiUrl.replace('vnd.github.v3.raw', 'vnd.github.v3.json'), {
+                headers: {
+                    'Authorization': `token ${token}`,
+                    'Accept': 'application/vnd.github.v3.json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+            });
+            
+            if (metadataResponse.ok) {
+                const metadata = await metadataResponse.json();
+                fileSha = metadata.sha;
+                console.log(`獲取到文件SHA: ${fileSha}`);
+                // 存儲SHA以便後續使用
+                await this.storage.saveSetting('lastGitHubSha', fileSha);
+            }
+        } catch (metadataError) {
+            console.warn('獲取文件元數據失敗，繼續嘗試獲取內容:', metadataError);
+            // 即使獲取元數據失敗，也繼續嘗試獲取內容
+        }
+        
         try {
             // 發送請求
             const response = await fetch(apiUrl, { headers });
@@ -625,7 +648,7 @@ class GitHubSync {
                             headers: {
                                 'Authorization': `token ${token}`,
                                 'Accept': 'application/vnd.github.v3.json',
-                                'Cache-Control': 'no-cache'
+                                'Cache-Control': 'no-cache, no-store, must-revalidate'
                             }
                         });
                         
@@ -636,10 +659,33 @@ class GitHubSync {
                         const latestFileInfo = await latestResponse.json();
                         const latestSha = latestFileInfo.sha;
                         
-                        // 使用最新的SHA重新提交
+                        // 獲取遠程文件內容並解析
+                        const remoteContentResponse = await fetch(`${apiUrl}?ref=main`, {
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Accept': 'application/vnd.github.v3.raw',
+                                'Cache-Control': 'no-cache, no-store, must-revalidate'
+                            }
+                        });
+                        
+                        if (!remoteContentResponse.ok) {
+                            throw new Error(`無法獲取遠程文件內容: ${remoteContentResponse.status}`);
+                        }
+                        
+                        // 解析遠程數據
+                        const remoteData = await remoteContentResponse.json();
+                        
+                        // 智能合併本地和遠程數據
+                        console.log('正在進行智能數據合併...');
+                        const mergedData = this.mergeData(data, remoteData);
+                        
+                        // 使用合併後的數據和最新的SHA重新提交
+                        const mergedContent = btoa(unescape(encodeURIComponent(JSON.stringify(mergedData, null, 2))));
                         const retryBody = {
                             ...requestBody,
-                            sha: latestSha
+                            content: mergedContent,
+                            sha: latestSha,
+                            message: `更新書籍數據（自動合併） - ${new Date().toISOString()}`
                         };
                         
                         const retryResponse = await fetch(apiUrl, {
@@ -662,12 +708,13 @@ class GitHubSync {
                                 commit: result.commit.sha
                             };
                         } else {
-                            // 如果重試失敗，拋出原始衝突錯誤
-                            throw new Error('衝突：遠程倉庫已被修改，請先同步最新版本');
+                            const retryErrorText = await retryResponse.text();
+                            console.error(`重試上傳失敗: ${retryResponse.status} ${retryErrorText}`);
+                            throw new Error('衝突：遠程倉庫已被修改，自動合併失敗，請先同步最新版本');
                         }
                     } catch (retryError) {
                         console.error('自動解決衝突失敗:', retryError);
-                        throw new Error('衝突：遠程倉庫已被修改，請先同步最新版本');
+                        throw new Error(`衝突：遠程倉庫已被修改，請先同步最新版本 (${retryError.message})`);
                     }
                 } else if (putResponse.status === 401 || putResponse.status === 403) {
                     throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
@@ -687,6 +734,135 @@ class GitHubSync {
         } catch (error) {
             console.error('上傳數據到GitHub失敗:', error);
             throw error;
+        }
+    }
+    
+    /**
+     * 智能合併本地和遠程數據
+     * @param {Object} localData 本地數據
+     * @param {Object} remoteData 遠程數據
+     * @returns {Object} 合併後的數據
+     */
+    mergeData(localData, remoteData) {
+        console.log('開始智能合併數據...');
+        
+        // 確保兩個數據源都有效
+        if (!localData || !remoteData) {
+            console.warn('合併數據時發現無效數據源，使用有效的數據');
+            return localData || remoteData || { books: [], version: 1 };
+        }
+        
+        // 確保books屬性是數組
+        const localBooks = Array.isArray(localData.books) ? localData.books : [];
+        const remoteBooks = Array.isArray(remoteData.books) ? remoteData.books : [];
+        
+        // 使用Map來跟踪書籍，以ID或唯一標識符為鍵
+        const mergedBooksMap = new Map();
+        
+        // 先添加遠程書籍
+        remoteBooks.forEach(book => {
+            if (book.id || book._id) {
+                const bookId = book.id || book._id;
+                mergedBooksMap.set(bookId, { ...book, _lastModified: book._lastModified || new Date().toISOString() });
+            }
+        });
+        
+        // 然後添加或更新本地書籍（如果本地版本較新）
+        localBooks.forEach(book => {
+            if (book.id || book._id) {
+                const bookId = book.id || book._id;
+                const existingBook = mergedBooksMap.get(bookId);
+                
+                // 如果遠程沒有此書籍，或者本地版本較新，則使用本地版本
+                if (!existingBook || 
+                    (book._lastModified && existingBook._lastModified && 
+                     new Date(book._lastModified) > new Date(existingBook._lastModified))) {
+                    mergedBooksMap.set(bookId, book);
+                }
+            } else {
+                // 對於沒有ID的書籍，直接添加（可能是新書）
+                // 為其生成一個臨時ID
+                const tempId = `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+                mergedBooksMap.set(tempId, { ...book, id: book.id || tempId });
+            }
+        });
+        
+        // 轉換回數組
+        const mergedBooks = Array.from(mergedBooksMap.values());
+        
+        // 確定合併後的版本號（使用較大的版本號）
+        const localVersion = localData.version || 1;
+        const remoteVersion = remoteData.version || 1;
+        const mergedVersion = Math.max(localVersion, remoteVersion) + 1;
+        
+        console.log(`合併完成: 合併了 ${mergedBooks.length} 筆書籍數據，版本號: ${mergedVersion}`);
+        
+        return {
+            books: mergedBooks,
+            version: mergedVersion,
+            lastSync: new Date().toISOString()
+        };
+    }
+    
+    /**
+     * 檢查數據一致性
+     * @returns {Promise<Object>} 一致性檢查結果
+     */
+    async checkDataConsistency() {
+        console.log('檢查數據一致性...');
+        
+        try {
+            // 獲取GitHub設置
+            const settings = await this.getGitHubSettings();
+            if (!settings.repo || !settings.path || !settings.token) {
+                return { status: 'unknown', message: 'GitHub設置不完整' };
+            }
+            
+            // 獲取上次同步的SHA
+            const lastSha = await this.storage.getSetting('lastGitHubSha');
+            if (!lastSha) {
+                return { status: 'unknown', message: '沒有上次同步的SHA記錄' };
+            }
+            
+            // 獲取當前GitHub上的文件元數據
+            const apiUrl = `https://api.github.com/repos/${settings.repo}/contents/${settings.path}`;
+            const metadataResponse = await fetch(apiUrl, {
+                headers: {
+                    'Authorization': `token ${settings.token}`,
+                    'Accept': 'application/vnd.github.v3.json',
+                    'Cache-Control': 'no-cache, no-store, must-revalidate'
+                }
+            });
+            
+            if (!metadataResponse.ok) {
+                return { 
+                    status: 'unknown', 
+                    message: `無法獲取GitHub文件元數據: ${metadataResponse.status}` 
+                };
+            }
+            
+            const metadata = await metadataResponse.json();
+            const currentSha = metadata.sha;
+            
+            // 比較SHA
+            if (lastSha !== currentSha) {
+                console.warn(`檢測到SHA不一致: 本地=${lastSha}, 遠程=${currentSha}`);
+                return { 
+                    status: 'inconsistent', 
+                    message: '遠程倉庫已被修改',
+                    localSha: lastSha,
+                    remoteSha: currentSha
+                };
+            }
+            
+            return { status: 'consistent', message: '數據一致' };
+        } catch (error) {
+            console.error('檢查數據一致性失敗:', error);
+            return { 
+                status: 'error', 
+                message: `檢查失敗: ${error.message}`,
+                error: error.message
+            };
         }
     }
     
