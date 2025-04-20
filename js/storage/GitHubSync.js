@@ -8,6 +8,18 @@ class GitHubSync {
         this.storage = storage; // IndexedDBStorage實例
         this.retryLimit = 3; // 自動重試次數限制
         this.retryDelay = 2000; // 重試延遲（毫秒）
+        
+        // 錯誤類型定義
+        this.errorTypes = {
+            NETWORK: 'network_error',       // 網絡連接問題
+            AUTH: 'authentication_error',  // 認證問題
+            PERMISSION: 'permission_error', // 權限問題
+            RATE_LIMIT: 'rate_limit',      // API速率限制
+            CONFLICT: 'conflict_error',    // 數據衝突
+            FORMAT: 'format_error',        // 數據格式問題
+            NOT_FOUND: 'not_found',        // 資源不存在
+            UNKNOWN: 'unknown_error'       // 未知錯誤
+        };
     }
     
     /**
@@ -425,6 +437,90 @@ class GitHubSync {
     }
     
     /**
+     * 解析GitHub API錯誤
+     * @param {Response} response HTTP響應對象
+     * @returns {Promise<Object>} 錯誤詳情
+     */
+    async parseGitHubError(response) {
+        let errorText = '';
+        try {
+            errorText = await response.text();
+        } catch (e) {
+            errorText = `無法讀取錯誤詳情: ${e.message}`;
+        }
+        
+        let errorType = this.errorTypes.UNKNOWN;
+        let message = `GitHub API錯誤 (${response.status}): ${response.statusText}`;
+        
+        // 根據狀態碼和錯誤文本分類錯誤
+        switch (response.status) {
+            case 401:
+                errorType = this.errorTypes.AUTH;
+                message = '認證失敗：令牌無效或已過期，請重新生成個人訪問令牌';
+                break;
+                
+            case 403:
+                if (errorText.includes('rate limit')) {
+                    errorType = this.errorTypes.RATE_LIMIT;
+                    message = '已達到GitHub API速率限制，請稍後再試';
+                    
+                    // 嘗試提取速率限制信息
+                    try {
+                        const resetTime = response.headers.get('X-RateLimit-Reset');
+                        if (resetTime) {
+                            const resetDate = new Date(parseInt(resetTime) * 1000);
+                            message += `，限制將於 ${resetDate.toLocaleString()} 重置`;
+                        }
+                    } catch (e) {
+                        console.warn('無法解析速率限制重置時間', e);
+                    }
+                } else {
+                    errorType = this.errorTypes.PERMISSION;
+                    message = '權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)';
+                }
+                break;
+                
+            case 404:
+                errorType = this.errorTypes.NOT_FOUND;
+                message = '找不到指定的資源：請檢查倉庫名稱和文件路徑是否正確';
+                break;
+                
+            case 409:
+                errorType = this.errorTypes.CONFLICT;
+                message = '數據衝突：遠程倉庫已被修改，請先同步最新版本';
+                break;
+                
+            case 422:
+                errorType = this.errorTypes.FORMAT;
+                message = '請求格式錯誤：請檢查提交的數據格式';
+                break;
+                
+            default:
+                if (response.status >= 500) {
+                    message = 'GitHub伺服器錯誤，請稍後再試';
+                }
+        }
+        
+        // 嘗試解析JSON錯誤信息
+        try {
+            const jsonError = JSON.parse(errorText);
+            if (jsonError.message) {
+                message += `\n詳細信息: ${jsonError.message}`;
+            }
+            if (jsonError.documentation_url) {
+                message += `\n參考文檔: ${jsonError.documentation_url}`;
+            }
+        } catch (e) {
+            // 不是有效的JSON，使用原始錯誤文本
+            if (errorText && errorText.length < 200) {
+                message += `\n詳細信息: ${errorText}`;
+            }
+        }
+        
+        return { errorType, message, statusCode: response.status };
+    }
+    
+    /**
      * 從GitHub獲取數據
      * @param {string} repo GitHub倉庫
      * @param {string} path 文件路徑
@@ -464,6 +560,10 @@ class GitHubSync {
                 console.log(`獲取到文件SHA: ${fileSha}`);
                 // 存儲SHA以便後續使用
                 await this.storage.saveSetting('lastGitHubSha', fileSha);
+            } else {
+                // 處理元數據獲取錯誤
+                const errorDetails = await this.parseGitHubError(metadataResponse);
+                console.warn(`獲取文件元數據失敗: ${errorDetails.message}`);
             }
         } catch (metadataError) {
             console.warn('獲取文件元數據失敗，繼續嘗試獲取內容:', metadataError);
@@ -472,28 +572,25 @@ class GitHubSync {
         
         try {
             // 發送請求
-            const response = await fetch(apiUrl, { headers });
+            let response;
+            try {
+                response = await fetch(apiUrl, { headers });
+            } catch (fetchError) {
+                // 處理網絡錯誤
+                const error = new Error(`網絡連接失敗: ${fetchError.message}`);
+                error.errorType = this.errorTypes.NETWORK;
+                throw error;
+            }
             
             // 檢查響應狀態
             if (!response.ok) {
-                const errorText = await response.text();
-                console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
+                const errorDetails = await this.parseGitHubError(response);
                 
-                // 處理特定錯誤狀態碼
-                if (response.status === 404) {
-                    throw new Error(`找不到指定的文件或路徑: ${path}，請檢查路徑是否正確`);
-                } else if (response.status === 401) {
-                    throw new Error('令牌無效或已過期，請重新生成個人訪問令牌');
-                } else if (response.status === 403) {
-                    // 檢查是否達到API速率限制
-                    if (errorText.includes('rate limit')) {
-                        throw new Error('已達到GitHub API速率限制，請稍後再試');
-                    } else {
-                        throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫');
-                    }
-                } else {
-                    throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
-                }
+                // 創建包含錯誤類型的錯誤對象
+                const error = new Error(errorDetails.message);
+                error.errorType = errorDetails.errorType;
+                error.statusCode = errorDetails.statusCode;
+                throw error;
             }
             
             // 嘗試解析數據
@@ -549,55 +646,97 @@ class GitHubSync {
             try {
                 // 先檢查令牌有效性
                 const userCheckUrl = 'https://api.github.com/user';
-                const userResponse = await fetch(userCheckUrl, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3.json'
-                    }
-                });
+                let userResponse;
+                
+                try {
+                    userResponse = await fetch(userCheckUrl, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3.json'
+                        }
+                    });
+                } catch (fetchError) {
+                    // 處理網絡錯誤
+                    const error = new Error(`網絡連接失敗: ${fetchError.message}`);
+                    error.errorType = this.errorTypes.NETWORK;
+                    error.details = '無法連接到GitHub API，請檢查您的網絡連接';
+                    throw error;
+                }
                 
                 if (!userResponse.ok) {
-                    if (userResponse.status === 401) {
-                        throw new Error('令牌無效或已過期，請重新生成個人訪問令牌');
-                    } else {
-                        throw new Error(`驗證失敗: ${userResponse.status} ${userResponse.statusText}`);
-                    }
+                    const errorDetails = await this.parseGitHubError(userResponse);
+                    const error = new Error(errorDetails.message);
+                    error.errorType = errorDetails.errorType;
+                    error.statusCode = errorDetails.statusCode;
+                    throw error;
                 }
                 
                 // 再檢查倉庫訪問權限
                 const repoCheckUrl = `https://api.github.com/repos/${repo}`;
-                const repoResponse = await fetch(repoCheckUrl, {
-                    headers: {
-                        'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3.json'
-                    }
-                });
+                let repoResponse;
                 
-                if (repoResponse.status === 401 || repoResponse.status === 403) {
-                    throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
-                } else if (repoResponse.status === 404) {
-                    throw new Error(`倉庫不存在或無權訪問: ${repo}，請檢查倉庫名稱是否正確`);
-                } else if (!repoResponse.ok) {
-                    throw new Error(`無法訪問倉庫: ${repoResponse.status} ${repoResponse.statusText}`);
+                try {
+                    repoResponse = await fetch(repoCheckUrl, {
+                        headers: {
+                            'Authorization': `token ${token}`,
+                            'Accept': 'application/vnd.github.v3.json'
+                        }
+                    });
+                } catch (fetchError) {
+                    const error = new Error(`網絡連接失敗: ${fetchError.message}`);
+                    error.errorType = this.errorTypes.NETWORK;
+                    error.details = '無法連接到GitHub API，請檢查您的網絡連接';
+                    throw error;
+                }
+                
+                if (!repoResponse.ok) {
+                    const errorDetails = await this.parseGitHubError(repoResponse);
+                    const error = new Error(errorDetails.message);
+                    error.errorType = errorDetails.errorType;
+                    error.statusCode = errorDetails.statusCode;
+                    
+                    // 添加更具體的錯誤信息
+                    if (repoResponse.status === 404) {
+                        error.details = `倉庫不存在或無權訪問: ${repo}，請檢查倉庫名稱是否正確`;
+                    } else if (repoResponse.status === 401 || repoResponse.status === 403) {
+                        error.details = '權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)';
+                    }
+                    
+                    throw error;
                 }
                 
                 // 檢查寫入權限
                 const repoData = await repoResponse.json();
                 if (repoData.permissions && !repoData.permissions.push) {
-                    throw new Error('您沒有此倉庫的寫入權限，請確保令牌具有寫入權限');
+                    const error = new Error('您沒有此倉庫的寫入權限，請確保令牌具有寫入權限');
+                    error.errorType = this.errorTypes.PERMISSION;
+                    error.details = '需要倉庫的寫入權限才能上傳數據，請檢查您的令牌權限設置';
+                    throw error;
                 }
             } catch (permError) {
                 console.error('權限檢查失敗:', permError);
+                // 確保錯誤對象包含錯誤類型
+                if (!permError.errorType) {
+                    permError.errorType = this.errorTypes.PERMISSION;
+                }
                 throw permError;
             }
             
             // 先獲取文件的SHA
-            const getResponse = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Accept': 'application/vnd.github.v3.json'
-                }
-            });
+            let getResponse;
+            try {
+                getResponse = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3.json'
+                    }
+                });
+            } catch (fetchError) {
+                const error = new Error(`網絡連接失敗: ${fetchError.message}`);
+                error.errorType = this.errorTypes.NETWORK;
+                error.details = '無法連接到GitHub API，請檢查您的網絡連接';
+                throw error;
+            }
             
             let sha;
             if (getResponse.ok) {
@@ -605,7 +744,12 @@ class GitHubSync {
                 sha = fileInfo.sha;
             } else if (getResponse.status !== 404) {
                 // 如果不是404（文件不存在），則拋出錯誤
-                throw new Error(`獲取文件信息失敗: ${getResponse.status} ${getResponse.statusText}`);
+                const errorDetails = await this.parseGitHubError(getResponse);
+                const error = new Error(errorDetails.message);
+                error.errorType = errorDetails.errorType;
+                error.statusCode = errorDetails.statusCode;
+                error.details = `獲取文件信息失敗: ${getResponse.status} ${getResponse.statusText}`;
+                throw error;
             }
             
             // 準備上傳數據
@@ -623,19 +767,27 @@ class GitHubSync {
             }
             
             // 發送請求
-            const putResponse = await fetch(apiUrl, {
-                method: 'PUT',
-                headers: {
-                    'Authorization': `token ${token}`,
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/vnd.github.v3.json'
-                },
-                body: JSON.stringify(requestBody)
-            });
+            let putResponse;
+            try {
+                putResponse = await fetch(apiUrl, {
+                    method: 'PUT',
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Content-Type': 'application/json',
+                        'Accept': 'application/vnd.github.v3.json'
+                    },
+                    body: JSON.stringify(requestBody)
+                });
+            } catch (fetchError) {
+                const error = new Error(`上傳數據時網絡連接失敗: ${fetchError.message}`);
+                error.errorType = this.errorTypes.NETWORK;
+                error.details = '無法連接到GitHub API，請檢查您的網絡連接並稍後重試';
+                throw error;
+            }
             
             // 檢查響應狀態
             if (!putResponse.ok) {
-                const errorText = await putResponse.text();
+                const errorDetails = await this.parseGitHubError(putResponse);
                 
                 // 處理常見錯誤
                 if (putResponse.status === 409) {
@@ -653,7 +805,11 @@ class GitHubSync {
                         });
                         
                         if (!latestResponse.ok) {
-                            throw new Error(`無法獲取最新文件信息: ${latestResponse.status}`);
+                            const latestErrorDetails = await this.parseGitHubError(latestResponse);
+                            const error = new Error(`無法獲取最新文件信息: ${latestResponse.status}`);
+                            error.errorType = latestErrorDetails.errorType;
+                            error.details = latestErrorDetails.message;
+                            throw error;
                         }
                         
                         const latestFileInfo = await latestResponse.json();
@@ -669,7 +825,11 @@ class GitHubSync {
                         });
                         
                         if (!remoteContentResponse.ok) {
-                            throw new Error(`無法獲取遠程文件內容: ${remoteContentResponse.status}`);
+                            const contentErrorDetails = await this.parseGitHubError(remoteContentResponse);
+                            const error = new Error(`無法獲取遠程文件內容: ${remoteContentResponse.status}`);
+                            error.errorType = contentErrorDetails.errorType;
+                            error.details = contentErrorDetails.message;
+                            throw error;
                         }
                         
                         // 解析遠程數據
@@ -708,18 +868,32 @@ class GitHubSync {
                                 commit: result.commit.sha
                             };
                         } else {
-                            const retryErrorText = await retryResponse.text();
-                            console.error(`重試上傳失敗: ${retryResponse.status} ${retryErrorText}`);
-                            throw new Error('衝突：遠程倉庫已被修改，自動合併失敗，請先同步最新版本');
+                            const retryErrorDetails = await this.parseGitHubError(retryResponse);
+                            console.error(`重試上傳失敗: ${retryResponse.status} ${retryErrorDetails.message}`);
+                            const error = new Error('衝突：遠程倉庫已被修改，自動合併失敗，請先同步最新版本');
+                            error.errorType = this.errorTypes.CONFLICT;
+                            error.details = retryErrorDetails.message;
+                            throw error;
                         }
                     } catch (retryError) {
                         console.error('自動解決衝突失敗:', retryError);
-                        throw new Error(`衝突：遠程倉庫已被修改，請先同步最新版本 (${retryError.message})`);
+                        // 確保錯誤對象包含錯誤類型
+                        if (!retryError.errorType) {
+                            retryError.errorType = this.errorTypes.CONFLICT;
+                        }
+                        const error = new Error(`衝突：遠程倉庫已被修改，請先同步最新版本 (${retryError.message})`);
+                        error.errorType = this.errorTypes.CONFLICT;
+                        error.details = retryError.details || '自動合併失敗，請手動同步最新數據';
+                        error.originalError = retryError;
+                        throw error;
                     }
-                } else if (putResponse.status === 401 || putResponse.status === 403) {
-                    throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
                 } else {
-                    throw new Error(`上傳失敗: ${putResponse.status} ${errorText}`);
+                    // 使用已解析的錯誤詳情
+                    const error = new Error(errorDetails.message);
+                    error.errorType = errorDetails.errorType;
+                    error.statusCode = errorDetails.statusCode;
+                    error.details = errorDetails.message;
+                    throw error;
                 }
             }
             
@@ -733,6 +907,10 @@ class GitHubSync {
             };
         } catch (error) {
             console.error('上傳數據到GitHub失敗:', error);
+            // 確保所有錯誤都有錯誤類型
+            if (!error.errorType) {
+                error.errorType = this.errorTypes.UNKNOWN;
+            }
             throw error;
         }
     }
@@ -815,29 +993,57 @@ class GitHubSync {
             // 獲取GitHub設置
             const settings = await this.getGitHubSettings();
             if (!settings.repo || !settings.path || !settings.token) {
-                return { status: 'unknown', message: 'GitHub設置不完整' };
+                return { 
+                    status: 'unknown', 
+                    message: 'GitHub設置不完整',
+                    errorType: this.errorTypes.UNKNOWN,
+                    details: '請先完成GitHub設置，包括倉庫名稱、文件路徑和訪問令牌'
+                };
             }
             
             // 獲取上次同步的SHA
             const lastSha = await this.storage.getSetting('lastGitHubSha');
             if (!lastSha) {
-                return { status: 'unknown', message: '沒有上次同步的SHA記錄' };
+                return { 
+                    status: 'unknown', 
+                    message: '沒有上次同步的SHA記錄',
+                    errorType: this.errorTypes.UNKNOWN,
+                    details: '尚未進行過同步，無法比較數據一致性'
+                };
             }
             
             // 獲取當前GitHub上的文件元數據
             const apiUrl = `https://api.github.com/repos/${settings.repo}/contents/${settings.path}`;
-            const metadataResponse = await fetch(apiUrl, {
-                headers: {
-                    'Authorization': `token ${settings.token}`,
-                    'Accept': 'application/vnd.github.v3.json',
-                    'Cache-Control': 'no-cache, no-store, must-revalidate'
-                }
-            });
+            let metadataResponse;
             
-            if (!metadataResponse.ok) {
+            try {
+                metadataResponse = await fetch(apiUrl, {
+                    headers: {
+                        'Authorization': `token ${settings.token}`,
+                        'Accept': 'application/vnd.github.v3.json',
+                        'Cache-Control': 'no-cache, no-store, must-revalidate'
+                    }
+                });
+            } catch (fetchError) {
+                // 處理網絡錯誤
                 return { 
-                    status: 'unknown', 
-                    message: `無法獲取GitHub文件元數據: ${metadataResponse.status}` 
+                    status: 'error', 
+                    message: '網絡連接失敗',
+                    errorType: this.errorTypes.NETWORK,
+                    details: `無法連接到GitHub API: ${fetchError.message}`,
+                    error: fetchError
+                };
+            }
+            
+            // 處理HTTP錯誤
+            if (!metadataResponse.ok) {
+                const errorDetails = await this.parseGitHubError(metadataResponse);
+                return { 
+                    status: 'error', 
+                    message: `無法獲取GitHub文件元數據: ${metadataResponse.status}`,
+                    errorType: errorDetails.errorType,
+                    details: errorDetails.message,
+                    statusCode: metadataResponse.status
                 };
             }
             
@@ -847,21 +1053,106 @@ class GitHubSync {
             // 比較SHA
             if (lastSha !== currentSha) {
                 console.warn(`檢測到SHA不一致: 本地=${lastSha}, 遠程=${currentSha}`);
+                
+                // 進一步檢查內容差異
+                const contentDiff = await this.checkContentDifference(settings, metadata);
+                
                 return { 
                     status: 'inconsistent', 
                     message: '遠程倉庫已被修改',
                     localSha: lastSha,
-                    remoteSha: currentSha
+                    remoteSha: currentSha,
+                    lastModified: metadata.last_modified || null,
+                    contentDifference: contentDiff,
+                    recommendedAction: '建議先同步遠程數據再進行修改'
                 };
             }
             
-            return { status: 'consistent', message: '數據一致' };
+            // 檢查本地數據版本
+            const localVersion = await this.storage.getSetting('dataVersion') || 0;
+            const remoteData = await this.fetchFromGitHub(settings.repo, settings.path, settings.token);
+            const remoteVersion = remoteData.version || 0;
+            
+            if (localVersion !== remoteVersion) {
+                return {
+                    status: 'version_mismatch',
+                    message: `數據版本不一致: 本地=${localVersion}, 遠程=${remoteVersion}`,
+                    localVersion,
+                    remoteVersion,
+                    recommendedAction: localVersion > remoteVersion ? 
+                        '本地版本較新，建議上傳本地數據' : '遠程版本較新，建議同步遠程數據'
+                };
+            }
+            
+            return { 
+                status: 'consistent', 
+                message: '數據一致',
+                sha: currentSha,
+                version: localVersion
+            };
         } catch (error) {
             console.error('檢查數據一致性失敗:', error);
             return { 
                 status: 'error', 
                 message: `檢查失敗: ${error.message}`,
-                error: error.message
+                errorType: this.errorTypes.UNKNOWN,
+                error: error
+            };
+        }
+    }
+    
+    /**
+     * 檢查內容差異
+     * @param {Object} settings GitHub設置
+     * @param {Object} metadata 文件元數據
+     * @returns {Promise<Object>} 差異信息
+     */
+    async checkContentDifference(settings, metadata) {
+        try {
+            // 獲取遠程文件內容
+            const remoteContent = await this.fetchFromGitHub(settings.repo, settings.path, settings.token);
+            
+            // 獲取本地數據
+            const books = await this.storage.getAllBooks();
+            const localData = { books, version: await this.storage.getSetting('dataVersion') || 0 };
+            
+            // 比較書籍數量
+            const localCount = localData.books.length;
+            const remoteCount = remoteContent.books ? remoteContent.books.length : 0;
+            
+            // 檢查版本差異
+            const versionDiff = (remoteContent.version || 0) - (localData.version || 0);
+            
+            // 檢查最後修改時間
+            let newerItems = 0;
+            if (remoteContent.books && Array.isArray(remoteContent.books)) {
+                newerItems = remoteContent.books.filter(remoteBook => {
+                    if (!remoteBook._lastModified) return false;
+                    
+                    // 查找對應的本地書籍
+                    const localBook = localData.books.find(book => 
+                        (book.id && book.id === remoteBook.id) || 
+                        (book._id && book._id === remoteBook._id));
+                    
+                    if (!localBook || !localBook._lastModified) return true;
+                    
+                    // 比較修改時間
+                    return new Date(remoteBook._lastModified) > new Date(localBook._lastModified);
+                }).length;
+            }
+            
+            return {
+                bookCountDiff: remoteCount - localCount,
+                versionDiff: versionDiff,
+                remoteNewer: versionDiff > 0,
+                newerItems: newerItems,
+                summary: `遠程有 ${remoteCount} 筆數據，本地有 ${localCount} 筆數據，${newerItems} 筆遠程數據較新`
+            };
+        } catch (error) {
+            console.error('檢查內容差異失敗:', error);
+            return {
+                error: `無法比較內容差異: ${error.message}`,
+                summary: '無法確定具體差異，建議謹慎處理'
             };
         }
     }
@@ -1013,17 +1304,34 @@ class GitHubSync {
      * @param {Error} error 錯誤對象（如果有）
      */
     triggerSyncEvent(status, error = null) {
+        // 準備事件詳情
+        const detail = { 
+            status: status,
+            timestamp: new Date().toISOString()
+        };
+        
+        // 如果有錯誤，添加錯誤信息
+        if (error) {
+            detail.error = {
+                message: error.message,
+                type: error.errorType || this.errorTypes.UNKNOWN,
+                details: error.details || null,
+                statusCode: error.statusCode || null
+            };
+        }
+        
         // 創建自定義事件
-        const event = new CustomEvent('githubSync', {
-            detail: {
-                status: status,
-                timestamp: new Date().toISOString(),
-                error: error
-            }
-        });
+        const event = new CustomEvent('githubSync', { detail });
         
         // 分發事件
         document.dispatchEvent(event);
+        
+        // 記錄同步狀態
+        this.storage.saveSetting('lastSyncStatus', {
+            status,
+            timestamp: new Date().toISOString(),
+            error: error ? detail.error : null
+        }).catch(e => console.error('無法保存同步狀態:', e));
         
         console.log(`GitHub同步事件已觸發 [狀態: ${status}]`);
     }
