@@ -738,19 +738,42 @@ document.addEventListener('DOMContentLoaded', function() {
             // 檢查文件是否已存在，獲取SHA
             let fileSha = '';
             try {
-                const checkResponse = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`, {
+                const checkUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}?ref=${branch}`;
+                console.log(`檢查文件 SHA: ${checkUrl}`); // Log URL
+                const checkResponse = await fetch(checkUrl, {
                     headers: {
                         'Authorization': `token ${token}`,
-                        'Accept': 'application/vnd.github.v3+json'
-                    }
+                        'Accept': 'application/vnd.github.v3+json',
+                        'Cache-Control': 'no-cache' // Add cache control
+                    },
+                    cache: 'no-cache' // Also add cache option for fetch
                 });
-                
-                if (checkResponse.status === 200) {
+
+                console.log(`檢查文件 SHA 狀態: ${checkResponse.status}`); // Log status
+
+                if (checkResponse.ok) { // Use checkResponse.ok for 2xx status
                     const fileData = await checkResponse.json();
                     fileSha = fileData.sha;
+                    console.log(`獲取到文件 SHA: ${fileSha}`); // Log fetched SHA
+                } else if (checkResponse.status === 404) {
+                    console.log('文件不存在，將創建新文件');
+                } else {
+                    // Handle other non-OK statuses during SHA fetch
+                    const errorText = await checkResponse.text();
+                    console.error(`獲取文件 SHA 時出錯: ${checkResponse.status} - ${errorText}`);
+                    throw new Error(`獲取文件 SHA 失敗: ${checkResponse.status}`);
                 }
             } catch (error) {
-                console.log('文件不存在，將創建新文件');
+                 // Catch network errors or errors thrown above
+                console.error('獲取文件 SHA 時捕獲到錯誤:', error);
+                 // Optionally re-throw or handle differently, maybe alert user
+                 alert(`無法獲取 GitHub 上的文件狀態，請稍後再試或檢查網絡連接。錯誤: ${error.message}`);
+                 // Stop the upload process if SHA fetch fails critically
+                 if (statusElement) {
+                     statusElement.textContent = '獲取文件狀態失敗';
+                     statusElement.style.color = 'red';
+                 }
+                 return; // Stop execution
             }
             
             // 準備上傳數據
@@ -763,10 +786,17 @@ document.addEventListener('DOMContentLoaded', function() {
             // 如果文件已存在，添加SHA
             if (fileSha) {
                 uploadData.sha = fileSha;
+                console.log(`在 PUT 請求中包含 SHA: ${fileSha}`); // Log SHA being sent
+            } else {
+                 console.log('未獲取到 SHA，將創建新文件');
             }
             
             // 上傳到GitHub
-            const response = await fetch(`https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`, {
+            const uploadUrl = `https://api.github.com/repos/${owner}/${repoName}/contents/data/${fileName}`;
+            console.log(`上傳文件到: ${uploadUrl}`); // Log upload URL
+            console.log('上傳數據:', JSON.stringify(uploadData, (key, value) => key === 'content' ? '<base64_content>' : value)); // Log upload data (mask content)
+
+            const response = await fetch(uploadUrl, {
                 method: 'PUT',
                 headers: {
                     'Authorization': `token ${token}`,
@@ -776,9 +806,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 body: JSON.stringify(uploadData)
             });
             
+            console.log(`上傳響應狀態: ${response.status}`); // Log upload response status
+
             if (!response.ok) {
                 const errorData = await response.json();
-                throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
+                console.error('GitHub API 錯誤詳情:', errorData); // Log detailed error
+                // Provide more specific error message for 409
+                if (response.status === 409) {
+                     throw new Error(`GitHub API錯誤: 409 - 文件版本衝突。請刷新頁面或稍後重試。遠端文件可能已被修改。`);
+                } else {
+                     throw new Error(`GitHub API錯誤: ${response.status} - ${errorData.message}`);
+                }
             }
             
             const result = await response.json();
