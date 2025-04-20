@@ -125,23 +125,63 @@ class GitHubSync {
             } catch (uploadError) {
                 // 處理上傳過程中的特定錯誤
                 if (uploadError.message.includes('衝突')) {
-                    console.warn('檢測到遠程倉庫衝突，嘗試先同步最新版本...');
-                    // 觸發同步失敗事件，但提供特定的錯誤信息
-                    this.triggerSyncEvent('conflict', uploadError);
+                    console.warn('檢測到遠程倉庫衝突，嘗試自動解決...');
                     
-                    return {
-                        status: 'conflict',
-                        message: '衝突：遠程倉庫已被修改，請先同步最新版本',
-                        error: uploadError.message
-                    };
-                } else if (uploadError.message.includes('權限不足')) {
-                    // 權限問題
+                    try {
+                        // 先從GitHub同步最新數據
+                        await this.syncFromGitHub(true);
+                        
+                        // 重新獲取未同步的操作記錄
+                        const refreshedOperations = await this.storage.getUnsyncedOperations(lastSyncTime);
+                        
+                        // 重新獲取GitHub上的最新數據
+                        const latestData = await this.fetchFromGitHub(settings.repo, settings.path, settings.token);
+                        
+                        // 重新應用增量更改
+                        const refreshedData = this.applyIncrementalChanges(latestData, refreshedOperations);
+                        
+                        // 再次嘗試上傳
+                        const retryResult = await this.uploadToGitHub(settings.repo, settings.path, settings.token, refreshedData);
+                        
+                        // 更新同步時間
+                        await this.updateLastSyncTime();
+                        
+                        // 清除已同步的操作記錄
+                        const now = new Date().toISOString();
+                        await this.storage.clearSyncedOperations(now);
+                        
+                        // 觸發同步成功事件
+                        this.triggerSyncEvent('success');
+                        
+                        console.log('衝突已自動解決，增量同步到GitHub完成');
+                        return {
+                            status: 'success',
+                            message: '衝突已自動解決，同步成功',
+                            changes: refreshedOperations.length,
+                            timestamp: now
+                        };
+                    } catch (retryError) {
+                        console.error('自動解決衝突失敗:', retryError);
+                        // 觸發同步失敗事件，但提供特定的錯誤信息
+                        this.triggerSyncEvent('conflict', uploadError);
+                        
+                        return {
+                            status: 'conflict',
+                            message: '衝突：遠程倉庫已被修改，請先同步最新版本',
+                            error: uploadError.message,
+                            details: '自動解決衝突失敗，請手動同步'
+                        };
+                    }
+                } else if (uploadError.message.includes('權限不足') || uploadError.message.includes('令牌無效') || 
+                           uploadError.message.includes('無權訪問') || uploadError.message.includes('無法訪問倉庫')) {
+                    // 權限問題 - 擴展錯誤處理範圍
                     this.triggerSyncEvent('permission', uploadError);
                     
                     return {
                         status: 'permission',
                         message: '權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)',
-                        error: uploadError.message
+                        error: uploadError.message,
+                        details: '請檢查您的GitHub設置和令牌權限'
                     };
                 }
                 
@@ -407,32 +447,63 @@ class GitHubSync {
             'Cache-Control': 'no-cache, no-store, must-revalidate'
         };
         
-        // 發送請求
-        const response = await fetch(apiUrl, { headers });
-        
-        // 檢查響應狀態
-        if (!response.ok) {
-            const errorText = await response.text();
-            console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
-            throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
-        }
-        
-        // 解析數據
-        const data = await response.json();
-        
-        console.log('成功從GitHub獲取數據');
-        
-        // 處理不同的數據格式
-        if (Array.isArray(data)) {
-            return { books: data, version: data.version || 1 };
-        } else if (data && typeof data === 'object') {
-            if (data.books && Array.isArray(data.books)) {
-                return data;
-            } else {
-                return { books: [data], version: data.version || 1 };
+        try {
+            // 發送請求
+            const response = await fetch(apiUrl, { headers });
+            
+            // 檢查響應狀態
+            if (!response.ok) {
+                const errorText = await response.text();
+                console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
+                
+                // 處理特定錯誤狀態碼
+                if (response.status === 404) {
+                    throw new Error(`找不到指定的文件或路徑: ${path}，請檢查路徑是否正確`);
+                } else if (response.status === 401) {
+                    throw new Error('令牌無效或已過期，請重新生成個人訪問令牌');
+                } else if (response.status === 403) {
+                    // 檢查是否達到API速率限制
+                    if (errorText.includes('rate limit')) {
+                        throw new Error('已達到GitHub API速率限制，請稍後再試');
+                    } else {
+                        throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫');
+                    }
+                } else {
+                    throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
+                }
             }
-        } else {
-            throw new Error('從GitHub獲取的數據格式無效');
+            
+            // 嘗試解析數據
+            let data;
+            try {
+                data = await response.json();
+            } catch (parseError) {
+                console.error('解析GitHub響應失敗:', parseError);
+                throw new Error('無法解析從GitHub獲取的數據，格式可能不是有效的JSON');
+            }
+            
+            console.log('成功從GitHub獲取數據');
+            
+            // 處理不同的數據格式
+            if (Array.isArray(data)) {
+                return { books: data, version: data.version || 1 };
+            } else if (data && typeof data === 'object') {
+                if (data.books && Array.isArray(data.books)) {
+                    return data;
+                } else {
+                    return { books: [data], version: data.version || 1 };
+                }
+            } else {
+                throw new Error('從GitHub獲取的數據格式無效');
+            }
+        } catch (error) {
+            // 捕獲網絡錯誤
+            if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                console.error('網絡請求失敗:', error);
+                throw new Error('無法連接到GitHub，請檢查您的網絡連接');
+            }
+            // 重新拋出其他錯誤
+            throw error;
         }
     }
     
@@ -451,8 +522,26 @@ class GitHubSync {
         const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}`;
         
         try {
-            // 檢查權限
+            // 檢查權限 - 使用更完善的權限檢查邏輯
             try {
+                // 先檢查令牌有效性
+                const userCheckUrl = 'https://api.github.com/user';
+                const userResponse = await fetch(userCheckUrl, {
+                    headers: {
+                        'Authorization': `token ${token}`,
+                        'Accept': 'application/vnd.github.v3.json'
+                    }
+                });
+                
+                if (!userResponse.ok) {
+                    if (userResponse.status === 401) {
+                        throw new Error('令牌無效或已過期，請重新生成個人訪問令牌');
+                    } else {
+                        throw new Error(`驗證失敗: ${userResponse.status} ${userResponse.statusText}`);
+                    }
+                }
+                
+                // 再檢查倉庫訪問權限
                 const repoCheckUrl = `https://api.github.com/repos/${repo}`;
                 const repoResponse = await fetch(repoCheckUrl, {
                     headers: {
@@ -463,8 +552,16 @@ class GitHubSync {
                 
                 if (repoResponse.status === 401 || repoResponse.status === 403) {
                     throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
+                } else if (repoResponse.status === 404) {
+                    throw new Error(`倉庫不存在或無權訪問: ${repo}，請檢查倉庫名稱是否正確`);
                 } else if (!repoResponse.ok) {
                     throw new Error(`無法訪問倉庫: ${repoResponse.status} ${repoResponse.statusText}`);
+                }
+                
+                // 檢查寫入權限
+                const repoData = await repoResponse.json();
+                if (repoData.permissions && !repoData.permissions.push) {
+                    throw new Error('您沒有此倉庫的寫入權限，請確保令牌具有寫入權限');
                 }
             } catch (permError) {
                 console.error('權限檢查失敗:', permError);
@@ -519,7 +616,59 @@ class GitHubSync {
                 
                 // 處理常見錯誤
                 if (putResponse.status === 409) {
-                    throw new Error('衝突：遠程倉庫已被修改，請先同步最新版本');
+                    console.warn('檢測到遠程倉庫衝突，嘗試自動解決...');
+                    
+                    // 嘗試自動解決衝突
+                    try {
+                        // 重新獲取最新的SHA
+                        const latestResponse = await fetch(apiUrl, {
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Accept': 'application/vnd.github.v3.json',
+                                'Cache-Control': 'no-cache'
+                            }
+                        });
+                        
+                        if (!latestResponse.ok) {
+                            throw new Error(`無法獲取最新文件信息: ${latestResponse.status}`);
+                        }
+                        
+                        const latestFileInfo = await latestResponse.json();
+                        const latestSha = latestFileInfo.sha;
+                        
+                        // 使用最新的SHA重新提交
+                        const retryBody = {
+                            ...requestBody,
+                            sha: latestSha
+                        };
+                        
+                        const retryResponse = await fetch(apiUrl, {
+                            method: 'PUT',
+                            headers: {
+                                'Authorization': `token ${token}`,
+                                'Content-Type': 'application/json',
+                                'Accept': 'application/vnd.github.v3.json'
+                            },
+                            body: JSON.stringify(retryBody)
+                        });
+                        
+                        if (retryResponse.ok) {
+                            const result = await retryResponse.json();
+                            console.log('衝突已自動解決，數據成功上傳到GitHub');
+                            
+                            return {
+                                status: 'success',
+                                message: '衝突已自動解決，數據成功上傳',
+                                commit: result.commit.sha
+                            };
+                        } else {
+                            // 如果重試失敗，拋出原始衝突錯誤
+                            throw new Error('衝突：遠程倉庫已被修改，請先同步最新版本');
+                        }
+                    } catch (retryError) {
+                        console.error('自動解決衝突失敗:', retryError);
+                        throw new Error('衝突：遠程倉庫已被修改，請先同步最新版本');
+                    }
                 } else if (putResponse.status === 401 || putResponse.status === 403) {
                     throw new Error('權限不足：請確保您的令牌有足夠的權限操作此倉庫 (需要repo或public_repo權限)');
                 } else {
@@ -722,12 +871,25 @@ class GitHubSync {
                 return {
                     status: 'skipped',
                     message: 'GitHub設置不完整，無法檢查數據一致性',
-                    consistent: false
+                    consistent: false,
+                    solution: '請先完成GitHub設置'
                 };
             }
             
-            // 獲取GitHub上的數據
-            const githubData = await this.fetchFromGitHub(settings.repo, settings.path, settings.token);
+            // 嘗試獲取GitHub上的數據，使用重試機制
+            let githubData;
+            try {
+                githubData = await this.fetchFromGitHubWithRetry(settings.repo, settings.path, settings.token);
+            } catch (fetchError) {
+                return {
+                    status: 'error',
+                    message: `無法從GitHub獲取數據: ${fetchError.message}`,
+                    error: fetchError.message,
+                    consistent: false,
+                    solution: '請檢查網絡連接和GitHub設置'
+                };
+            }
+            
             const remoteBooks = githubData.books;
             
             // 檢查數量是否一致
@@ -737,36 +899,90 @@ class GitHubSync {
                     message: `數據不一致: 本地 ${localBooks.length} 筆, 遠程 ${remoteBooks.length} 筆`,
                     consistent: false,
                     localCount: localBooks.length,
-                    remoteCount: remoteBooks.length
+                    remoteCount: remoteBooks.length,
+                    solution: localBooks.length < remoteBooks.length ? 
+                        '建議從GitHub同步最新數據' : '建議將本地數據同步到GitHub'
                 };
             }
             
             // 創建ID到書籍的映射
             const localBooksMap = new Map(localBooks.map(book => [book.id, book]));
+            const remoteBooksMap = new Map(remoteBooks.map(book => [book.id, book]));
             
             // 檢查每本書籍
             const inconsistentBooks = [];
+            const missingLocal = [];
+            const missingRemote = [];
             
+            // 檢查遠程書籍在本地是否存在且一致
             for (const remoteBook of remoteBooks) {
                 const localBook = localBooksMap.get(remoteBook.id);
                 
-                // 如果本地沒有此書籍，或版本不一致
-                if (!localBook || (remoteBook.version && localBook.version && remoteBook.version !== localBook.version)) {
+                // 如果本地沒有此書籍
+                if (!localBook) {
+                    missingLocal.push({
+                        id: remoteBook.id,
+                        title: remoteBook.title,
+                        version: remoteBook.version
+                    });
+                    continue;
+                }
+                
+                // 檢查版本是否一致
+                if (remoteBook.version && localBook.version && remoteBook.version !== localBook.version) {
                     inconsistentBooks.push({
                         id: remoteBook.id,
                         title: remoteBook.title,
-                        localVersion: localBook ? localBook.version : null,
-                        remoteVersion: remoteBook.version
+                        localVersion: localBook.version,
+                        remoteVersion: remoteBook.version,
+                        newerVersion: remoteBook.version > localBook.version ? 'remote' : 'local'
                     });
                 }
             }
             
-            if (inconsistentBooks.length > 0) {
+            // 檢查本地書籍在遠程是否存在
+            for (const localBook of localBooks) {
+                if (!remoteBooksMap.has(localBook.id)) {
+                    missingRemote.push({
+                        id: localBook.id,
+                        title: localBook.title,
+                        version: localBook.version
+                    });
+                }
+            }
+            
+            // 合併所有不一致情況
+            const totalInconsistencies = inconsistentBooks.length + missingLocal.length + missingRemote.length;
+            
+            if (totalInconsistencies > 0) {
+                let solution = '';
+                
+                if (missingLocal.length > 0 && missingRemote.length === 0) {
+                    solution = '建議從GitHub同步最新數據';
+                } else if (missingRemote.length > 0 && missingLocal.length === 0) {
+                    solution = '建議將本地數據同步到GitHub';
+                } else if (inconsistentBooks.length > 0) {
+                    // 檢查哪邊的版本更新
+                    const newerRemote = inconsistentBooks.filter(book => book.newerVersion === 'remote').length;
+                    const newerLocal = inconsistentBooks.filter(book => book.newerVersion === 'local').length;
+                    
+                    if (newerRemote > newerLocal) {
+                        solution = '建議從GitHub同步最新數據';
+                    } else {
+                        solution = '建議將本地數據同步到GitHub';
+                    }
+                } else {
+                    solution = '建議先從GitHub同步，然後再將本地變更同步到GitHub';
+                }
+                
                 return {
                     status: 'inconsistent',
-                    message: `發現 ${inconsistentBooks.length} 筆不一致的數據`,
+                    message: `發現 ${totalInconsistencies} 筆不一致的數據`,
                     consistent: false,
-                    inconsistentBooks
+                    inconsistentBooks,
+                    missingLocal,
+                    missingRemote,
+                    solution
                 };
             }
             
@@ -784,7 +1000,8 @@ class GitHubSync {
                 status: 'error',
                 message: `數據一致性檢查失敗: ${error.message}`,
                 error: error.message,
-                consistent: false
+                consistent: false,
+                solution: '請檢查網絡連接和GitHub設置'
             };
         }
     }
