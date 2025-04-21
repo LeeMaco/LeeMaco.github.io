@@ -41,12 +41,31 @@ document.addEventListener('DOMContentLoaded', function() {
     
     createSuggestionsContainer();
     
-    // 初始化數據並確保數據加載完成
-    BookData.init().then(() => {
-        console.log('數據初始化完成');
-    }).catch(error => {
-        console.error('數據初始化失敗:', error);
-    });
+    // 初始化數據並嘗試從 GitHub 同步
+    async function initializeAndSyncData() {
+        try {
+            await BookData.init();
+            console.log('本地數據初始化完成');
+            
+            // 嘗試從 GitHub 同步數據
+            // 注意：這裡使用了默認 URL，請確保在 data.js 中修改為您的實際 URL
+            const syncSuccess = await BookData.syncBooksFromGitHub(); 
+            if (syncSuccess) {
+                console.log('成功從 GitHub 同步書籍數據');
+                // 可選：同步成功後刷新頁面或重新加載書籍列表
+                // performSearch(); // 例如，如果希望同步後立即顯示最新數據
+            } else {
+                console.warn('從 GitHub 同步書籍數據失敗，將使用本地數據');
+            }
+        } catch (error) {
+            console.error('數據初始化或同步過程中發生錯誤:', error);
+            // 即使同步失敗，也繼續使用本地數據
+        }
+        // 無論同步是否成功，都可以在這裡執行後續操作，例如加載初始書籍列表
+        // performSearch(); // 如果希望總是在初始化後顯示數據
+    }
+
+    initializeAndSyncData(); // 調用異步初始化函數
     
     // 綁定搜索按鈕點擊事件
     searchBtn.addEventListener('click', function() {

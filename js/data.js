@@ -10,9 +10,6 @@ const BookData = {
         password: 'admin123'
     },
     
-    // 存儲從JSON文件加載的書籍數據
-    jsonBooks: [],
-    
     // 垃圾桶存儲鍵名
     TRASH_KEY: 'books_trash',
     
@@ -66,128 +63,48 @@ const BookData = {
             localStorage.setItem('adminCredentials', JSON.stringify(this.adminCredentials));
         }
         
-        // 從JSON文件加載書籍數據
-        // 返回Promise以便可以等待數據加載完成
-        return this.loadBooksFromJSON();
+        // 初始化完成
+        return Promise.resolve(); // 返回一個 resolved Promise
     },
-    
-    // 從JSON文件加載書籍數據
-    loadBooksFromJSON: function() {
-        // 使用多種策略嘗試加載JSON數據
-        const strategies = [];
-        
-        // 策略1: 相對路徑 (適用於本地環境)
-        strategies.push('./data/books.json');
-        
-        // 策略2: 基於當前URL的路徑 (適用於大多數情況)
-        const currentUrl = window.location.href;
-        let basePath = '';
-        
-        // 從當前URL中提取基礎路徑
-        if (currentUrl.includes('.html')) {
-            // 如果URL包含HTML文件名，則移除文件名部分
-            basePath = currentUrl.substring(0, currentUrl.lastIndexOf('/') + 1);
-        } else {
-            // 如果沒有明確的HTML文件名，則假設當前URL就是基礎路徑
-            basePath = currentUrl.endsWith('/') ? currentUrl : currentUrl + '/';
-        }
-        strategies.push(basePath + 'data/books.json');
-        
-        // 策略3: GitHub Pages特定路徑 (如果檢測到GitHub Pages環境)
-        if (window.location.href.includes('github.io')) {
-            const origin = window.location.origin;
-            const pathParts = window.location.pathname.split('/');
-            
-            // 如果在倉庫子目錄中，嘗試構建正確的路徑
-            if (pathParts.length > 2) {
-                const repoName = pathParts[1]; // 假設第二部分是倉庫名
-                strategies.push(`${origin}/${repoName}/data/books.json`);
+
+    // 從 GitHub 同步書籍數據
+    syncBooksFromGitHub: async function(githubUrl = 'https://raw.githubusercontent.com/your-username/your-repo/main/data/books.json') { // 請替換為實際的 GitHub Raw URL
+        console.log('開始從 GitHub 同步書籍數據:', githubUrl);
+        try {
+            const response = await fetch(githubUrl);
+            if (!response.ok) {
+                throw new Error(`HTTP 錯誤！狀態: ${response.status}`);
             }
-            
-            // 直接從根路徑嘗試
-            strategies.push(`${origin}/data/books.json`);
+            const githubBooks = await response.json();
+            console.log('從 GitHub 獲取到書籍數量:', githubBooks.length);
+
+            // 驗證數據格式 (可選，但建議)
+            if (!Array.isArray(githubBooks)) {
+                throw new Error('從 GitHub 獲取的數據格式不正確，期望得到一個數組。');
+            }
+
+            // 確保所有書籍 ID 都是字符串
+            githubBooks.forEach(book => {
+                if (book.id !== undefined) {
+                    book.id = String(book.id);
+                }
+                // 可以添加更多驗證，例如檢查必要欄位是否存在
+            });
+
+            // 直接用 GitHub 的數據覆蓋本地存儲
+            localStorage.setItem('books', JSON.stringify(githubBooks));
+            console.log('成功將 GitHub 書籍數據同步到 localStorage');
+            return true; // 表示同步成功
+        } catch (error) {
+            console.error('從 GitHub 同步書籍數據時發生錯誤:', error);
+            // 在同步失敗時，可以選擇保留本地數據或清空，這裡選擇保留
+            return false; // 表示同步失敗
         }
-        
-        console.log('將嘗試以下數據加載策略:', strategies);
-        
-        // 使用Promise.any嘗試所有策略，直到一個成功
-        const fetchPromises = strategies.map(url => {
-            console.log('嘗試從URL加載:', url);
-            return fetch(url, {
-                cache: 'no-store',
-                headers: {
-                    'Cache-Control': 'no-cache'
-                }
-            })
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error(`從 ${url} 加載失敗: ${response.status} ${response.statusText}`);
-                }
-                console.log('成功從URL加載數據:', url);
-                return response.json();
-            });
-        });
-        
-        return Promise.any(fetchPromises)
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('無法加載JSON文件: ' + response.statusText);
-                }
-                return response.json();
-            })
-            .then(data => {
-                console.log('從JSON文件加載了', data.length, '本書籍');
-                // 確保所有JSON書籍的ID都是字符串類型
-                data.forEach(book => {
-                    if (book.id !== undefined) {
-                        book.id = String(book.id);
-                    }
-                });
-                this.jsonBooks = data;
-                return data;
-            })
-            .catch(error => {
-                console.error('加載JSON書籍數據時發生錯誤:', error);
-                // 提供更詳細的錯誤信息
-                const errorMessage = `無法加載書籍數據: ${error.message}\n` +
-                                    `嘗試的URL: ${strategies.join(', ')}\n` +
-                                    `當前環境: ${window.location.href.includes('github.io') ? 'GitHub Pages' : '本地'}\n` +
-                                    `當前頁面: ${window.location.href}`;
-                console.error(errorMessage);
-                
-                // 如果在GitHub Pages環境中，嘗試使用備用方法
-                if (window.location.href.includes('github.io')) {
-                    console.log('在GitHub Pages環境中檢測到錯誤，嘗試使用備用方法加載數據...');
-                    // 嘗試使用絕對路徑
-                    const fallbackUrl = window.location.origin + '/data/books.json';
-                    console.log('嘗試備用URL:', fallbackUrl);
-                    
-                    return fetch(fallbackUrl, { cache: 'no-store' })
-                        .then(response => {
-                            if (!response.ok) {
-                                throw new Error(`備用方法也失敗: ${response.status} ${response.statusText}`);
-                            }
-                            return response.json();
-                        })
-                        .then(data => {
-                            console.log('使用備用方法成功加載了', data.length, '本書籍');
-                            this.jsonBooks = data;
-                            return data;
-                        })
-                        .catch(fallbackError => {
-                            console.error('備用方法也失敗:', fallbackError);
-                            this.jsonBooks = [];
-                            throw new Error(`無法加載書籍數據。原始錯誤: ${error.message}, 備用方法錯誤: ${fallbackError.message}`);
-                        });
-                }
-                
-                this.jsonBooks = [];
-                throw error; // 重新拋出錯誤，以便上層捕獲
-            });
     },
+    // (移除 loadBooksFromJSON 函數)
     
-    // 獲取所有書籍（合併localStorage和JSON文件中的數據）
-    getAllBooks: function() {
+    // 獲取所有本地存儲的書籍
+    getAllLocalBooks: function() {
         // 從localStorage獲取書籍
         const localBooks = localStorage.getItem('books');
         const parsedLocalBooks = localBooks ? JSON.parse(localBooks) : [];
@@ -198,31 +115,8 @@ const BookData = {
                 book.id = String(book.id);
             }
         });
-        
-        // 確保jsonBooks不為空
-        if (!this.jsonBooks || this.jsonBooks.length === 0) {
-            console.log('jsonBooks為空，只返回localStorage中的書籍');
-            return parsedLocalBooks;
-        }
-        
-        // 合併localStorage和JSON文件中的書籍，避免ID重複
-        // 使用字符串ID進行比較，避免類型不匹配問題
-        const localBookIds = new Set(parsedLocalBooks.map(book => String(book.id)));
-        const uniqueJsonBooks = this.jsonBooks.filter(book => {
-            // 確保book.id存在且轉換為字符串
-            return book.id !== undefined && !localBookIds.has(String(book.id));
-        });
-        
-        // 確保所有JSON書籍的ID都是字符串類型
-        uniqueJsonBooks.forEach(book => {
-            if (book.id !== undefined) {
-                book.id = String(book.id);
-            }
-        });
-        
-        const allBooks = [...parsedLocalBooks, ...uniqueJsonBooks];
-        console.log('合併後的書籍總數:', allBooks.length, '(localStorage:', parsedLocalBooks.length, ', JSON:', uniqueJsonBooks.length, ')');
-        return allBooks;
+        console.log('從localStorage獲取書籍數量:', parsedLocalBooks.length);
+        return parsedLocalBooks;
     },
     
     // 根據ID獲取書籍
@@ -239,10 +133,7 @@ const BookData = {
         // 使用嚴格相等比較(===)而不是寬鬆比較，避免類型轉換問題
         let book = parsedLocalBooks.find(book => String(book.id) === bookId);
         
-        // 如果在localStorage中沒找到，再從JSON文件中查找
-        if (!book && this.jsonBooks.length > 0) {
-            book = this.jsonBooks.find(book => String(book.id) === bookId);
-        }
+        // (移除從 jsonBooks 查找的邏輯)
         
         // 確保返回的書籍ID是字符串類型
         if (book) {
@@ -261,7 +152,7 @@ const BookData = {
         try {
             console.log('開始搜索書籍，查詢:', query, '類型:', type, '篩選條件:', filters);
             
-            let books = this.getAllBooks();
+            let books = this.getAllLocalBooks(); // 只搜索本地存儲的書籍
             console.log('獲取到書籍總數:', books.length);
             
             if (books.length === 0) {
@@ -340,9 +231,146 @@ const BookData = {
         }
     },
     
-    // 添加新書籍
+    // 獲取書籍（支持篩選、排序和分頁）
+    getBooks: function(options = {}) {
+        const { 
+            page = 1, 
+            limit = 10, 
+            searchKeyword = '', 
+            searchField = 'all', 
+            filterPublisher = '', 
+            filterCabinet = '', 
+            sortField = 'createdAt', 
+            sortOrder = 'desc' 
+        } = options;
+
+        console.log('getBooks called with options:', options);
+
+        // 注意：此函數現在異步獲取數據
+        // 返回一個 Promise
+        return this._fetchAndProcessBooks(options);
+        // (getBooks 的主要邏輯已移至 _fetchAndProcessBooks)
+    },
+
+    // 內部輔助函數：異步獲取、處理和分頁書籍數據
+    _fetchAndProcessBooks: async function(options = {}) {
+        const { 
+            page = 1, 
+            limit = 10, 
+            searchKeyword = '', 
+            searchField = 'all', 
+            filterPublisher = '', 
+            filterCabinet = '', 
+            sortField = 'createdAt', 
+            sortOrder = 'desc' 
+        } = options;
+
+        try {
+            // 1. 獲取本地存儲的書籍
+            const localBooks = this.getAllLocalBooks();
+            // 暫時不合併 JSON 數據，專注於本地數據的分頁和性能
+            let allBooks = [...localBooks]; 
+
+            const totalBooksBeforeFiltering = allBooks.length;
+            console.log('Total local books before filtering:', totalBooksBeforeFiltering);
+
+            // 2. 應用關鍵字搜索
+            if (searchKeyword) {
+                const lowerQuery = searchKeyword.toLowerCase().trim();
+                allBooks = allBooks.filter(book => {
+                    if (!book) return false;
+                    if (searchField === 'all') {
+                        return (
+                            (book.title && String(book.title).toLowerCase().includes(lowerQuery)) ||
+                            (book.author && String(book.author).toLowerCase().includes(lowerQuery)) ||
+                            (book.series && String(book.series).toLowerCase().includes(lowerQuery)) ||
+                            (book.publisher && String(book.publisher).toLowerCase().includes(lowerQuery)) ||
+                            (book.cabinet && String(book.cabinet).toLowerCase().includes(lowerQuery)) ||
+                            (book.row && String(book.row).toLowerCase().includes(lowerQuery)) ||
+                            (book.isbn && String(book.isbn).toLowerCase().includes(lowerQuery)) ||
+                            (book.description && String(book.description).toLowerCase().includes(lowerQuery)) ||
+                            (book.notes && String(book.notes).toLowerCase().includes(lowerQuery))
+                        );
+                    } else if (searchField === 'cabinet') {
+                        return book.cabinet && String(book.cabinet).toLowerCase() === lowerQuery;
+                    } else {
+                        if (book[searchField]) {
+                            const fieldValue = String(book[searchField]).toLowerCase();
+                            return fieldValue.includes(lowerQuery);
+                        }
+                        return false;
+                    }
+                });
+            }
+
+            // 3. 應用出版社篩選
+            if (filterPublisher) {
+                allBooks = allBooks.filter(book => book.publisher && String(book.publisher).toLowerCase() === String(filterPublisher).toLowerCase());
+            }
+
+            // 4. 應用櫃號篩選
+            if (filterCabinet) {
+                allBooks = allBooks.filter(book => book.cabinet && String(book.cabinet).toLowerCase() === String(filterCabinet).toLowerCase());
+            }
+
+            const totalFilteredBooks = allBooks.length;
+            console.log('Total local books after filtering:', totalFilteredBooks);
+
+            // 5. 應用排序
+            allBooks.sort((a, b) => {
+                let valueA = a[sortField] || '';
+                let valueB = b[sortField] || '';
+
+                // 嘗試將日期字符串轉換為時間戳進行比較
+                if (sortField === 'createdAt' || sortField === 'updatedAt') {
+                    valueA = valueA ? new Date(valueA).getTime() : 0;
+                    valueB = valueB ? new Date(valueB).getTime() : 0;
+                } else {
+                    // 其他字段按字符串或數字比較
+                    valueA = typeof valueA === 'string' ? valueA.toLowerCase() : valueA;
+                    valueB = typeof valueB === 'string' ? valueB.toLowerCase() : valueB;
+                }
+
+                if (sortOrder === 'asc') {
+                    return valueA > valueB ? 1 : (valueA < valueB ? -1 : 0);
+                } else {
+                    return valueA < valueB ? 1 : (valueA > valueB ? -1 : 0);
+                }
+            });
+
+            // 6. 應用分頁
+            const startIndex = (page - 1) * limit;
+            const endIndex = page * limit;
+            const paginatedBooks = allBooks.slice(startIndex, endIndex);
+            console.log(`Pagination: page=${page}, limit=${limit}, startIndex=${startIndex}, endIndex=${endIndex}`);
+            console.log('Paginated local books count:', paginatedBooks.length);
+
+            // 7. 返回結果 (只包含本地數據)
+            return {
+                books: paginatedBooks,
+                total: totalFilteredBooks, // 返回篩選/排序後的總數
+                page: page,
+                limit: limit,
+                totalPages: Math.ceil(totalFilteredBooks / limit)
+            };
+
+        } catch (error) {
+            console.error('處理本地書籍數據時發生錯誤:', error);
+            // 返回空結果或帶有錯誤標記的結果
+            return {
+                books: [],
+                total: 0,
+                page: page,
+                limit: limit,
+                totalPages: 0,
+                error: error.message
+            };
+        }
+    },
+
+    // 添加新書籍 (只添加到 localStorage)
     addBook: function(bookData) {
-        const books = this.getAllBooks();
+        const books = this.getAllLocalBooks();
         const now = new Date();
         const newBook = {
             ...bookData,
@@ -356,7 +384,7 @@ const BookData = {
         return newBook;
     },
     
-    // 更新書籍
+    // 更新書籍 (只更新 localStorage)
     updateBook: function(id, bookData) {
         // 確保ID是字符串類型
         const bookId = String(id);
@@ -400,7 +428,7 @@ const BookData = {
         }
     },
     
-    // 將書籍移至垃圾桶
+    // 將書籍移至垃圾桶 (只操作 localStorage)
     moveToTrash: function(id) {
         // 確保ID是字符串類型
         const bookId = String(id);
@@ -414,7 +442,7 @@ const BookData = {
         }
         
         // 從書籍列表中移除
-        const books = this.getAllBooks();
+        const books = this.getAllLocalBooks();
         const filteredBooks = books.filter(b => String(b.id) !== bookId);
         
         // 添加刪除時間戳
@@ -471,7 +499,7 @@ const BookData = {
         book.updatedAt = new Date().toISOString();
         
         // 獲取當前書籍列表並添加恢復的書籍
-        const books = this.getAllBooks();
+        const books = this.getAllLocalBooks();
         books.push(book);
         
         // 保存更新後的書籍列表和垃圾桶
