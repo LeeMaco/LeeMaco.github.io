@@ -1344,6 +1344,17 @@ class App {
      * @param {number} delay 顯示時間（毫秒）
      */
     showMessage(message, type, delay = 5000) {
+        // 確保同時僅顯示一則同步相關通知
+        if (type === 'success' || type === 'danger' || type === 'info' || type === 'warning') {
+            // 關閉現有所有同步相關的 toast
+            const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
+            const existingToasts = toastContainer.querySelectorAll('.toast');
+            existingToasts.forEach(t => {
+                const bsToast = bootstrap.Toast.getInstance(t);
+                if (bsToast) bsToast.hide();
+                else t.remove();
+            });
+        }
         // 創建Toast元素
         const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
         const toastId = 'toast-' + Date.now();
