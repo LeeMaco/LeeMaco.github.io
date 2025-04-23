@@ -455,7 +455,14 @@ class GitHubSync {
             // 檢查響應狀態
             if (!putResponse.ok) {
                 const errorText = await putResponse.text();
-                throw new Error(`上傳失敗: ${putResponse.status} ${errorText}`);
+                // 檢查是否為衝突錯誤 (409 Conflict)
+                if (putResponse.status === 409) {
+                    console.error('上傳衝突：遠程文件已被修改。', errorText);
+                    throw new Error('同步衝突：遠程倉庫已被修改，請先從GitHub同步最新版本');
+                } else {
+                    console.error(`上傳失敗 (${putResponse.status}): ${errorText}`);
+                    throw new Error(`上傳失敗: ${putResponse.status} ${putResponse.statusText}`);
+                }
             }
             
             const result = await putResponse.json();

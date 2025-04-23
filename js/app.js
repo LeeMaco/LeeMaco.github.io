@@ -891,6 +891,7 @@ class App {
         let icon = '';
         let message = '';
         let detailMessage = '';
+        let isConflictError = false; // 新增標記來識別衝突錯誤
         
         if (status === 'success') {
             toastClass = 'text-bg-success';
@@ -904,7 +905,12 @@ class App {
             
             // 提供更詳細的錯誤信息
             if (error) {
-                if (error.message.includes('網絡連接失敗')) {
+                // 檢查是否為同步衝突錯誤
+                if (error.message.includes('同步衝突') || error.message.includes('409')) {
+                    isConflictError = true;
+                    message = '同步衝突';
+                    detailMessage = '遠程倉庫已被修改，請先點擊「從 GitHub 同步」按鈕獲取最新版本，然後再嘗試上傳您的更改。';
+                } else if (error.message.includes('網絡連接失敗')) {
                     detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
                 } else if (error.message.includes('授權失敗')) {
                     detailMessage = '請檢查您的GitHub訪問令牌是否有效';
@@ -942,7 +948,7 @@ class App {
         this.syncStatus.appendChild(toast);
         
         // 顯示通知
-        const bsToast = new bootstrap.Toast(toast, { delay: 6000 }); // 延長顯示時間
+        const bsToast = new bootstrap.Toast(toast, { delay: isConflictError ? 10000 : 6000 }); // 衝突錯誤顯示更長時間
         bsToast.show();
         
         // 自動移除通知
@@ -955,8 +961,8 @@ class App {
             this.loadBooks();
         }
         
-        // 如果同步失敗，顯示重試按鈕
-        if (status === 'error' && error) {
+        // 如果同步失敗且不是衝突錯誤，顯示重試按鈕 (注意：此處重試邏輯可能仍需調整)
+        if (status === 'error' && error && !isConflictError) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
             retryBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>重試同步';
@@ -965,11 +971,15 @@ class App {
                 bsToast.hide();
                 // 顯示新的進度通知
                 this.showMessage('正在重新嘗試同步...', 'info');
-                // 觸發重新同步
+                // 觸發重新同步 (注意：應調用正確的同步函數，例如 db.syncToGitHub())
                 setTimeout(() => {
-                    const books = db.getAllBooks();
-                    admin.uploadToGitHub({ books: books })
-                        .catch(err => console.error('重試同步失敗:', err));
+                    // 應調用 db.syncToGitHub() 而不是 admin.uploadToGitHub
+                    db.syncToGitHub() // 假設 db 是 DatabaseModule 的實例
+                        .catch(err => {
+                            console.error('重試同步失敗:', err);
+                            // 可以在此處再次觸發錯誤處理
+                            this.handleGitHubSyncEvent({ detail: { status: 'error', timestamp: new Date().toISOString(), error: err } });
+                        });
                 }, 1000);
             };
             
