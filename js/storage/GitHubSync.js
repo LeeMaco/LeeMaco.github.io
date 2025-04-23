@@ -352,36 +352,42 @@ class GitHubSync {
      */
     async fetchFromGitHub(repo, path, token) {
         console.log(`正在從GitHub倉庫 ${repo} 獲取數據...`);
-        
-        // 添加緩存破壞參數，確保獲取最新數據
         const cacheBuster = `?timestamp=${Date.now()}`;
-        
-        // 構建API URL
         const apiUrl = `https://api.github.com/repos/${repo}/contents/${path}${cacheBuster}`;
-        
-        // 設置請求頭
         const headers = {
             'Authorization': `token ${token}`,
             'Accept': 'application/vnd.github.v3.raw',
             'Cache-Control': 'no-cache, no-store, must-revalidate'
         };
-        
-        // 發送請求
-        const response = await fetch(apiUrl, { headers });
-        
-        // 檢查響應狀態
+        let response;
+        try {
+            response = await fetch(apiUrl, { headers });
+        } catch (err) {
+            // 網路連線錯誤或 CORS 問題
+            throw new Error('網絡連接失敗，請檢查您的網絡連接或瀏覽器CORS設置');
+        }
         if (!response.ok) {
             const errorText = await response.text();
-            console.error(`GitHub API錯誤 (${response.status}): ${errorText}`);
-            throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
+            if (response.status === 401 || response.status === 403) {
+                // 權限或Token錯誤
+                throw new Error('授權失敗，請檢查您的GitHub訪問令牌（PAT）是否有效且有權限');
+            } else if (response.status === 404) {
+                throw new Error('找不到指定的GitHub檔案，請檢查倉庫名稱與路徑設定');
+            } else if (response.status === 429) {
+                throw new Error('請求過多，已超過GitHub API速率限制，請稍後再試');
+            } else if (response.status === 400 && errorText.includes('CORS')) {
+                throw new Error('CORS限制，請檢查您的瀏覽器或伺服器設定');
+            } else {
+                throw new Error(`GitHub API錯誤: ${response.status} ${response.statusText}`);
+            }
         }
-        
-        // 解析數據
-        const data = await response.json();
-        
+        let data;
+        try {
+            data = await response.json();
+        } catch (err) {
+            throw new Error('GitHub API返回了無效的數據格式');
+        }
         console.log('成功從GitHub獲取數據');
-        
-        // 處理不同的數據格式
         if (Array.isArray(data)) {
             return { books: data, version: data.version || 1 };
         } else if (data && typeof data === 'object') {
@@ -493,17 +499,28 @@ class GitHubSync {
                 const response = await fetch(url, options);
                 
                 if (!response.ok) {
-                    throw new Error(`請求失敗: ${response.status} ${response.statusText}`);
+                    if (response.status === 401 || response.status === 403) {
+                        throw new Error('授權失敗，請檢查您的GitHub訪問令牌（PAT）是否有效且有權限');
+                    } else if (response.status === 404) {
+                        throw new Error('找不到指定的GitHub檔案，請檢查倉庫名稱與路徑設定');
+                    } else if (response.status === 429) {
+                        throw new Error('請求過多，已超過GitHub API速率限制，請稍後再試');
+                    } else if (response.status === 400) {
+                        throw new Error('請求格式錯誤，請檢查API參數與CORS設定');
+                    } else {
+                        throw new Error(`請求失敗: ${response.status} ${response.statusText}`);
+                    }
                 }
-                
                 return await response.json();
             } catch (error) {
                 retries++;
                 
                 if (retries >= this.retryLimit) {
+                    if (error instanceof TypeError && error.message.includes('Failed to fetch')) {
+                        throw new Error('網絡連接失敗，請檢查您的網絡連接或瀏覽器CORS設置');
+                    }
                     throw error;
                 }
-                
                 console.log(`請求失敗，${this.retryDelay / 1000}秒後重試 (${retries}/${this.retryLimit})...`);
                 await new Promise(resolve => setTimeout(resolve, this.retryDelay));
             }
