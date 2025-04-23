@@ -892,6 +892,7 @@ class App {
         let message = '';
         let detailMessage = '';
         let isConflictError = false; // 新增標記來識別衝突錯誤
+        let showRetryButton = false; // 新增標記來控制重試按鈕顯示
         
         if (status === 'success') {
             toastClass = 'text-bg-success';
@@ -910,6 +911,7 @@ class App {
                     isConflictError = true;
                     message = '同步衝突';
                     detailMessage = '遠程倉庫已被修改，請先點擊「從 GitHub 同步」按鈕獲取最新版本，然後再嘗試上傳您的更改。';
+                    showRetryButton = false; // 衝突時不顯示重試按鈕
                 } else if (error.message.includes('網絡連接失敗')) {
                     detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
                 } else if (error.message.includes('授權失敗')) {
@@ -962,7 +964,7 @@ class App {
         }
         
         // 如果同步失敗且不是衝突錯誤，顯示重試按鈕 (注意：此處重試邏輯可能仍需調整)
-        if (status === 'error' && error && !isConflictError) {
+        if (status === 'error' && error && !isConflictError && showRetryButton !== false) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
             retryBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>重試同步';
