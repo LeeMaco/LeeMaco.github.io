@@ -1355,6 +1355,17 @@ class App {
                 else t.remove();
             });
         }
+        // 若為同步相關訊息，移除 GitHub 同步區塊內的所有通知
+        if (type === 'success' || type === 'danger' || type === 'info' || type === 'warning') {
+            if (this.syncStatus) {
+                const syncToasts = this.syncStatus.querySelectorAll('.toast');
+                syncToasts.forEach(t => {
+                    const bsToast = bootstrap.Toast.getInstance(t);
+                    if (bsToast) bsToast.hide();
+                    else t.remove();
+                });
+            }
+        }
         // 創建Toast元素
         const toastContainer = document.getElementById('toastContainer') || this.createToastContainer();
         const toastId = 'toast-' + Date.now();
