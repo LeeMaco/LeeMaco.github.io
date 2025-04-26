@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍管理系統</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <header>
+        <div class="container">
+            <h1><i class="fas fa-book"></i> 書籍管理系統</h1>
+            <div class="user-controls">
+                <button id="loginBtn" class="btn"><i class="fas fa-sign-in-alt"></i> 管理員登入</button>
+            </div>
+        </div>
+    </header>
+
+    <main class="container">
+        <section class="search-section">
+            <h2>搜索書籍</h2>
+            <div class="search-container">
+                <input type="text" id="searchInput" placeholder="輸入書名、作者或ISBN...">
+                <button id="searchBtn" class="btn"><i class="fas fa-search"></i> 搜索</button>
+            </div>
+            <div class="filter-container">
+                <select id="categoryFilter">
+                    <option value="">所有類別</option>
+                    <option value="fiction">小說</option>
+                    <option value="science">科學</option>
+                    <option value="history">歷史</option>
+                    <option value="biography">傳記</option>
+                    <option value="technology">科技</option>
+                </select>
+            </div>
+        </section>
+
+        <section class="results-section">
+            <h2>搜索結果</h2>
+            <div id="bookResults" class="book-grid">
+                <!-- 書籍結果將在這裡動態生成 -->
+            </div>
+        </section>
+
+        <!-- 管理員面板 (默認隱藏) -->
+        <section id="adminPanel" class="admin-panel hidden">
+            <h2>管理員面板</h2>
+            <div class="admin-controls">
+                <button id="addBookBtn" class="btn"><i class="fas fa-plus"></i> 新增書籍</button>
+                <button id="exportBtn" class="btn"><i class="fas fa-file-export"></i> 導出數據</button>
+                <button id="importBtn" class="btn"><i class="fas fa-file-import"></i> 導入數據</button>
+                <button id="backupBtn" class="btn"><i class="fas fa-save"></i> 備份數據</button>
+                <button id="logoutBtn" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> 登出</button>
+            </div>
+            <div id="adminBookList" class="book-list">
+                <!-- 管理員書籍列表將在這裡動態生成 -->
+            </div>
+        </section>
+    </main>
+
+    <!-- 模態框 -->
+    <div id="modal" class="modal">
+        <div class="modal-content">
+            <span class="close">&times;</span>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <!-- 書籍詳情模板 -->
+    <template id="bookDetailTemplate">
+        <div class="book-detail">
+            <h2 class="book-title"></h2>
+            <div class="book-info">
+                <p><strong>作者:</strong> <span class="book-author"></span></p>
+                <p><strong>ISBN:</strong> <span class="book-isbn"></span></p>
+                <p><strong>類別:</strong> <span class="book-category"></span></p>
+                <p><strong>出版年份:</strong> <span class="book-year"></span></p>
+                <p><strong>位置:</strong> <span class="book-location"></span></p>
+                <p><strong>狀態:</strong> <span class="book-status"></span></p>
+            </div>
+        </div>
+    </template>
+
+    <!-- 書籍表單模板 -->
+    <template id="bookFormTemplate">
+        <form id="bookForm" class="book-form">
+            <h2 id="formTitle">新增書籍</h2>
+            <input type="hidden" id="bookId">
+            <div class="form-group">
+                <label for="title">書名</label>
+                <input type="text" id="title" required>
+            </div>
+            <div class="form-group">
+                <label for="author">作者</label>
+                <input type="text" id="author" required>
+            </div>
+            <div class="form-group">
+                <label for="isbn">ISBN</label>
+                <input type="text" id="isbn" required>
+            </div>
+            <div class="form-group">
+                <label for="category">類別</label>
+                <select id="category" required>
+                    <option value="fiction">小說</option>
+                    <option value="science">科學</option>
+                    <option value="history">歷史</option>
+                    <option value="biography">傳記</option>
+                    <option value="technology">科技</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="year">出版年份</label>
+                <input type="number" id="year" required>
+            </div>
+            <div class="form-group">
+                <label for="location">位置</label>
+                <input type="text" id="location" required>
+            </div>
+            <div class="form-group">
+                <label for="status">狀態</label>
+                <select id="status" required>
+                    <option value="available">可借閱</option>
+                    <option value="borrowed">已借出</option>
+                    <option value="reserved">已預約</option>
+                </select>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">保存</button>
+                <button type="button" class="btn btn-cancel">取消</button>
+            </div>
+        </form>
+    </template>
+
+    <!-- 登入表單模板 -->
+    <template id="loginFormTemplate">
+        <form id="loginForm" class="login-form">
+            <h2>管理員登入</h2>
+            <div class="form-group">
+                <label for="username">用戶名</label>
+                <input type="text" id="username" required>
+            </div>
+            <div class="form-group">
+                <label for="password">密碼</label>
+                <input type="password" id="password" required>
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn">登入</button>
+                <button type="button" class="btn btn-cancel">取消</button>
+            </div>
+        </form>
+    </template>
+
+    <footer>
+        <div class="container">
+            <p>&copy; 2023 書籍管理系統 | <a href="https://github.com/yourusername/book-management-system" target="_blank">GitHub</a></p>
+        </div>
+    </footer>
+
+    <script src="js/data.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>
