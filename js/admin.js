@@ -165,7 +165,8 @@ class Admin {
             const apiUrl = `https://api.github.com/repos/${this.githubSettings.repo}/contents/${this.githubSettings.path}`;
             
             // 顯示上傳信息
-            const recordCount = Array.isArray(data.books) ? data.books.length : 0;
+            // 檢查數據結構，支持直接傳入書籍數組或包含books屬性的對象
+            const recordCount = Array.isArray(data) ? data.length : (Array.isArray(data.books) ? data.books.length : 0);
             const jsonData = JSON.stringify(data, null, 2);
             const dataSize = jsonData.length / 1024;
             
@@ -491,15 +492,9 @@ class Admin {
                 // 獲取所有書籍數據
                 const allBooks = db.getAllBooks();
                 
-                // 創建要上傳的數據對象
-                const syncData = {
-                    books: allBooks,
-                    lastSync: new Date().toISOString(),
-                    version: '1.0'
-                };
-                
+                // 直接上傳書籍數組，而不是包裝在books屬性中
                 // 上傳到GitHub
-                this.uploadToGitHub(syncData)
+                this.uploadToGitHub(allBooks)
                     .then(() => {
                         // 觸發同步成功事件
                         this.triggerSyncEvent('success');

@@ -136,28 +136,8 @@ class App {
                 // 顯示同步中的狀態提示
                 this.showMessage('正在從GitHub同步數據...', 'info');
                 
-                // 嘗試從GitHub獲取最新數據
-                db.getAllBooks(true) // 傳入true表示強制刷新
-                    .then(books => {
-                        // 確保books是數組
-                        if (!Array.isArray(books)) {
-                            console.error('從GitHub同步數據時收到無效數據:', books);
-                            this.showMessage('從GitHub同步數據時收到無效數據格式', 'danger');
-                            return;
-                        }
-                        
-                        // 顯示同步成功的狀態提示
-                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
-                        
-                        // 更新顯示
-                        this.displayBooks(books);
-                    })
-                    .catch(error => {
-                        console.error('從GitHub同步數據時發生錯誤:', error);
-                        
-                        // 顯示同步失敗的狀態提示
-                        this.showMessage(`從GitHub同步數據時發生錯誤: ${error.message}`, 'danger');
-                    });
+                // 重新載入書籍數據並強制從GitHub同步
+                this.loadBooks(true);
             });
         }
         
@@ -226,13 +206,14 @@ class App {
     
     /**
      * 載入書籍數據
+     * @param {boolean} syncFromGitHub 是否從GitHub同步數據
      */
-    loadBooks() {
+    loadBooks(syncFromGitHub = true) {
         // 顯示載入中的狀態提示
         this.showMessage('正在載入書籍數據...', 'info');
         
-        // 使用Promise方式獲取書籍數據
-        db.getAllBooks()
+        // 使用Promise方式獲取書籍數據，如果syncFromGitHub為true，則強制從GitHub同步
+        db.getAllBooks(syncFromGitHub)
             .then(books => {
                 // 確保books是數組
                 if (!Array.isArray(books)) {
@@ -242,7 +223,13 @@ class App {
                     return;
                 }
                 this.displayBooks(books);
-                this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+                
+                // 根據是否從GitHub同步顯示不同的成功訊息
+                if (syncFromGitHub) {
+                    this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                } else {
+                    this.showMessage(`成功載入 ${books.length} 筆書籍數據`, 'success');
+                }
             })
             .catch(error => {
                 console.error('載入書籍數據時發生錯誤:', error);
