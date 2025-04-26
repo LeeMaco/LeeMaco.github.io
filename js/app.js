@@ -337,18 +337,76 @@ document.addEventListener('DOMContentLoaded', function() {
      * 處理導出數據
      */
     function handleExport() {
-        BookData.exportData();
-        showNotification('數據已導出', 'success');
+        // 顯示導出選項
+        const exportOptions = document.createElement('div');
+        exportOptions.className = 'export-options';
+        exportOptions.innerHTML = `
+            <h2>導出數據</h2>
+            <div class="export-buttons">
+                <button id="exportJsonBtn" class="btn"><i class="fas fa-file-code"></i> 導出為JSON</button>
+                <button id="exportExcelBtn" class="btn"><i class="fas fa-file-excel"></i> 導出為Excel</button>
+            </div>
+        `;
+        
+        const exportJsonBtn = exportOptions.querySelector('#exportJsonBtn');
+        const exportExcelBtn = exportOptions.querySelector('#exportExcelBtn');
+        
+        exportJsonBtn.addEventListener('click', function() {
+            BookData.exportData();
+            closeModalWindow();
+            showNotification('數據已導出為JSON', 'success');
+        });
+        
+        exportExcelBtn.addEventListener('click', function() {
+            AdminModule.exportToExcel();
+            closeModalWindow();
+            showNotification('數據已導出為Excel', 'success');
+        });
+        
+        modalContent.innerHTML = '';
+        modalContent.appendChild(exportOptions);
+        openModal();
     }
     
     /**
      * 顯示導入表單
      */
     function showImportForm() {
+        // 顯示導入選項
+        const importOptions = document.createElement('div');
+        importOptions.className = 'import-options';
+        importOptions.innerHTML = `
+            <h2>導入數據</h2>
+            <div class="import-buttons">
+                <button id="importJsonBtn" class="btn"><i class="fas fa-file-code"></i> 導入JSON</button>
+                <button id="importExcelBtn" class="btn"><i class="fas fa-file-excel"></i> 導入Excel</button>
+            </div>
+        `;
+        
+        const importJsonBtn = importOptions.querySelector('#importJsonBtn');
+        const importExcelBtn = importOptions.querySelector('#importExcelBtn');
+        
+        importJsonBtn.addEventListener('click', function() {
+            showJsonImportForm();
+        });
+        
+        importExcelBtn.addEventListener('click', function() {
+            showExcelImportForm();
+        });
+        
+        modalContent.innerHTML = '';
+        modalContent.appendChild(importOptions);
+        openModal();
+    }
+    
+    /**
+     * 顯示JSON導入表單
+     */
+    function showJsonImportForm() {
         const importForm = document.createElement('div');
         importForm.className = 'import-form';
         importForm.innerHTML = `
-            <h2>導入數據</h2>
+            <h2>導入JSON數據</h2>
             <p>請選擇JSON格式的書籍數據文件：</p>
             <input type="file" id="importFile" accept=".json">
             <div class="form-actions">
@@ -387,19 +445,138 @@ document.addEventListener('DOMContentLoaded', function() {
         
         modalContent.innerHTML = '';
         modalContent.appendChild(importForm);
-        openModal();
+    }
+    
+    /**
+     * 顯示Excel導入表單
+     */
+    function showExcelImportForm() {
+        const template = document.getElementById('excelImportTemplate').content.cloneNode(true);
+        const importExcelBtn = template.querySelector('#importExcelBtn');
+        const cancelExcelImportBtn = template.querySelector('#cancelExcelImportBtn');
+        const excelFile = template.querySelector('#excelFile');
+        const autoUploadCheckbox = template.querySelector('#autoUploadToGithub');
+        
+        importExcelBtn.addEventListener('click', async function() {
+            const file = excelFile.files[0];
+            if (!file) {
+                showNotification('請選擇Excel文件', 'error');
+                return;
+            }
+            
+            try {
+                const autoUpload = autoUploadCheckbox.checked;
+                await AdminModule.importFromExcel(file, autoUpload, showNotification);
+                displayAdminBookList();
+                displayBooks(BookData.getBooks());
+                closeModalWindow();
+            } catch (error) {
+                console.error('Excel導入錯誤:', error);
+            }
+        });
+        
+        cancelExcelImportBtn.addEventListener('click', closeModalWindow);
+        
+        modalContent.innerHTML = '';
+        modalContent.appendChild(template);
     }
     
     /**
      * 處理備份數據
      */
     function handleBackup() {
-        const result = BookData.backupToGitHub();
-        if (result) {
-            showNotification('數據已備份到GitHub', 'success');
-        } else {
-            showNotification('備份失敗', 'error');
+        // 檢查GitHub設置
+        const settings = AdminModule.loadGithubSettings();
+        
+        if (!settings.token || !settings.repo) {
+            // 如果沒有設置，顯示設置表單
+            showGithubSettingsForm();
+            return;
         }
+        
+        // 確認備份
+        const confirmBackup = document.createElement('div');
+        confirmBackup.className = 'confirm-backup';
+        confirmBackup.innerHTML = `
+            <h2>備份到GitHub</h2>
+            <p>確定要將當前數據備份到GitHub嗎？</p>
+            <p><strong>倉庫:</strong> ${settings.repo}</p>
+            <p><strong>分支:</strong> ${settings.branch}</p>
+            <div class="form-actions">
+                <button id="confirmBackupBtn" class="btn">確認備份</button>
+                <button id="editSettingsBtn" class="btn">編輯設置</button>
+                <button id="cancelBackupBtn" class="btn btn-cancel">取消</button>
+            </div>
+        `;
+        
+        const confirmBackupBtn = confirmBackup.querySelector('#confirmBackupBtn');
+        const editSettingsBtn = confirmBackup.querySelector('#editSettingsBtn');
+        const cancelBackupBtn = confirmBackup.querySelector('#cancelBackupBtn');
+        
+        confirmBackupBtn.addEventListener('click', async function() {
+            const books = BookData.getBooks();
+            const result = await AdminModule.uploadToGitHub(books, showNotification);
+            if (result) {
+                closeModalWindow();
+            }
+        });
+        
+        editSettingsBtn.addEventListener('click', function() {
+            showGithubSettingsForm();
+        });
+        
+        cancelBackupBtn.addEventListener('click', closeModalWindow);
+        
+        modalContent.innerHTML = '';
+        modalContent.appendChild(confirmBackup);
+        openModal();
+    }
+    
+    /**
+     * 顯示GitHub設置表單
+     */
+    function showGithubSettingsForm() {
+        const template = document.getElementById('githubSettingsTemplate').content.cloneNode(true);
+        const saveBtn = template.querySelector('#saveGithubSettingsBtn');
+        const cancelBtn = template.querySelector('#cancelGithubSettingsBtn');
+        const tokenInput = template.querySelector('#githubToken');
+        const repoInput = template.querySelector('#githubRepo');
+        const branchInput = template.querySelector('#githubBranch');
+        
+        // 載入現有設置
+        const settings = AdminModule.loadGithubSettings();
+        tokenInput.value = settings.token || '';
+        repoInput.value = settings.repo || '';
+        branchInput.value = settings.branch || 'main';
+        
+        saveBtn.addEventListener('click', function() {
+            const newSettings = {
+                token: tokenInput.value.trim(),
+                repo: repoInput.value.trim(),
+                branch: branchInput.value.trim() || 'main',
+                path: 'books_data.json'
+            };
+            
+            if (!newSettings.token) {
+                showNotification('請輸入GitHub個人訪問令牌', 'error');
+                return;
+            }
+            
+            if (!newSettings.repo) {
+                showNotification('請輸入倉庫名稱', 'error');
+                return;
+            }
+            
+            AdminModule.saveGithubSettings(newSettings);
+            closeModalWindow();
+            showNotification('GitHub設置已保存', 'success');
+        });
+        
+        cancelBtn.addEventListener('click', closeModalWindow);
+        
+        modalContent.innerHTML = '';
+        modalContent.appendChild(template);
+        openModal();
     }
     
     /**

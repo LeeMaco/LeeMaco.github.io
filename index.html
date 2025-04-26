@@ -5,7 +5,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>書籍管理系統</title>
     <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="css/github-excel.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+    <!-- SheetJS (Excel處理庫) -->
+    <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
 </head>
 <body>
     <header>
@@ -66,6 +69,47 @@
             <div id="modalContent"></div>
         </div>
     </div>
+
+    <!-- GitHub設置模板 -->
+    <template id="githubSettingsTemplate">
+        <div class="github-settings-form">
+            <h2>GitHub備份設置</h2>
+            <div class="form-group">
+                <label for="githubToken">個人訪問令牌 (PAT)</label>
+                <input type="password" id="githubToken" placeholder="輸入您的GitHub個人訪問令牌">
+                <small>需要具有repo權限的令牌</small>
+            </div>
+            <div class="form-group">
+                <label for="githubRepo">倉庫名稱</label>
+                <input type="text" id="githubRepo" placeholder="格式: 用戶名/倉庫名">
+            </div>
+            <div class="form-group">
+                <label for="githubBranch">分支名稱</label>
+                <input type="text" id="githubBranch" value="main">
+            </div>
+            <div class="form-actions">
+                <button id="saveGithubSettingsBtn" class="btn">保存設置</button>
+                <button id="cancelGithubSettingsBtn" class="btn btn-cancel">取消</button>
+            </div>
+        </div>
+    </template>
+
+    <!-- Excel導入模板 -->
+    <template id="excelImportTemplate">
+        <div class="excel-import-form">
+            <h2>導入Excel數據</h2>
+            <p>請選擇Excel格式的書籍數據文件：</p>
+            <input type="file" id="excelFile" accept=".xlsx, .xls">
+            <div class="form-group checkbox-group">
+                <input type="checkbox" id="autoUploadToGithub">
+                <label for="autoUploadToGithub">導入後自動上傳到GitHub</label>
+            </div>
+            <div class="form-actions">
+                <button id="importExcelBtn" class="btn">導入</button>
+                <button id="cancelExcelImportBtn" class="btn btn-cancel">取消</button>
+            </div>
+        </div>
+    </template>
 
     <!-- 書籍詳情模板 -->
     <template id="bookDetailTemplate">
@@ -158,6 +202,7 @@
     </footer>
 
     <script src="js/data.js"></script>
+    <script src="js/admin.js"></script>
     <script src="js/app.js"></script>
 </body>
 </html>

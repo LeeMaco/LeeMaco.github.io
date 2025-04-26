@@ -168,12 +168,11 @@ const BookData = {
         }
     },
     
-    // 備份數據到GitHub (模擬功能)
+    // 備份數據到GitHub (使用AdminModule)
     backupToGitHub: function() {
-        // 實際應用中，這裡會有與GitHub API交互的代碼
-        // 由於這是靜態網頁，我們只模擬此功能
-        console.log('數據已備份到GitHub');
-        return true;
+        // 此功能已移至AdminModule
+        console.log('數據備份功能已移至AdminModule');
+        return false;
     }
 };
 
