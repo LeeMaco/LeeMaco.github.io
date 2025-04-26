@@ -472,47 +472,6 @@ class App {
                 });
                 
             return; // 提前返回，因為後續處理在Promise中進行
-            
-            
-            // 檢查數據庫是否為空
-            if (results.length === 0) {
-                this.showMessage('數據庫中沒有書籍資料', 'warning');
-                this.displayBooks([]);
-                return;
-            }
-            
-            // 按關鍵字搜尋（書名、作者、描述、備註等多個欄位）
-            results = results.filter(book => {
-                // 安全地檢查每個屬性是否存在且為字符串類型
-                const titleMatch = typeof book.title === 'string' && book.title.toLowerCase().includes(query);
-                const authorMatch = typeof book.author === 'string' && book.author.toLowerCase().includes(query);
-                const descriptionMatch = typeof book.description === 'string' && book.description.toLowerCase().includes(query);
-                const notesMatch = typeof book.notes === 'string' && book.notes.toLowerCase().includes(query);
-                const publisherMatch = typeof book.publisher === 'string' && book.publisher.toLowerCase().includes(query);
-                const isbnMatch = typeof book.isbn === 'string' && book.isbn.toLowerCase().includes(query);
-                const seriesMatch = typeof book.series === 'string' && book.series.toLowerCase().includes(query);
-                const categoryMatch = typeof book.category === 'string' && book.category.toLowerCase().includes(query);
-                const cabinetMatch = typeof book.cabinet === 'string' && book.cabinet.toLowerCase().includes(query);
-                const rowMatch = typeof book.row === 'string' && book.row.toLowerCase().includes(query);
-                
-                // 返回任一屬性匹配的結果
-                return titleMatch || authorMatch || descriptionMatch || notesMatch || 
-                       publisherMatch || isbnMatch || seriesMatch || categoryMatch || 
-                       cabinetMatch || rowMatch;
-            });
-            
-            // 顯示搜尋結果和狀態提示
-            this.displayBooks(results);
-            
-            // 顯示搜尋條件的狀態提示
-            const resultMessage = `搜尋關鍵字「${query}」，找到 ${results.length} 筆資料`;
-            this.showMessage(resultMessage, results.length > 0 ? 'info' : 'warning');
-            
-            // 如果沒有結果，在noResults區域顯示更友好的提示
-            if (results.length === 0 && this.noResults) {
-                this.noResults.classList.remove('d-none');
-                this.noResults.innerHTML = `<div class="alert alert-warning"><i class="fas fa-exclamation-triangle me-2"></i>沒有符合「${query}」的書籍資料，請嘗試其他關鍵字</div>`;
-            }
         } catch (error) {
             console.error('搜尋錯誤:', error);
             this.showMessage(`搜尋時發生錯誤: ${error.message}`, 'danger');
@@ -875,6 +834,9 @@ class App {
     /**
      * 監聽GitHub同步事件
      */
+    /**
+     * 監聽GitHub同步事件
+     */
     listenForGitHubSyncEvents() {
         document.addEventListener('githubSync', (event) => this.handleGitHubSyncEvent(event));
     }
@@ -910,8 +872,9 @@ class App {
                 if (error.message.includes('同步衝突') || error.message.includes('409')) {
                     isConflictError = true;
                     message = '同步衝突';
-                    detailMessage = '遠程倉庫已被修改，請先點擊「從 GitHub 同步」按鈕獲取最新版本，然後再嘗試上傳您的更改。';
-                    showRetryButton = false; // 衝突時不顯示重試按鈕
+                    detailMessage = '衝突：遠程倉庫已被修改，請先同步最新版本，然後再嘗試上傳您的更改。';
+                    showRetryButton = false; // 衝突時不顯示重試按鈕，因為重試不會解決衝突問題
+                    icon = '<i class="fas fa-exclamation-triangle me-2"></i>'; // 使用警告三角形圖標
                 } else if (error.message.includes('網絡連接失敗')) {
                     detailMessage = '無法連接到GitHub服務器，請檢查您的網絡連接';
                 } else if (error.message.includes('授權失敗')) {
@@ -930,7 +893,7 @@ class App {
         
         // 創建通知元素
         const toast = document.createElement('div');
-        toast.className = `toast align-items-center ${toastClass} border-0`;
+        toast.className = `toast align-items-center ${toastClass} ${isConflictError ? 'border border-warning' : 'border-0'}`;
         toast.setAttribute('role', 'alert');
         toast.setAttribute('aria-live', 'assertive');
         toast.setAttribute('aria-atomic', 'true');
@@ -950,7 +913,7 @@ class App {
         this.syncStatus.appendChild(toast);
         
         // 顯示通知
-        const bsToast = new bootstrap.Toast(toast, { delay: isConflictError ? 10000 : 6000 }); // 衝突錯誤顯示更長時間
+        const bsToast = new bootstrap.Toast(toast, { delay: isConflictError ? 15000 : 6000 }); // 衝突錯誤顯示更長時間
         bsToast.show();
         
         // 自動移除通知
@@ -958,12 +921,45 @@ class App {
             toast.remove();
         });
         
+        // 如果是衝突錯誤，添加「同步」按鈕
+        if (isConflictError) {
+            const syncBtn = document.createElement('button');
+            syncBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
+            syncBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>同步最新版本';
+            syncBtn.onclick = () => {
+                // 移除當前通知
+                bsToast.hide();
+                // 顯示新的進度通知
+                this.showMessage('正在從GitHub同步數據...', 'info');
+                // 從GitHub獲取最新數據
+                db.getAllBooks(true) // 傳入true表示強制刷新
+                    .then(books => {
+                        if (!Array.isArray(books)) {
+                            this.showMessage('從GitHub同步數據時收到無效數據格式', 'danger');
+                            return;
+                        }
+                        this.showMessage(`成功從GitHub同步 ${books.length} 筆書籍數據`, 'success');
+                        this.displayBooks(books);
+                    })
+                    .catch(error => {
+                        this.showMessage(`從GitHub同步數據時發生錯誤: ${error.message}`, 'danger');
+                    });
+            };
+            
+            // 將同步按鈕添加到通知中
+            const toastBody = toast.querySelector('.toast-body');
+            if (toastBody && !toastBody.querySelector('.btn-warning')) {
+                toastBody.appendChild(syncBtn);
+            }
+        }
+        
         // 如果同步成功，重新載入書籍列表
         if (status === 'success') {
             this.loadBooks();
         }
         
-        // 如果同步失敗且不是衝突錯誤，顯示重試按鈕 (注意：此處重試邏輯可能仍需調整)
+        // 只有在非衝突錯誤的情況下才顯示重試按鈕
+        // 確保同時僅顯示一則同步相關通知
         if (status === 'error' && error && !isConflictError && showRetryButton !== false) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';

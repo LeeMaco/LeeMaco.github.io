@@ -725,4 +725,21 @@ class GitHubSync {
                 };
             }
             
-            console.log('數據一致性檢查完成: 數
+            console.log('數據一致性檢查完成: 數據一致');
+            
+            return {
+                status: 'consistent',
+                message: '數據一致性檢查完成，所有數據一致',
+                consistent: true
+            };
+        } catch (error) {
+            console.error('檢查數據一致性時發生錯誤:', error);
+            return {
+                status: 'error',
+                message: `檢查數據一致性時發生錯誤: ${error.message}`,
+                error: error.message,
+                consistent: false
+            };
+        }
+    }
+}
