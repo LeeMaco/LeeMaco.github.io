@@ -853,8 +853,8 @@ class App {
         let icon = '';
         let message = '';
         let detailMessage = '';
-        let isConflictError = false; // 新增標記來識別衝突錯誤
-        let showRetryButton = false; // 新增標記來控制重試按鈕顯示
+        let isConflictError = false; // 標記來識別衝突錯誤
+        let showRetryButton = true; // 預設顯示重試按鈕，除非特別設置為false
         
         if (status === 'success') {
             toastClass = 'text-bg-success';
@@ -869,7 +869,7 @@ class App {
             // 提供更詳細的錯誤信息
             if (error) {
                 // 檢查是否為同步衝突錯誤
-                if (error.message.includes('同步衝突') || error.message.includes('409')) {
+                if (error.message.includes('同步衝突') || error.message.includes('409') || error.message.includes('衝突')) {
                     isConflictError = true;
                     message = '同步衝突';
                     detailMessage = '衝突：遠程倉庫已被修改，請先同步最新版本，然後再嘗試上傳您的更改。';
@@ -960,7 +960,7 @@ class App {
         
         // 只有在非衝突錯誤的情況下才顯示重試按鈕
         // 確保同時僅顯示一則同步相關通知
-        if (status === 'error' && error && !isConflictError && showRetryButton !== false) {
+        if (status === 'error' && error && !isConflictError && showRetryButton === true) {
             const retryBtn = document.createElement('button');
             retryBtn.className = 'btn btn-sm btn-warning mt-2 d-block mx-auto';
             retryBtn.innerHTML = '<i class="fas fa-sync-alt me-1"></i>重試同步';
