@@ -9,6 +9,9 @@ class Admin {
         
         // 初始化事件監聽器
         this.initEventListeners();
+        
+        // 初始化衝突錯誤標記
+        this.isConflictError = false;
     }
     
     /**
@@ -131,6 +134,9 @@ class Admin {
             
             // 顯示進度容器
             progressContainer.classList.remove('d-none');
+            
+            // 重置衝突錯誤標記
+            this.isConflictError = false;
             
             // 初始化進度顯示
             this.updateProgress(0, '準備上傳...', 'info', '正在檢查數據和設置...');
@@ -288,6 +294,8 @@ class Admin {
                         detailedMsg = '請求無效：可能是提交訊息或內容格式有問題';
                     } else if (response.status === 409) {
                         detailedMsg = '衝突：遠程倉庫已被修改，請先同步最新版本';
+                        // 標記為衝突錯誤，稍後會顯示同步按鈕而非重試按鈕
+                        this.isConflictError = true;
                     } else if (response.status === 429) {
                         detailedMsg = '請求過多：已超過GitHub API速率限制，請稍後再試';
                     } else {
@@ -365,23 +373,45 @@ class Admin {
                 // 觸發同步失敗事件
                 this.triggerSyncEvent('error', error);
                 
-                // 顯示重試按鈕
+                // 顯示按鈕（根據錯誤類型顯示不同按鈕）
                 const progressContainer = document.getElementById('githubProgressContainer');
                 const statusBody = progressContainer?.querySelector('.status-body');
                 
-                if (statusBody && !statusBody.querySelector('.retry-btn')) {
-                    const retryBtn = document.createElement('button');
-                    retryBtn.className = 'btn btn-warning btn-sm retry-btn mt-2';
-                    retryBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>重試上傳';
-                    retryBtn.onclick = () => {
-                        // 移除重試按鈕
-                        retryBtn.remove();
-                        // 重置進度條
-                        this.updateProgress(0, '準備重新上傳...', 'info', '正在重新初始化上傳程序...');
-                        // 重新嘗試上傳
-                        setTimeout(() => this.uploadToGitHub(data).then(resolve).catch(reject), 1000);
-                    };
-                    statusBody.appendChild(retryBtn);
+                if (statusBody && !statusBody.querySelector('.action-btn')) {
+                    const actionBtn = document.createElement('button');
+                    
+                    if (this.isConflictError) {
+                        // 如果是衝突錯誤，顯示同步最新版本按鈕
+                        actionBtn.className = 'btn btn-primary btn-sm action-btn mt-2';
+                        actionBtn.innerHTML = '<i class="fas fa-cloud-download-alt me-2"></i>同步最新版本';
+                        actionBtn.onclick = () => {
+                            // 移除按鈕
+                            actionBtn.remove();
+                            // 更新進度顯示
+                            this.updateProgress(0, '正在同步最新版本...', 'info', '正在從GitHub獲取最新數據...');
+                            
+                            // 這裡應該實現從GitHub獲取最新版本的邏輯
+                            // 由於這需要額外的實現，這裡只是顯示一個提示
+                            this.updateProgress(50, '準備同步...', 'info', '請使用「從GitHub同步」功能獲取最新版本');
+                            
+                            // 重置衝突標記
+                            this.isConflictError = false;
+                        };
+                    } else {
+                        // 其他錯誤，顯示重試上傳按鈕
+                        actionBtn.className = 'btn btn-warning btn-sm action-btn mt-2';
+                        actionBtn.innerHTML = '<i class="fas fa-sync-alt me-2"></i>重試上傳';
+                        actionBtn.onclick = () => {
+                            // 移除重試按鈕
+                            actionBtn.remove();
+                            // 重置進度條
+                            this.updateProgress(0, '準備重新上傳...', 'info', '正在重新初始化上傳程序...');
+                            // 重新嘗試上傳
+                            setTimeout(() => this.uploadToGitHub(data).then(resolve).catch(reject), 1000);
+                        };
+                    }
+                    
+                    statusBody.appendChild(actionBtn);
                 }
                 
                 reject(error);
