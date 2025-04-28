@@ -112,17 +112,22 @@ const AdminModule = {
                     // 將工作表轉換為JSON
                     let books = XLSX.utils.sheet_to_json(firstSheet);
                     
-                    // 處理數據格式
+                    // 處理數據格式，確保所有必要欄位都被包含
                     books = books.map(book => ({
                         id: book.id || Date.now().toString() + Math.floor(Math.random() * 1000),
                         title: book.title || '',
                         author: book.author || '',
+                        volume: book.volume || '',
                         isbn: book.isbn || '',
                         category: book.category || 'fiction',
                         year: parseInt(book.year) || new Date().getFullYear(),
+                        publisher: book.publisher || '',
+                        cabinet: book.cabinet || '',
+                        row: book.row || '',
                         location: book.location || '',
-                        status: book.status || 'available'
-                    }));
+                        status: book.status || 'available',
+                        description: book.description || '',
+                        notes: book.notes || ''}));
                     
                     // 獲取現有書籍數據
                     const existingBooks = BookData.getBooks();

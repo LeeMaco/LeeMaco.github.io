@@ -117,11 +117,17 @@
             <h2 class="book-title"></h2>
             <div class="book-info">
                 <p><strong>作者:</strong> <span class="book-author"></span></p>
+                <p><strong>集數:</strong> <span class="book-volume"></span></p>
                 <p><strong>ISBN:</strong> <span class="book-isbn"></span></p>
                 <p><strong>類別:</strong> <span class="book-category"></span></p>
                 <p><strong>出版年份:</strong> <span class="book-year"></span></p>
+                <p><strong>出版社:</strong> <span class="book-publisher"></span></p>
+                <p><strong>櫃號:</strong> <span class="book-cabinet"></span></p>
+                <p><strong>行號:</strong> <span class="book-row"></span></p>
                 <p><strong>位置:</strong> <span class="book-location"></span></p>
                 <p><strong>狀態:</strong> <span class="book-status"></span></p>
+                <p><strong>描述:</strong> <span class="book-description"></span></p>
+                <p><strong>備註:</strong> <span class="book-notes"></span></p>
             </div>
         </div>
     </template>
@@ -138,6 +144,10 @@
             <div class="form-group">
                 <label for="author">作者</label>
                 <input type="text" id="author" required>
+            </div>
+            <div class="form-group">
+                <label for="volume">集數</label>
+                <input type="text" id="volume">
             </div>
             <div class="form-group">
                 <label for="isbn">ISBN</label>
@@ -158,6 +168,18 @@
                 <input type="number" id="year" required>
             </div>
             <div class="form-group">
+                <label for="publisher">出版社</label>
+                <input type="text" id="publisher">
+            </div>
+            <div class="form-group">
+                <label for="cabinet">櫃號</label>
+                <input type="text" id="cabinet">
+            </div>
+            <div class="form-group">
+                <label for="row">行號</label>
+                <input type="text" id="row">
+            </div>
+            <div class="form-group">
                 <label for="location">位置</label>
                 <input type="text" id="location" required>
             </div>
@@ -168,6 +190,14 @@
                     <option value="borrowed">已借出</option>
                     <option value="reserved">已預約</option>
                 </select>
+            </div>
+            <div class="form-group">
+                <label for="description">描述</label>
+                <textarea id="description" rows="3"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="notes">備註</label>
+                <textarea id="notes" rows="2"></textarea>
             </div>
             <div class="form-actions">
                 <button type="submit" class="btn">保存</button>

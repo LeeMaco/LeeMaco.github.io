@@ -179,11 +179,17 @@ document.addEventListener('DOMContentLoaded', function() {
         
         template.querySelector('.book-title').textContent = book.title;
         template.querySelector('.book-author').textContent = book.author;
+        template.querySelector('.book-volume').textContent = book.volume || '無';
         template.querySelector('.book-isbn').textContent = book.isbn;
         template.querySelector('.book-category').textContent = getCategoryText(book.category);
         template.querySelector('.book-year').textContent = book.year;
+        template.querySelector('.book-publisher').textContent = book.publisher || '無';
+        template.querySelector('.book-cabinet').textContent = book.cabinet || '無';
+        template.querySelector('.book-row').textContent = book.row || '無';
         template.querySelector('.book-location').textContent = book.location;
         template.querySelector('.book-status').textContent = getStatusText(book.status);
+        template.querySelector('.book-description').textContent = book.description || '無';
+        template.querySelector('.book-notes').textContent = book.notes || '無';
         
         modalContent.innerHTML = '';
         modalContent.appendChild(template);
@@ -245,11 +251,17 @@ document.addEventListener('DOMContentLoaded', function() {
             const newBook = {
                 title: document.getElementById('title').value,
                 author: document.getElementById('author').value,
+                volume: document.getElementById('volume').value,
                 isbn: document.getElementById('isbn').value,
                 category: document.getElementById('category').value,
                 year: parseInt(document.getElementById('year').value),
+                publisher: document.getElementById('publisher').value,
+                cabinet: document.getElementById('cabinet').value,
+                row: document.getElementById('row').value,
                 location: document.getElementById('location').value,
-                status: document.getElementById('status').value
+                status: document.getElementById('status').value,
+                description: document.getElementById('description').value,
+                notes: document.getElementById('notes').value
             };
             
             BookData.addBook(newBook);
@@ -276,22 +288,34 @@ document.addEventListener('DOMContentLoaded', function() {
         const bookIdInput = template.querySelector('#bookId');
         const titleInput = template.querySelector('#title');
         const authorInput = template.querySelector('#author');
+        const volumeInput = template.querySelector('#volume');
         const isbnInput = template.querySelector('#isbn');
         const categoryInput = template.querySelector('#category');
         const yearInput = template.querySelector('#year');
+        const publisherInput = template.querySelector('#publisher');
+        const cabinetInput = template.querySelector('#cabinet');
+        const rowInput = template.querySelector('#row');
         const locationInput = template.querySelector('#location');
         const statusInput = template.querySelector('#status');
+        const descriptionInput = template.querySelector('#description');
+        const notesInput = template.querySelector('#notes');
         const cancelBtn = template.querySelector('.btn-cancel');
         
         formTitle.textContent = '編輯書籍';
         bookIdInput.value = book.id;
         titleInput.value = book.title;
         authorInput.value = book.author;
+        volumeInput.value = book.volume || '';
         isbnInput.value = book.isbn;
         categoryInput.value = book.category;
         yearInput.value = book.year;
+        publisherInput.value = book.publisher || '';
+        cabinetInput.value = book.cabinet || '';
+        rowInput.value = book.row || '';
         locationInput.value = book.location;
         statusInput.value = book.status;
+        descriptionInput.value = book.description || '';
+        notesInput.value = book.notes || '';
         
         form.addEventListener('submit', function(e) {
             e.preventDefault();
@@ -300,11 +324,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 id: bookIdInput.value,
                 title: titleInput.value,
                 author: authorInput.value,
+                volume: volumeInput.value,
                 isbn: isbnInput.value,
                 category: categoryInput.value,
                 year: parseInt(yearInput.value),
+                publisher: publisherInput.value,
+                cabinet: cabinetInput.value,
+                row: rowInput.value,
                 location: locationInput.value,
-                status: statusInput.value
+                status: statusInput.value,
+                description: descriptionInput.value,
+                notes: notesInput.value
             };
             
             BookData.updateBook(updatedBook);
