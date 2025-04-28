@@ -180,16 +180,16 @@ document.addEventListener('DOMContentLoaded', function() {
         template.querySelector('.book-title').textContent = book.title;
         template.querySelector('.book-author').textContent = book.author;
         template.querySelector('.book-volume').textContent = book.volume || '無';
-        template.querySelector('.book-isbn').textContent = book.isbn;
-        template.querySelector('.book-category').textContent = getCategoryText(book.category);
-        template.querySelector('.book-year').textContent = book.year;
-        template.querySelector('.book-publisher').textContent = book.publisher || '無';
         template.querySelector('.book-cabinet').textContent = book.cabinet || '無';
         template.querySelector('.book-row').textContent = book.row || '無';
-        template.querySelector('.book-location').textContent = book.location;
-        template.querySelector('.book-status').textContent = getStatusText(book.status);
+        template.querySelector('.book-category').textContent = getCategoryText(book.category);
+        template.querySelector('.book-publisher').textContent = book.publisher || '無';
         template.querySelector('.book-description').textContent = book.description || '無';
         template.querySelector('.book-notes').textContent = book.notes || '無';
+        template.querySelector('.book-isbn').textContent = book.isbn;
+        template.querySelector('.book-year').textContent = book.year;
+        template.querySelector('.book-location').textContent = book.location;
+        template.querySelector('.book-status').textContent = getStatusText(book.status);
         
         modalContent.innerHTML = '';
         modalContent.appendChild(template);
@@ -252,16 +252,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: document.getElementById('title').value,
                 author: document.getElementById('author').value,
                 volume: document.getElementById('volume').value,
-                isbn: document.getElementById('isbn').value,
-                category: document.getElementById('category').value,
-                year: parseInt(document.getElementById('year').value),
-                publisher: document.getElementById('publisher').value,
                 cabinet: document.getElementById('cabinet').value,
                 row: document.getElementById('row').value,
-                location: document.getElementById('location').value,
-                status: document.getElementById('status').value,
+                category: document.getElementById('category').value,
+                publisher: document.getElementById('publisher').value,
                 description: document.getElementById('description').value,
-                notes: document.getElementById('notes').value
+                notes: document.getElementById('notes').value,
+                isbn: document.getElementById('isbn').value,
+                year: parseInt(document.getElementById('year').value),
+                location: document.getElementById('location').value,
+                status: document.getElementById('status').value
             };
             
             BookData.addBook(newBook);
@@ -325,16 +325,16 @@ document.addEventListener('DOMContentLoaded', function() {
                 title: titleInput.value,
                 author: authorInput.value,
                 volume: volumeInput.value,
-                isbn: isbnInput.value,
-                category: categoryInput.value,
-                year: parseInt(yearInput.value),
-                publisher: publisherInput.value,
                 cabinet: cabinetInput.value,
                 row: rowInput.value,
-                location: locationInput.value,
-                status: statusInput.value,
+                category: categoryInput.value,
+                publisher: publisherInput.value,
                 description: descriptionInput.value,
-                notes: notesInput.value
+                notes: notesInput.value,
+                isbn: isbnInput.value,
+                year: parseInt(yearInput.value),
+                location: locationInput.value,
+                status: statusInput.value
             };
             
             BookData.updateBook(updatedBook);
