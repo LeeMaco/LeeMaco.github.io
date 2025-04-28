@@ -32,6 +32,13 @@ document.addEventListener('DOMContentLoaded', function() {
     // 初始化應用程序
     init();
     
+    // 添加垃圾桶按鈕
+    const trashBinBtn = document.createElement('button');
+    trashBinBtn.id = 'trashBinBtn';
+    trashBinBtn.className = 'btn';
+    trashBinBtn.innerHTML = '<i class="fas fa-trash"></i> 垃圾桶';
+    adminPanel.appendChild(trashBinBtn);
+    
     // 事件監聽器
     searchBtn.addEventListener('click', handleSearch);
     searchInput.addEventListener('keypress', function(e) {
@@ -44,6 +51,7 @@ document.addEventListener('DOMContentLoaded', function() {
     exportBtn.addEventListener('click', handleExport);
     importBtn.addEventListener('click', showImportForm);
     backupBtn.addEventListener('click', handleBackup);
+    trashBinBtn.addEventListener('click', showTrashBin);
     closeModal.addEventListener('click', closeModalWindow);
     window.addEventListener('click', function(e) {
         if (e.target === modal) closeModalWindow();
@@ -375,11 +383,13 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="export-buttons">
                 <button id="exportJsonBtn" class="btn"><i class="fas fa-file-code"></i> 導出為JSON</button>
                 <button id="exportExcelBtn" class="btn"><i class="fas fa-file-excel"></i> 導出為Excel</button>
+                <button id="exportTrashBtn" class="btn"><i class="fas fa-trash-restore"></i> 導出垃圾桶數據</button>
             </div>
         `;
         
         const exportJsonBtn = exportOptions.querySelector('#exportJsonBtn');
         const exportExcelBtn = exportOptions.querySelector('#exportExcelBtn');
+        const exportTrashBtn = exportOptions.querySelector('#exportTrashBtn');
         
         exportJsonBtn.addEventListener('click', function() {
             BookData.exportData();
@@ -391,6 +401,16 @@ document.addEventListener('DOMContentLoaded', function() {
             AdminModule.exportToExcel();
             closeModalWindow();
             showNotification('數據已導出為Excel', 'success');
+        });
+        
+        exportTrashBtn.addEventListener('click', function() {
+            const result = AdminModule.exportTrashBinToExcel();
+            closeModalWindow();
+            if (result) {
+                showNotification('垃圾桶數據已導出為Excel', 'success');
+            } else {
+                showNotification('垃圾桶中沒有數據', 'info');
+            }
         });
         
         modalContent.innerHTML = '';
@@ -487,6 +507,12 @@ document.addEventListener('DOMContentLoaded', function() {
         const excelFile = template.querySelector('#excelFile');
         const autoUploadCheckbox = template.querySelector('#autoUploadToGithub');
         
+        // 添加說明文字
+        const infoText = document.createElement('p');
+        infoText.className = 'import-info';
+        infoText.innerHTML = '注意：系統將自動識別Excel中的欄位，並將重複數據移至垃圾桶。';
+        template.querySelector('.form-group').appendChild(infoText);
+        
         importExcelBtn.addEventListener('click', async function() {
             const file = excelFile.files[0];
             if (!file) {
@@ -509,6 +535,98 @@ document.addEventListener('DOMContentLoaded', function() {
         
         modalContent.innerHTML = '';
         modalContent.appendChild(template);
+    }
+    
+    /**
+     * 顯示垃圾桶
+     */
+    function showTrashBin() {
+        const trashBooks = AdminModule.getTrashBin();
+        
+        const trashBinContainer = document.createElement('div');
+        trashBinContainer.className = 'trash-bin-container';
+        
+        if (trashBooks.length === 0) {
+            trashBinContainer.innerHTML = `
+                <h2>垃圾桶</h2>
+                <p>垃圾桶中沒有數據</p>
+                <div class="form-actions">
+                    <button id="closeTrashBtn" class="btn btn-cancel">關閉</button>
+                </div>
+            `;
+            
+            const closeTrashBtn = trashBinContainer.querySelector('#closeTrashBtn');
+            closeTrashBtn.addEventListener('click', closeModalWindow);
+        } else {
+            trashBinContainer.innerHTML = `
+                <h2>垃圾桶</h2>
+                <p>以下是在導入過程中被過濾的重複書籍：</p>
+                <div class="trash-book-list">
+                    <div class="book-list-item book-list-header">
+                        <div>選擇</div>
+                        <div>書名</div>
+                        <div>作者</div>
+                        <div>ISBN</div>
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button id="restoreSelectedBtn" class="btn">恢復選中項</button>
+                    <button id="clearTrashBtn" class="btn btn-danger">清空垃圾桶</button>
+                    <button id="closeTrashBtn" class="btn btn-cancel">關閉</button>
+                </div>
+            `;
+            
+            const trashBookList = trashBinContainer.querySelector('.trash-book-list');
+            
+            trashBooks.forEach(book => {
+                const listItem = document.createElement('div');
+                listItem.className = 'book-list-item';
+                listItem.dataset.id = book.id;
+                
+                listItem.innerHTML = `
+                    <div><input type="checkbox" class="book-checkbox" data-id="${book.id}"></div>
+                    <div>${book.title}</div>
+                    <div>${book.author}</div>
+                    <div>${book.isbn}</div>
+                `;
+                
+                trashBookList.appendChild(listItem);
+            });
+            
+            const restoreSelectedBtn = trashBinContainer.querySelector('#restoreSelectedBtn');
+            const clearTrashBtn = trashBinContainer.querySelector('#clearTrashBtn');
+            const closeTrashBtn = trashBinContainer.querySelector('#closeTrashBtn');
+            
+            restoreSelectedBtn.addEventListener('click', function() {
+                const selectedCheckboxes = trashBinContainer.querySelectorAll('.book-checkbox:checked');
+                if (selectedCheckboxes.length === 0) {
+                    showNotification('請選擇要恢復的書籍', 'info');
+                    return;
+                }
+                
+                const selectedIds = Array.from(selectedCheckboxes).map(checkbox => checkbox.dataset.id);
+                const restoredCount = AdminModule.restoreFromTrashBin(selectedIds);
+                
+                displayAdminBookList();
+                displayBooks(BookData.getBooks());
+                closeModalWindow();
+                showNotification(`已恢復 ${restoredCount} 本書籍`, 'success');
+            });
+            
+            clearTrashBtn.addEventListener('click', function() {
+                if (confirm('確定要清空垃圾桶嗎？此操作不可恢復。')) {
+                    AdminModule.clearTrashBin();
+                    closeModalWindow();
+                    showNotification('垃圾桶已清空', 'info');
+                }
+            });
+            
+            closeTrashBtn.addEventListener('click', closeModalWindow);
+        }
+        
+        modalContent.innerHTML = '';
+        modalContent.appendChild(trashBinContainer);
+        openModal();
     }
     
     /**

@@ -312,6 +312,43 @@ footer a:hover {
     text-decoration: underline;
 }
 
+/* 垃圾桶樣式 */
+.trash-bin-container {
+    padding: 20px;
+}
+
+.import-info {
+    margin-top: 10px;
+    color: #666;
+    font-style: italic;
+}
+
+.trash-book-list {
+    margin: 15px 0;
+    max-height: 400px;
+    overflow-y: auto;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.trash-book-list .book-list-item {
+    display: grid;
+    grid-template-columns: 60px 2fr 1fr 1fr;
+    padding: 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.trash-book-list .book-list-header {
+    font-weight: bold;
+    background-color: #f5f5f5;
+}
+
+.book-checkbox {
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+}
+
 /* 輔助類 */
 .hidden {
     display: none;
