@@ -108,14 +108,11 @@ document.addEventListener('DOMContentLoaded', function() {
             bookCard.className = 'book-card';
             bookCard.dataset.id = book.id;
             
-            const statusClass = `status-${book.status}`;
-            const statusText = getStatusText(book.status);
-            
             bookCard.innerHTML = `
                 <h3>${book.title}</h3>
                 <p><strong>作者:</strong> ${book.author}</p>
-                <p><strong>位置:</strong> ${book.location}</p>
-                <p><span class="status ${statusClass}">${statusText}</span></p>
+                <p><strong>類別:</strong> ${getCategoryText(book.category)}</p>
+                <p><strong>更新:</strong> ${formatDate(book.updatedAt)}</p>
             `;
             
             bookCard.addEventListener('click', function() {
@@ -123,6 +120,21 @@ document.addEventListener('DOMContentLoaded', function() {
             });
             
             bookResults.appendChild(bookCard);
+        });
+    }
+    
+    /**
+     * 格式化日期
+     */
+    function formatDate(dateString) {
+        if (!dateString) return '無';
+        const date = new Date(dateString);
+        return date.toLocaleString('zh-TW', { 
+            year: 'numeric', 
+            month: '2-digit', 
+            day: '2-digit',
+            hour: '2-digit',
+            minute: '2-digit'
         });
     }
     
@@ -135,7 +147,8 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="book-list-item book-list-header">
                 <div>書名</div>
                 <div>作者</div>
-                <div>位置</div>
+                <div>類別</div>
+                <div>更新時間</div>
                 <div>操作</div>
             </div>
         `;
@@ -148,7 +161,8 @@ document.addEventListener('DOMContentLoaded', function() {
             listItem.innerHTML = `
                 <div>${book.title}</div>
                 <div>${book.author}</div>
-                <div>${book.location}</div>
+                <div>${getCategoryText(book.category)}</div>
+                <div>${formatDate(book.updatedAt)}</div>
                 <div class="book-list-actions">
                     <button class="btn edit-btn"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-danger delete-btn"><i class="fas fa-trash"></i></button>
@@ -260,9 +274,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 description: document.getElementById('description').value,
                 notes: document.getElementById('notes').value,
                 isbn: document.getElementById('isbn').value,
-                year: parseInt(document.getElementById('year').value),
-                location: document.getElementById('location').value,
-                status: document.getElementById('status').value
+                createdAt: new Date().toISOString(),
+                updatedAt: new Date().toISOString()
             };
             
             BookData.addBook(newBook);
@@ -292,12 +305,9 @@ document.addEventListener('DOMContentLoaded', function() {
         const volumeInput = template.querySelector('#volume');
         const isbnInput = template.querySelector('#isbn');
         const categoryInput = template.querySelector('#category');
-        const yearInput = template.querySelector('#year');
         const publisherInput = template.querySelector('#publisher');
         const cabinetInput = template.querySelector('#cabinet');
         const rowInput = template.querySelector('#row');
-        const locationInput = template.querySelector('#location');
-        const statusInput = template.querySelector('#status');
         const descriptionInput = template.querySelector('#description');
         const notesInput = template.querySelector('#notes');
         const cancelBtn = template.querySelector('.btn-cancel');
@@ -309,12 +319,9 @@ document.addEventListener('DOMContentLoaded', function() {
         volumeInput.value = book.volume || '';
         isbnInput.value = book.isbn;
         categoryInput.value = book.category;
-        yearInput.value = book.year;
         publisherInput.value = book.publisher || '';
         cabinetInput.value = book.cabinet || '';
         rowInput.value = book.row || '';
-        locationInput.value = book.location;
-        statusInput.value = book.status;
         descriptionInput.value = book.description || '';
         notesInput.value = book.notes || '';
         
@@ -333,9 +340,8 @@ document.addEventListener('DOMContentLoaded', function() {
                 description: descriptionInput.value,
                 notes: notesInput.value,
                 isbn: isbnInput.value,
-                year: parseInt(yearInput.value),
-                location: locationInput.value,
-                status: statusInput.value
+                createdAt: book.createdAt, // 保留原創建時間
+                updatedAt: new Date().toISOString() // 更新時間為當前時間
             };
             
             BookData.updateBook(updatedBook);

@@ -352,15 +352,18 @@ footer a:hover {
 @media (max-width: 768px) {
     .book-grid {
         grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: 15px;
     }
     
     .admin-controls {
         flex-direction: column;
+        gap: 10px;
     }
     
     .book-list-item {
-        grid-template-columns: 1fr;
-        gap: 5px;
+        grid-template-columns: 1fr 1fr;
+        gap: 8px;
+        padding: 12px 8px;
     }
     
     .book-list-header {
@@ -370,5 +373,60 @@ footer a:hover {
     .modal-content {
         width: 95%;
         margin: 5% auto;
+        padding: 15px;
+    }
+    
+    header .container {
+        flex-direction: column;
+        text-align: center;
+        gap: 10px;
+    }
+    
+    .search-container {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .search-container input,
+    .search-container button {
+        width: 100%;
+        border-radius: 4px;
+    }
+    
+    .filter-container select {
+        width: 100%;
+        max-width: 100%;
+    }
+    
+    .form-group {
+        margin-bottom: 15px;
+    }
+    
+    .form-actions {
+        flex-direction: column;
+        gap: 10px;
+    }
+    
+    .form-actions button {
+        width: 100%;
+    }
+}
+
+/* 小型移動設備 */
+@media (max-width: 480px) {
+    .book-grid {
+        grid-template-columns: 1fr;
+    }
+    
+    .book-card {
+        padding: 12px;
+    }
+    
+    .book-detail h2 {
+        font-size: 1.4rem;
+    }
+    
+    .book-info p {
+        font-size: 0.9rem;
     }
 }

@@ -126,9 +126,8 @@
                 <p><strong>描述:</strong> <span class="book-description"></span></p>
                 <p><strong>備註:</strong> <span class="book-notes"></span></p>
                 <p><strong>ISBN:</strong> <span class="book-isbn"></span></p>
-                <p><strong>出版年份:</strong> <span class="book-year"></span></p>
-                <p><strong>位置:</strong> <span class="book-location"></span></p>
-                <p><strong>狀態:</strong> <span class="book-status"></span></p>
+                <p><strong>創建時間:</strong> <span class="book-created-at"></span></p>
+                <p><strong>更新時間:</strong> <span class="book-updated-at"></span></p>
             </div>
         </div>
     </template>
@@ -184,21 +183,7 @@
                 <label for="isbn">ISBN</label>
                 <input type="text" id="isbn" required>
             </div>
-            <div class="form-group">
-                <label for="year">出版年份</label>
-                <input type="number" id="year" required>
-            </div>
-            <div class="form-group">
-                <label for="location">位置</label>
-                <input type="text" id="location" required>
-            </div>
-            <div class="form-group">
-                <label for="status">狀態</label>
-                <select id="status" required>
-                    <option value="available">可借閱</option>
-                    <option value="borrowed">已借出</option>
-                    <option value="reserved">已預約</option>
-                </select>
+            <!-- 創建時間和更新時間將在後端自動生成 -->
             </div>
             </div>
             <div class="form-actions">

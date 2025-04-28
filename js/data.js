@@ -18,15 +18,14 @@ const BookData = {
             author: 'J.K. 羅琳',
             isbn: '9789573317272',
             category: 'fiction',
-            year: 1997,
             volume: '1',
             cabinet: 'A',
             row: '01',
             publisher: '皇冠出版',
             description: '哈利波特系列第一部，講述了哈利發現自己是巫師並進入霍格華茲魔法學校的故事。',
             notes: '',
-            location: 'A區-01-01',
-            status: 'available'
+            createdAt: new Date('2023-01-01').toISOString(),
+            updatedAt: new Date('2023-01-01').toISOString()
         },
         {
             id: '2',
@@ -34,15 +33,14 @@ const BookData = {
             author: '史蒂芬·霍金',
             isbn: '9789571199924',
             category: 'science',
-            year: 1988,
             volume: '',
             cabinet: 'B',
             row: '02',
             publisher: '遠流出版',
             description: '霍金的科普著作，介紹宇宙學的基本概念和理論。',
             notes: '暢銷科普讀物',
-            location: 'B區-02-03',
-            status: 'borrowed'
+            createdAt: new Date('2023-01-02').toISOString(),
+            updatedAt: new Date('2023-01-02').toISOString()
         },
         {
             id: '3',
@@ -50,15 +48,14 @@ const BookData = {
             author: '劉慈欣',
             isbn: '9789865061197',
             category: 'fiction',
-            year: 2008,
             volume: '1',
             cabinet: 'A',
             row: '03',
             publisher: '貓頭鷹出版',
             description: '中國科幻小說，講述人類與三體文明接觸的故事。',
             notes: '科幻三部曲第一部',
-            location: 'A區-03-02',
-            status: 'available'
+            createdAt: new Date('2023-01-03').toISOString(),
+            updatedAt: new Date('2023-01-03').toISOString()
         },
         {
             id: '4',
@@ -66,15 +63,14 @@ const BookData = {
             author: '尤瓦爾·赫拉利',
             isbn: '9789869019415',
             category: 'history',
-            year: 2014,
             volume: '',
             cabinet: 'C',
             row: '01',
             publisher: '天下文化',
             description: '從人類演化的角度回顧全球歷史。',
             notes: '',
-            location: 'C區-01-04',
-            status: 'reserved'
+            createdAt: new Date('2023-01-04').toISOString(),
+            updatedAt: new Date('2023-01-04').toISOString()
         },
         {
             id: '5',
@@ -82,15 +78,14 @@ const BookData = {
             author: '查理·芒格',
             isbn: '9789578799943',
             category: 'biography',
-            year: 2005,
             volume: '',
             cabinet: 'D',
             row: '02',
             publisher: '商業周刊',
             description: '查理·芒格的投資智慧和思想。',
             notes: '投資經典',
-            location: 'D區-02-01',
-            status: 'available'
+            createdAt: new Date('2023-01-05').toISOString(),
+            updatedAt: new Date('2023-01-05').toISOString()
         }
     ],
     
