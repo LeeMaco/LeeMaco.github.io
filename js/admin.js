@@ -12,9 +12,6 @@ const AdminModule = {
         path: 'books_data.json'
     },
     
-    // 垃圾桶 - 存儲被過濾的重複數據
-    trashBin: [],
-    
     // 從localStorage獲取GitHub設置
     loadGithubSettings: function() {
         const settings = localStorage.getItem('githubSettings');
@@ -99,43 +96,68 @@ const AdminModule = {
         }
     },
     
-    // 獲取垃圾桶數據
-    getTrashBin: function() {
-        const storedTrash = localStorage.getItem('trashBin');
-        this.trashBin = storedTrash ? JSON.parse(storedTrash) : [];
-        return this.trashBin;
-    },
-    
-    // 保存數據到垃圾桶
+    // 保存書籍到垃圾桶
     saveToTrashBin: function(books) {
-        this.trashBin = this.getTrashBin();
-        this.trashBin = [...this.trashBin, ...books];
-        localStorage.setItem('trashBin', JSON.stringify(this.trashBin));
-    },
-    
-    // 清空垃圾桶
-    clearTrashBin: function() {
-        this.trashBin = [];
-        localStorage.removeItem('trashBin');
-        return true;
+        // 從localStorage獲取垃圾桶數據，如果沒有則創建新數組
+        const trashBin = localStorage.getItem('booksTrashBin') ? 
+            JSON.parse(localStorage.getItem('booksTrashBin')) : [];
+        
+        // 為每本書添加刪除時間戳
+        const booksWithTimestamp = books.map(book => ({
+            ...book,
+            deletedAt: new Date().toISOString()
+        }));
+        
+        // 將新的重複書籍添加到垃圾桶
+        const updatedTrashBin = [...trashBin, ...booksWithTimestamp];
+        
+        // 保存更新後的垃圾桶
+        localStorage.setItem('booksTrashBin', JSON.stringify(updatedTrashBin));
+        
+        return updatedTrashBin.length;
     },
     
     // 從垃圾桶恢復書籍
-    restoreFromTrashBin: function(bookIds) {
-        const trashBooks = this.getTrashBin();
-        const booksToRestore = trashBooks.filter(book => bookIds.includes(book.id));
-        const remainingTrash = trashBooks.filter(book => !bookIds.includes(book.id));
+    restoreFromTrashBin: function(bookId, showNotification) {
+        // 獲取垃圾桶數據
+        const trashBin = localStorage.getItem('booksTrashBin') ? 
+            JSON.parse(localStorage.getItem('booksTrashBin')) : [];
         
-        // 更新垃圾桶
-        this.trashBin = remainingTrash;
-        localStorage.setItem('trashBin', JSON.stringify(this.trashBin));
+        // 查找要恢復的書籍
+        const bookToRestore = trashBin.find(book => book.id === bookId);
         
-        // 將書籍添加到主數據庫
-        const existingBooks = BookData.getBooks();
-        const mergedBooks = [...existingBooks, ...booksToRestore];
-        BookData.saveBooks(mergedBooks);
+        if (!bookToRestore) {
+            showNotification('找不到要恢復的書籍', 'error');
+            return false;
+        }
         
-        return booksToRestore.length;
+        // 從垃圾桶中移除該書籍
+        const updatedTrashBin = trashBin.filter(book => book.id !== bookId);
+        localStorage.setItem('booksTrashBin', JSON.stringify(updatedTrashBin));
+        
+        // 刪除時間戳屬性
+        delete bookToRestore.deletedAt;
+        
+        // 獲取當前書籍數據並添加恢復的書籍
+        const currentBooks = BookData.getBooks();
+        currentBooks.push(bookToRestore);
+        BookData.saveBooks(currentBooks);
+        
+        showNotification(`已成功恢復書籍: ${bookToRestore.title}`, 'success');
+        return true;
+    },
+    
+    // 獲取垃圾桶中的書籍
+    getTrashBinBooks: function() {
+        return localStorage.getItem('booksTrashBin') ? 
+            JSON.parse(localStorage.getItem('booksTrashBin')) : [];
+    },
+    
+    // 清空垃圾桶
+    emptyTrashBin: function(showNotification) {
+        localStorage.removeItem('booksTrashBin');
+        showNotification('垃圾桶已清空', 'success');
+        return true;
     },
     
     // 從Excel導入數據
@@ -302,47 +324,6 @@ const AdminModule = {
     
     // 導出數據為Excel
     exportToExcel: function() {
-        const books = BookData.getBooks();
-        
-        // 創建工作簿
-        const wb = XLSX.utils.book_new();
-        
-        // 創建工作表
-        const ws = XLSX.utils.json_to_sheet(books);
-        
-        // 將工作表添加到工作簿
-        XLSX.utils.book_append_sheet(wb, ws, '書籍數據');
-        
-        // 生成Excel文件並下載
-        const fileName = 'books_export_' + new Date().toISOString().slice(0, 10) + '.xlsx';
-        XLSX.writeFile(wb, fileName);
-        
-        return true;
-    },
-    
-    // 導出垃圾桶數據為Excel
-    exportTrashBinToExcel: function() {
-        const trashBooks = this.getTrashBin();
-        
-        if (trashBooks.length === 0) {
-            return false;
-        }
-        
-        // 創建工作簿
-        const wb = XLSX.utils.book_new();
-        
-        // 創建工作表
-        const ws = XLSX.utils.json_to_sheet(trashBooks);
-        
-        // 將工作表添加到工作簿
-        XLSX.utils.book_append_sheet(wb, ws, '垃圾桶數據');
-        
-        // 生成Excel文件並下載
-        const fileName = 'trash_bin_export_' + new Date().toISOString().slice(0, 10) + '.xlsx';
-        XLSX.writeFile(wb, fileName);
-        
-        return true;
-    }
         const books = BookData.getBooks();
         
         // 創建工作簿
