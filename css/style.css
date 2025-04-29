@@ -197,7 +197,7 @@ section h2 {
 
 .book-list-item {
     display: grid;
-    grid-template-columns: 1fr 1fr 1fr 100px;
+    grid-template-columns: 1fr 1fr 0.7fr 0.7fr 0.7fr 100px;
     padding: 10px;
     border-bottom: 1px solid #ddd;
     align-items: center;
@@ -232,11 +232,13 @@ section h2 {
 
 .modal-content {
     background-color: white;
-    margin: 10% auto;
+    margin: 2% auto;
     padding: 20px;
     border-radius: 5px;
-    width: 80%;
+    width: 90%;
     max-width: 600px;
+    max-height: 90vh;
+    overflow-y: auto;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     position: relative;
 }
@@ -267,6 +269,7 @@ section h2 {
 /* 表單樣式 */
 .book-form, .login-form {
     width: 100%;
+    padding-right: 10px;
 }
 
 .form-group {
@@ -279,7 +282,7 @@ section h2 {
     font-weight: bold;
 }
 
-.form-group input, .form-group select {
+.form-group input, .form-group select, .form-group textarea {
     width: 100%;
     padding: 10px;
     border: 1px solid #ddd;
@@ -361,9 +364,20 @@ footer a:hover {
     }
     
     .book-list-item {
-        grid-template-columns: 1fr 1fr;
+        grid-template-columns: 1fr;
         gap: 8px;
         padding: 12px 8px;
+    }
+    
+    .book-list-item > div {
+        padding: 4px 0;
+        display: flex;
+        justify-content: space-between;
+    }
+    
+    .book-list-item > div::before {
+        content: attr(data-label);
+        font-weight: bold;
     }
     
     .book-list-header {
@@ -372,8 +386,25 @@ footer a:hover {
     
     .modal-content {
         width: 95%;
-        margin: 5% auto;
+        margin: 2% auto;
         padding: 15px;
+        max-height: 95vh;
+    }
+    
+    .book-form, .login-form {
+        padding-right: 5px;
+    }
+    
+    .form-group {
+        margin-bottom: 0.8rem;
+    }
+    
+    .form-group label {
+        margin-bottom: 0.3rem;
+    }
+    
+    .form-group input, .form-group select, .form-group textarea {
+        padding: 8px;
     }
     
     header .container {

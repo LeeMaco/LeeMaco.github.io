@@ -54,8 +54,8 @@ document.addEventListener('DOMContentLoaded', function() {
      * 初始化應用程序
      */
     function init() {
-        // 顯示所有書籍
-        displayBooks(BookData.getBooks());
+        // 初始顯示提示信息，而不是所有書籍
+        bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
         // 檢查是否已登入
         checkLoginStatus();
     }
@@ -111,8 +111,9 @@ document.addEventListener('DOMContentLoaded', function() {
             bookCard.innerHTML = `
                 <h3>${book.title}</h3>
                 <p><strong>作者:</strong> ${book.author}</p>
-                <p><strong>類別:</strong> ${getCategoryText(book.category)}</p>
-                <p><strong>更新:</strong> ${formatDate(book.updatedAt)}</p>
+                <p><strong>集數:</strong> ${book.volume || '無'}</p>
+                <p><strong>櫃號:</strong> ${book.cabinet || '無'}</p>
+                <p><strong>行號:</strong> ${book.row || '無'}</p>
             `;
             
             bookCard.addEventListener('click', function() {
@@ -147,8 +148,9 @@ document.addEventListener('DOMContentLoaded', function() {
             <div class="book-list-item book-list-header">
                 <div>書名</div>
                 <div>作者</div>
-                <div>類別</div>
-                <div>更新時間</div>
+                <div>集數</div>
+                <div>櫃號</div>
+                <div>行號</div>
                 <div>操作</div>
             </div>
         `;
@@ -159,10 +161,11 @@ document.addEventListener('DOMContentLoaded', function() {
             listItem.dataset.id = book.id;
             
             listItem.innerHTML = `
-                <div>${book.title}</div>
-                <div>${book.author}</div>
-                <div>${getCategoryText(book.category)}</div>
-                <div>${formatDate(book.updatedAt)}</div>
+                <div data-label="書名">${book.title}</div>
+                <div data-label="作者">${book.author}</div>
+                <div data-label="集數">${book.volume || '無'}</div>
+                <div data-label="櫃號">${book.cabinet || '無'}</div>
+                <div data-label="行號">${book.row || '無'}</div>
                 <div class="book-list-actions">
                     <button class="btn edit-btn"><i class="fas fa-edit"></i></button>
                     <button class="btn btn-danger delete-btn"><i class="fas fa-trash"></i></button>

@@ -144,7 +144,8 @@ const BookData = {
     // 搜索書籍
     searchBooks: function(query, category = '') {
         const books = this.getBooks();
-        if (!query && !category) return books;
+        // 如果沒有查詢條件和分類，返回空數組而不是所有書籍
+        if (!query && !category) return [];
         
         return books.filter(book => {
             const matchesQuery = !query || 
