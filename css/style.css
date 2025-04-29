@@ -132,6 +132,19 @@ section h2 {
     gap: 20px;
 }
 
+/* 同步指示器樣式 */
+.sync-indicator {
+    text-align: center;
+    padding: 2rem;
+    font-size: 1.2rem;
+    color: #3498db;
+}
+
+.sync-indicator i {
+    margin-right: 10px;
+    font-size: 1.5rem;
+}
+
 .book-card {
     background-color: white;
     border-radius: 5px;
