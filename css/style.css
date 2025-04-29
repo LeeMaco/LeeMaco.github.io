@@ -232,13 +232,11 @@ section h2 {
 
 .modal-content {
     background-color: white;
-    margin: 2% auto;
+    margin: 10% auto;
     padding: 20px;
     border-radius: 5px;
-    width: 90%;
+    width: 80%;
     max-width: 600px;
-    max-height: 90vh;
-    overflow-y: auto;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     position: relative;
 }
@@ -269,7 +267,6 @@ section h2 {
 /* 表單樣式 */
 .book-form, .login-form {
     width: 100%;
-    padding-right: 10px;
 }
 
 .form-group {
@@ -282,7 +279,7 @@ section h2 {
     font-weight: bold;
 }
 
-.form-group input, .form-group select, .form-group textarea {
+.form-group input, .form-group select {
     width: 100%;
     padding: 10px;
     border: 1px solid #ddd;
@@ -386,25 +383,8 @@ footer a:hover {
     
     .modal-content {
         width: 95%;
-        margin: 2% auto;
+        margin: 5% auto;
         padding: 15px;
-        max-height: 95vh;
-    }
-    
-    .book-form, .login-form {
-        padding-right: 5px;
-    }
-    
-    .form-group {
-        margin-bottom: 0.8rem;
-    }
-    
-    .form-group label {
-        margin-bottom: 0.3rem;
-    }
-    
-    .form-group input, .form-group select, .form-group textarea {
-        padding: 8px;
     }
     
     header .container {
