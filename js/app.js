@@ -54,22 +54,10 @@ document.addEventListener('DOMContentLoaded', function() {
      * 初始化應用程序
      */
     function init() {
-        // 顯示同步指示器
-        bookResults.innerHTML = '<div class="sync-indicator"><i class="fas fa-sync fa-spin"></i> 正在同步數據...</div>';
-        
-        // 確保 BookData 已初始化
-        BookData.init();
-        
-        // 延遲一點時間以顯示同步效果
-        setTimeout(() => {
-            // 獲取最新書籍數據
-            const allBooks = BookData.getBooks();
-            displayBooks(allBooks);
-            // 顯示同步完成通知
-            showNotification('數據同步完成', 'success');
-            // 檢查是否已登入
-            checkLoginStatus();
-        }, 800);
+        // 初始顯示提示信息，而不是所有書籍
+        bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
+        // 檢查是否已登入
+        checkLoginStatus();
     }
     
     /**
