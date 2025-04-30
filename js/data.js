@@ -198,6 +198,23 @@ const BookData = {
     backupToGitHub: function() {
         // 此功能已移至AdminModule
         console.log('數據備份功能已移至AdminModule');
+    },
+    
+    // 備份書籍數據到指定的JSON文件
+    backupToFile: function() {
+        const books = this.getBooks();
+        const dataStr = JSON.stringify(books, null, 2);
+        const dataUri = 'data:application/json;charset=utf-8,' + encodeURIComponent(dataStr);
+        
+        // 設置固定的備份文件名
+        const backupFileName = 'books_data.json';
+        
+        const linkElement = document.createElement('a');
+        linkElement.setAttribute('href', dataUri);
+        linkElement.setAttribute('download', backupFileName);
+        linkElement.click();
+        
+        return true;
         return false;
     }
 };

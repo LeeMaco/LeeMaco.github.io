@@ -232,11 +232,13 @@ section h2 {
 
 .modal-content {
     background-color: white;
-    margin: 10% auto;
+    margin: 5% auto;
     padding: 20px;
     border-radius: 5px;
     width: 80%;
     max-width: 600px;
+    max-height: 80vh;
+    overflow-y: auto;
     box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
     position: relative;
 }
@@ -385,6 +387,8 @@ footer a:hover {
         width: 95%;
         margin: 5% auto;
         padding: 15px;
+        max-height: 85vh;
+        overflow-y: auto;
     }
     
     header .container {
