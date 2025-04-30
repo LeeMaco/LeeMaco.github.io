@@ -21,6 +21,55 @@ const AdminModule = {
         return this.githubSettings;
     },
     
+    // 從GitHub獲取最新數據（無需認證，適用於公開倉庫）
+    fetchLatestDataFromGitHub: async function(showNotification) {
+        try {
+            const settings = this.loadGithubSettings();
+            
+            if (!settings.repo) {
+                console.log('未配置GitHub倉庫，使用本地數據');
+                return null;
+            }
+            
+            // 使用GitHub API獲取文件內容（無需認證）
+            const response = await fetch(`https://api.github.com/repos/${settings.repo}/contents/${settings.path}?ref=${settings.branch}`);
+            
+            if (!response.ok) {
+                if (showNotification) {
+                    showNotification(`無法從GitHub獲取數據: ${response.status} ${response.statusText}`, 'warning');
+                }
+                console.warn(`無法從GitHub獲取數據: ${response.status} ${response.statusText}`);
+                return null;
+            }
+            
+            const fileInfo = await response.json();
+            
+            // 解碼Base64內容
+            const content = decodeURIComponent(escape(atob(fileInfo.content)));
+            
+            try {
+                // 解析JSON數據
+                const books = JSON.parse(content);
+                if (showNotification) {
+                    showNotification('已從GitHub獲取最新數據', 'success');
+                }
+                return books;
+            } catch (parseError) {
+                console.error('解析GitHub數據時出錯:', parseError);
+                if (showNotification) {
+                    showNotification('解析GitHub數據時出錯', 'error');
+                }
+                return null;
+            }
+        } catch (error) {
+            console.error('從GitHub獲取數據時出錯:', error);
+            if (showNotification) {
+                showNotification(`從GitHub獲取數據時出錯: ${error.message}`, 'error');
+            }
+            return null;
+        }
+    },
+    
     // 保存GitHub設置到localStorage
     saveGithubSettings: function(settings) {
         this.githubSettings = settings;

@@ -53,11 +53,49 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 初始化應用程序
      */
-    function init() {
+    async function init() {
         // 初始顯示提示信息，而不是所有書籍
         bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
+        
         // 檢查是否已登入
         checkLoginStatus();
+        
+        // 自動從GitHub獲取最新數據（僅對一般用戶）
+        if (!isAdminLoggedIn) {
+            try {
+                // 顯示加載提示
+                const loadingNotification = showNotification('正在從GitHub獲取最新數據...', 'info', 0);
+                
+                // 獲取GitHub數據
+                const githubData = await AdminModule.fetchLatestDataFromGitHub(showNotification);
+                
+                // 如果成功獲取數據
+                if (githubData && Array.isArray(githubData)) {
+                    // 獲取本地數據
+                    const localData = BookData.getBooks();
+                    
+                    // 檢查數據是否有變化
+                    const localDataStr = JSON.stringify(localData);
+                    const githubDataStr = JSON.stringify(githubData);
+                    
+                    if (localDataStr !== githubDataStr) {
+                        // 更新本地數據
+                        BookData.saveBooks(githubData);
+                        showNotification('已更新至最新書籍數據', 'success');
+                    } else {
+                        console.log('本地數據已是最新');
+                    }
+                }
+                
+                // 移除加載提示
+                if (loadingNotification) {
+                    loadingNotification.remove();
+                }
+            } catch (error) {
+                console.error('自動更新數據時出錯:', error);
+                showNotification('自動更新數據時出錯，使用本地數據', 'error');
+            }
+        }
     }
     
     /**
@@ -766,8 +804,12 @@ document.addEventListener('DOMContentLoaded', function() {
     
     /**
      * 顯示通知
+     * @param {string} message - 通知消息
+     * @param {string} type - 通知類型 (info, success, warning, error)
+     * @param {number} duration - 通知顯示時間 (毫秒)，設為0則不自動消失
+     * @returns {HTMLElement|null} - 如果duration為0，返回通知元素以便手動移除
      */
-    function showNotification(message, type = 'info') {
+    function showNotification(message, type = 'info', duration = 3000) {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
@@ -778,12 +820,19 @@ document.addEventListener('DOMContentLoaded', function() {
             notification.classList.add('show');
         }, 10);
         
+        // 如果duration為0，則不自動移除通知，而是返回通知元素以便手動移除
+        if (duration === 0) {
+            return notification;
+        }
+        
         setTimeout(function() {
             notification.classList.remove('show');
             setTimeout(function() {
                 notification.remove();
             }, 300);
-        }, 3000);
+        }, duration);
+        
+        return null;
     }
     
     /**
