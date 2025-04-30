@@ -1,0 +1,32 @@
+/* GitHub設置和Excel導入表單樣式 */
+.github-settings-form,
+.excel-import-form,
+.export-options,
+.import-options,
+.confirm-backup {
+    padding: 20px;
+}
+
+.export-buttons,
+.import-buttons {
+    display: flex;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.checkbox-group {
+    display: flex;
+    align-items: center;
+    margin: 15px 0;
+}
+
+.checkbox-group input[type="checkbox"] {
+    margin-right: 10px;
+}
+
+small {
+    display: block;
+    margin-top: 5px;
+    color: #666;
+    font-size: 0.8em;
+}
