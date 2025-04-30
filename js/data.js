@@ -149,9 +149,9 @@ const BookData = {
         
         return books.filter(book => {
             const matchesQuery = !query || 
-                book.title.toLowerCase().includes(query.toLowerCase()) ||
-                book.author.toLowerCase().includes(query.toLowerCase()) ||
-                book.isbn.includes(query);
+                (book.title && book.title.toLowerCase().includes(query.toLowerCase())) ||
+                (book.author && book.author.toLowerCase().includes(query.toLowerCase())) ||
+                (book.isbn && book.isbn.toString().includes(query));
                 
             const matchesCategory = !category || book.category === category;
             
