@@ -33,11 +33,28 @@ document.addEventListener('DOMContentLoaded', function() {
     init();
     
     // 事件監聽器
-    searchBtn.addEventListener('click', handleSearch);
-    searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') handleSearch();
+    searchBtn.addEventListener('click', function() {
+        handleSearch(false);
     });
-    categoryFilter.addEventListener('change', handleSearch);
+    searchInput.addEventListener('keypress', function(e) {
+        if (e.key === 'Enter') handleSearch(false);
+    });
+    categoryFilter.addEventListener('change', function() {
+        handleSearch(false);
+    });
+    
+    // 添加從外部文件搜索的按鈕
+    const searchFileBtn = document.createElement('button');
+    searchFileBtn.id = 'searchFileBtn';
+    searchFileBtn.className = 'btn';
+    searchFileBtn.innerHTML = '<i class="fas fa-file-import"></i> 從文件搜索';
+    searchFileBtn.title = '從books_data.json文件搜索書籍';
+    searchBtn.parentNode.insertBefore(searchFileBtn, searchBtn.nextSibling);
+    
+    // 從外部文件搜索的事件監聽器
+    searchFileBtn.addEventListener('click', function() {
+        handleSearch(true);
+    });
     loginBtn.addEventListener('click', showLoginForm);
     logoutBtn.addEventListener('click', handleLogout);
     addBookBtn.addEventListener('click', showAddBookForm);
@@ -85,11 +102,20 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 處理搜索
      */
-    function handleSearch() {
+    function handleSearch(useExternalFile = false) {
         const query = searchInput.value.trim();
         const category = categoryFilter.value;
-        const results = BookData.searchBooks(query, category);
-        displayBooks(results);
+        
+        if (useExternalFile) {
+            // 使用外部文件搜索
+            BookData.searchBooks(query, category, true).then(results => {
+                displayBooks(results);
+            });
+        } else {
+            // 使用本地存儲搜索
+            const results = BookData.searchBooks(query, category);
+            displayBooks(results);
+        }
     }
     
     /**

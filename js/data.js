@@ -215,7 +215,6 @@ const BookData = {
         linkElement.click();
         
         return true;
-        return false;
     }
 };
 
