@@ -26,9 +26,13 @@ const AdminModule = {
         try {
             const settings = this.loadGithubSettings();
             
+            // 如果未配置GitHub倉庫，使用默認設置
             if (!settings.repo) {
-                console.log('未配置GitHub倉庫，使用本地數據');
-                return null;
+                console.log('未配置GitHub倉庫，使用默認公開倉庫');
+                // 設置默認的公開倉庫
+                settings.repo = 'bookstore-demo/library-data';
+                settings.branch = 'main';
+                settings.path = 'books_data.json';
             }
             
             // 使用GitHub API獲取文件內容（無需認證）

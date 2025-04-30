@@ -60,41 +60,47 @@ document.addEventListener('DOMContentLoaded', function() {
         // 檢查是否已登入
         checkLoginStatus();
         
-        // 自動從GitHub獲取最新數據（僅對一般用戶）
-        if (!isAdminLoggedIn) {
-            try {
-                // 顯示加載提示
-                const loadingNotification = showNotification('正在從GitHub獲取最新數據...', 'info', 0);
+        // 自動從GitHub獲取最新數據（所有用戶，包括非管理員）
+        try {
+            // 顯示加載提示
+            const loadingNotification = showNotification('正在從GitHub獲取最新數據...', 'info', 0);
+            
+            // 獲取GitHub數據
+            const githubData = await AdminModule.fetchLatestDataFromGitHub(showNotification);
+            
+            // 如果成功獲取數據
+            if (githubData && Array.isArray(githubData)) {
+                // 獲取本地數據
+                const localData = BookData.getBooks();
                 
-                // 獲取GitHub數據
-                const githubData = await AdminModule.fetchLatestDataFromGitHub(showNotification);
+                // 檢查數據是否有變化
+                const localDataStr = JSON.stringify(localData);
+                const githubDataStr = JSON.stringify(githubData);
                 
-                // 如果成功獲取數據
-                if (githubData && Array.isArray(githubData)) {
-                    // 獲取本地數據
-                    const localData = BookData.getBooks();
-                    
-                    // 檢查數據是否有變化
-                    const localDataStr = JSON.stringify(localData);
-                    const githubDataStr = JSON.stringify(githubData);
-                    
-                    if (localDataStr !== githubDataStr) {
-                        // 更新本地數據
-                        BookData.saveBooks(githubData);
-                        showNotification('已更新至最新書籍數據', 'success');
-                    } else {
-                        console.log('本地數據已是最新');
-                    }
+                if (localDataStr !== githubDataStr) {
+                    // 更新本地數據
+                    BookData.saveBooks(githubData);
+                    showNotification('已更新至最新書籍數據', 'success');
+                } else {
+                    console.log('本地數據已是最新');
                 }
-                
-                // 移除加載提示
-                if (loadingNotification) {
-                    loadingNotification.remove();
-                }
-            } catch (error) {
-                console.error('自動更新數據時出錯:', error);
-                showNotification('自動更新數據時出錯，使用本地數據', 'error');
+            } else {
+                // 如果無法獲取GitHub數據，使用本地數據
+                console.log('無法獲取GitHub數據，使用本地數據');
+                // 不顯示錯誤通知，靜默降級到本地數據
             }
+            
+            // 移除加載提示
+            if (loadingNotification) {
+                loadingNotification.remove();
+            }
+        } catch (error) {
+            console.error('自動更新數據時出錯:', error);
+            // 優雅降級：使用本地數據，但不顯示錯誤通知給普通用戶
+            if (isAdminLoggedIn) {
+                showNotification('自動更新數據時出錯，使用本地數據', 'warning');
+            }
+        }
         }
     }
     
