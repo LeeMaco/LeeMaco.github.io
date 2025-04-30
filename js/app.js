@@ -33,28 +33,11 @@ document.addEventListener('DOMContentLoaded', function() {
     init();
     
     // 事件監聽器
-    searchBtn.addEventListener('click', function() {
-        handleSearch(false);
-    });
+    searchBtn.addEventListener('click', handleSearch);
     searchInput.addEventListener('keypress', function(e) {
-        if (e.key === 'Enter') handleSearch(false);
+        if (e.key === 'Enter') handleSearch();
     });
-    categoryFilter.addEventListener('change', function() {
-        handleSearch(false);
-    });
-    
-    // 添加從外部文件搜索的按鈕
-    const searchFileBtn = document.createElement('button');
-    searchFileBtn.id = 'searchFileBtn';
-    searchFileBtn.className = 'btn';
-    searchFileBtn.innerHTML = '<i class="fas fa-file-import"></i> 從文件搜索';
-    searchFileBtn.title = '從books_data.json文件搜索書籍';
-    searchBtn.parentNode.insertBefore(searchFileBtn, searchBtn.nextSibling);
-    
-    // 從外部文件搜索的事件監聽器
-    searchFileBtn.addEventListener('click', function() {
-        handleSearch(true);
-    });
+    categoryFilter.addEventListener('change', handleSearch);
     loginBtn.addEventListener('click', showLoginForm);
     logoutBtn.addEventListener('click', handleLogout);
     addBookBtn.addEventListener('click', showAddBookForm);
@@ -102,20 +85,11 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 處理搜索
      */
-    function handleSearch(useExternalFile = false) {
+    function handleSearch() {
         const query = searchInput.value.trim();
         const category = categoryFilter.value;
-        
-        if (useExternalFile) {
-            // 使用外部文件搜索
-            BookData.searchBooks(query, category, true).then(results => {
-                displayBooks(results);
-            });
-        } else {
-            // 使用本地存儲搜索
-            const results = BookData.searchBooks(query, category);
-            displayBooks(results);
-        }
+        const results = BookData.searchBooks(query, category);
+        displayBooks(results);
     }
     
     /**
@@ -551,85 +525,50 @@ document.addEventListener('DOMContentLoaded', function() {
      * 處理備份數據
      */
     function handleBackup() {
-        // 創建備份選項對話框
-        const backupOptions = document.createElement('div');
-        backupOptions.className = 'backup-options';
-        backupOptions.innerHTML = `
-            <h2>備份數據</h2>
-            <p>請選擇備份方式：</p>
+        // 檢查GitHub設置
+        const settings = AdminModule.loadGithubSettings();
+        
+        if (!settings.token || !settings.repo) {
+            // 如果沒有設置，顯示設置表單
+            showGithubSettingsForm();
+            return;
+        }
+        
+        // 確認備份
+        const confirmBackup = document.createElement('div');
+        confirmBackup.className = 'confirm-backup';
+        confirmBackup.innerHTML = `
+            <h2>備份到GitHub</h2>
+            <p>確定要將當前數據備份到GitHub嗎？</p>
+            <p><strong>倉庫:</strong> ${settings.repo}</p>
+            <p><strong>分支:</strong> ${settings.branch}</p>
             <div class="form-actions">
-                <button id="backupToFileBtn" class="btn"><i class="fas fa-file"></i> 備份到JSON文件</button>
-                <button id="backupToGitHubBtn" class="btn"><i class="fab fa-github"></i> 備份到GitHub</button>
+                <button id="confirmBackupBtn" class="btn">確認備份</button>
+                <button id="editSettingsBtn" class="btn">編輯設置</button>
                 <button id="cancelBackupBtn" class="btn btn-cancel">取消</button>
             </div>
         `;
         
-        const backupToFileBtn = backupOptions.querySelector('#backupToFileBtn');
-        const backupToGitHubBtn = backupOptions.querySelector('#backupToGitHubBtn');
-        const cancelBackupBtn = backupOptions.querySelector('#cancelBackupBtn');
+        const confirmBackupBtn = confirmBackup.querySelector('#confirmBackupBtn');
+        const editSettingsBtn = confirmBackup.querySelector('#editSettingsBtn');
+        const cancelBackupBtn = confirmBackup.querySelector('#cancelBackupBtn');
         
-        // 備份到JSON文件
-        backupToFileBtn.addEventListener('click', function() {
-            if (BookData.backupToFile()) {
+        confirmBackupBtn.addEventListener('click', async function() {
+            const books = BookData.getBooks();
+            const result = await AdminModule.uploadToGitHub(books, showNotification);
+            if (result) {
                 closeModalWindow();
-                showNotification('數據已成功備份到 books_data.json 文件', 'success');
-            } else {
-                showNotification('備份失敗', 'error');
             }
         });
         
-        // 備份到GitHub
-        backupToGitHubBtn.addEventListener('click', function() {
-            // 檢查GitHub設置
-            const settings = AdminModule.loadGithubSettings();
-            
-            if (!settings.token || !settings.repo) {
-                // 如果沒有設置，顯示設置表單
-                showGithubSettingsForm();
-                return;
-            }
-            
-            // 確認備份到GitHub
-            const confirmBackup = document.createElement('div');
-            confirmBackup.className = 'confirm-backup';
-            confirmBackup.innerHTML = `
-                <h2>備份到GitHub</h2>
-                <p>確定要將當前數據備份到GitHub嗎？</p>
-                <p><strong>倉庫:</strong> ${settings.repo}</p>
-                <p><strong>分支:</strong> ${settings.branch}</p>
-                <div class="form-actions">
-                    <button id="confirmBackupBtn" class="btn">確認備份</button>
-                    <button id="editSettingsBtn" class="btn">編輯設置</button>
-                    <button id="cancelBackupBtn" class="btn btn-cancel">取消</button>
-                </div>
-            `;
-            
-            const confirmBackupBtn = confirmBackup.querySelector('#confirmBackupBtn');
-            const editSettingsBtn = confirmBackup.querySelector('#editSettingsBtn');
-            const cancelBackupBtn = confirmBackup.querySelector('#cancelBackupBtn');
-            
-            confirmBackupBtn.addEventListener('click', async function() {
-                const books = BookData.getBooks();
-                const result = await AdminModule.uploadToGitHub(books, showNotification);
-                if (result) {
-                    closeModalWindow();
-                }
-            });
-            
-            editSettingsBtn.addEventListener('click', function() {
-                showGithubSettingsForm();
-            });
-            
-            cancelBackupBtn.addEventListener('click', closeModalWindow);
-            
-            modalContent.innerHTML = '';
-            modalContent.appendChild(confirmBackup);
+        editSettingsBtn.addEventListener('click', function() {
+            showGithubSettingsForm();
         });
         
         cancelBackupBtn.addEventListener('click', closeModalWindow);
         
         modalContent.innerHTML = '';
-        modalContent.appendChild(backupOptions);
+        modalContent.appendChild(confirmBackup);
         openModal();
     }
     
