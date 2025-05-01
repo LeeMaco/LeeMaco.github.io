@@ -53,55 +53,80 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 初始化應用程序
      */
-    async function init() {
+    function init() {
         // 初始顯示提示信息，而不是所有書籍
         bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
-        
         // 檢查是否已登入
         checkLoginStatus();
+        // 自動從GitHub獲取最新數據
+        fetchLatestDataFromGitHub();
+    }
+    
+    /**
+     * 從GitHub獲取最新數據
+     */
+    function fetchLatestDataFromGitHub() {
+        // 默認的GitHub倉庫配置
+        const defaultRepo = 'demo-user/book-management-system';
+        const defaultBranch = 'main';
+        const defaultPath = 'books_data.json';
         
-        // 自動從GitHub獲取最新數據（所有用戶，包括非管理員）
-        try {
-            // 顯示加載提示
-            const loadingNotification = showNotification('正在從GitHub獲取最新數據...', 'info', 0);
-            
-            // 獲取GitHub數據
-            const githubData = await AdminModule.fetchLatestDataFromGitHub(showNotification);
-            
-            // 如果成功獲取數據
-            if (githubData && Array.isArray(githubData)) {
-                // 獲取本地數據
-                const localData = BookData.getBooks();
-                
-                // 檢查數據是否有變化
-                const localDataStr = JSON.stringify(localData);
-                const githubDataStr = JSON.stringify(githubData);
-                
-                if (localDataStr !== githubDataStr) {
-                    // 更新本地數據
-                    BookData.saveBooks(githubData);
-                    showNotification('已更新至最新書籍數據', 'success');
-                } else {
-                    console.log('本地數據已是最新');
+        // 嘗試獲取管理員設置的GitHub倉庫信息
+        const settings = AdminModule.loadGithubSettings();
+        const repo = settings.repo || defaultRepo;
+        const branch = settings.branch || defaultBranch;
+        const path = settings.path || defaultPath;
+        
+        // 如果是管理員登入狀態，不自動更新數據
+        if (isAdminLoggedIn) {
+            return;
+        }
+        
+        // 顯示加載提示
+        const loadingNotification = showNotification('正在檢查更新...', 'info', 0);
+        
+        // 從GitHub獲取數據
+        fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`)
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('無法連接到GitHub倉庫');
                 }
-            } else {
-                // 如果無法獲取GitHub數據，使用本地數據
-                console.log('無法獲取GitHub數據，使用本地數據');
-                // 不顯示錯誤通知，靜默降級到本地數據
-            }
-            
-            // 移除加載提示
-            if (loadingNotification) {
-                loadingNotification.remove();
-            }
-        } catch (error) {
-            console.error('自動更新數據時出錯:', error);
-            // 優雅降級：使用本地數據，但不顯示錯誤通知給普通用戶
-            if (isAdminLoggedIn) {
-                showNotification('自動更新數據時出錯，使用本地數據', 'warning');
-            }
-        }
-        }
+                return response.json();
+            })
+            .then(data => {
+                // 解碼Base64內容
+                const content = atob(data.content);
+                try {
+                    const books = JSON.parse(content);
+                    // 更新本地數據
+                    BookData.saveBooks(books);
+                    // 移除加載提示
+                    if (loadingNotification) {
+                        loadingNotification.remove();
+                    }
+                    showNotification('書籍數據已更新', 'success');
+                    // 如果用戶已經搜索過，重新顯示結果
+                    const query = searchInput.value.trim();
+                    const category = categoryFilter.value;
+                    if (query || category) {
+                        handleSearch();
+                    }
+                } catch (error) {
+                    console.error('解析JSON數據失敗:', error);
+                    if (loadingNotification) {
+                        loadingNotification.remove();
+                    }
+                    showNotification('更新數據失敗: 無效的數據格式', 'error');
+                }
+            })
+            .catch(error => {
+                console.error('獲取GitHub數據失敗:', error);
+                if (loadingNotification) {
+                    loadingNotification.remove();
+                }
+                // 靜默失敗，不顯示錯誤通知給普通用戶
+                // showNotification('獲取最新數據失敗: ' + error.message, 'error');
+            });
     }
     
     /**
@@ -810,10 +835,6 @@ document.addEventListener('DOMContentLoaded', function() {
     
     /**
      * 顯示通知
-     * @param {string} message - 通知消息
-     * @param {string} type - 通知類型 (info, success, warning, error)
-     * @param {number} duration - 通知顯示時間 (毫秒)，設為0則不自動消失
-     * @returns {HTMLElement|null} - 如果duration為0，返回通知元素以便手動移除
      */
     function showNotification(message, type = 'info', duration = 3000) {
         const notification = document.createElement('div');
@@ -826,19 +847,18 @@ document.addEventListener('DOMContentLoaded', function() {
             notification.classList.add('show');
         }, 10);
         
-        // 如果duration為0，則不自動移除通知，而是返回通知元素以便手動移除
-        if (duration === 0) {
-            return notification;
+        // 如果duration為0，則不自動關閉通知
+        if (duration > 0) {
+            setTimeout(function() {
+                notification.classList.remove('show');
+                setTimeout(function() {
+                    notification.remove();
+                }, 300);
+            }, duration);
         }
         
-        setTimeout(function() {
-            notification.classList.remove('show');
-            setTimeout(function() {
-                notification.remove();
-            }, 300);
-        }, duration);
-        
-        return null;
+        // 返回通知元素，以便可以手動關閉
+        return notification;
     }
     
     /**
