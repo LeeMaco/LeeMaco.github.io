@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('modal');
     const modalContent = document.getElementById('modalContent');
     const closeModal = document.querySelector('.close');
+    const refreshDataBtn = document.getElementById('refreshDataBtn');
     
     // 模板
     const bookDetailTemplate = document.getElementById('bookDetailTemplate');
@@ -44,6 +45,9 @@ document.addEventListener('DOMContentLoaded', function() {
     exportBtn.addEventListener('click', handleExport);
     importBtn.addEventListener('click', showImportForm);
     backupBtn.addEventListener('click', handleBackup);
+    refreshDataBtn.addEventListener('click', function() {
+        fetchLatestBooksData(true); // 傳入true表示手動觸發
+    });
     document.getElementById('trashBinBtn').addEventListener('click', showTrashBin);
     closeModal.addEventListener('click', closeModalWindow);
     window.addEventListener('click', function(e) {
@@ -58,74 +62,88 @@ document.addEventListener('DOMContentLoaded', function() {
         bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
         // 檢查是否已登入
         checkLoginStatus();
-        // 自動從GitHub獲取最新數據
-        fetchLatestDataFromGitHub();
+        // 自動獲取最新的books_data.json文件
+        fetchLatestBooksData(false); // 傳入false表示自動觸發
     }
     
     /**
-     * 從GitHub獲取最新數據
+     * 獲取最新的books_data.json文件
+     * @param {boolean} isManual - 是否為手動觸發更新
      */
-    function fetchLatestDataFromGitHub() {
-        // 默認的GitHub倉庫配置
-        const defaultRepo = 'demo-user/book-management-system';
-        const defaultBranch = 'main';
-        const defaultPath = 'books_data.json';
-        
-        // 嘗試獲取管理員設置的GitHub倉庫信息
-        const settings = AdminModule.loadGithubSettings();
-        const repo = settings.repo || defaultRepo;
-        const branch = settings.branch || defaultBranch;
-        const path = settings.path || defaultPath;
-        
-        // 如果是管理員登入狀態，不自動更新數據
-        if (isAdminLoggedIn) {
-            return;
+    function fetchLatestBooksData(isManual = false) {
+        // 如果是手動觸發，顯示加載中通知
+        if (isManual) {
+            showNotification('正在獲取最新書籍資料...', 'info');
+            // 禁用更新按鈕，防止重複點擊
+            refreshDataBtn.disabled = true;
+            refreshDataBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
         }
         
-        // 顯示加載提示
-        const loadingNotification = showNotification('正在檢查更新...', 'info', 0);
-        
-        // 從GitHub獲取數據
-        fetch(`https://api.github.com/repos/${repo}/contents/${path}?ref=${branch}`)
+        fetch('books_data.json')
             .then(response => {
                 if (!response.ok) {
-                    throw new Error('無法連接到GitHub倉庫');
+                    throw new Error('無法獲取books_data.json文件');
                 }
                 return response.json();
             })
             .then(data => {
-                // 解碼Base64內容
-                const content = atob(data.content);
-                try {
-                    const books = JSON.parse(content);
-                    // 更新本地數據
-                    BookData.saveBooks(books);
-                    // 移除加載提示
-                    if (loadingNotification) {
-                        loadingNotification.remove();
+                // 檢查數據是否為有效的書籍數組
+                if (Array.isArray(data) && data.length > 0) {
+                    // 獲取本地數據
+                    const localBooks = BookData.getBooks();
+                    
+                    // 檢查是否需要更新（比較數量或最後更新時間）
+                    let needUpdate = false;
+                    
+                    if (localBooks.length !== data.length) {
+                        needUpdate = true;
+                    } else {
+                        // 檢查最新更新時間
+                        const latestLocalUpdate = Math.max(...localBooks.map(book => new Date(book.updatedAt).getTime()));
+                        const latestRemoteUpdate = Math.max(...data.map(book => new Date(book.updatedAt).getTime()));
+                        
+                        if (latestRemoteUpdate > latestLocalUpdate) {
+                            needUpdate = true;
+                        }
                     }
-                    showNotification('書籍數據已更新', 'success');
-                    // 如果用戶已經搜索過，重新顯示結果
-                    const query = searchInput.value.trim();
-                    const category = categoryFilter.value;
-                    if (query || category) {
-                        handleSearch();
+                    
+                    if (needUpdate) {
+                        // 更新本地數據
+                        BookData.saveBooks(data);
+                        console.log(isManual ? '已手動更新書籍數據' : '已自動更新書籍數據');
+                        
+                        // 顯示通知
+                        showNotification(isManual ? '書籍資料已成功更新！' : '書籍數據已自動更新', 'success');
+                        
+                        // 如果用戶已經搜索過，重新顯示結果
+                        if (searchInput.value.trim() || categoryFilter.value) {
+                            handleSearch();
+                        } else {
+                            // 顯示所有書籍
+                            displayBooks(data);
+                        }
+                    } else if (isManual) {
+                        // 如果是手動觸發但沒有需要更新的內容
+                        showNotification('書籍資料已是最新狀態', 'info');
                     }
-                } catch (error) {
-                    console.error('解析JSON數據失敗:', error);
-                    if (loadingNotification) {
-                        loadingNotification.remove();
-                    }
-                    showNotification('更新數據失敗: 無效的數據格式', 'error');
+                } else if (isManual) {
+                    // 如果是手動觸發但數據無效
+                    showNotification('獲取的書籍資料無效', 'error');
                 }
             })
             .catch(error => {
-                console.error('獲取GitHub數據失敗:', error);
-                if (loadingNotification) {
-                    loadingNotification.remove();
+                console.error('獲取books_data.json文件時發生錯誤:', error);
+                // 錯誤處理：使用本地數據繼續
+                if (isManual) {
+                    showNotification('更新書籍資料失敗: ' + error.message, 'error');
                 }
-                // 靜默失敗，不顯示錯誤通知給普通用戶
-                // showNotification('獲取最新數據失敗: ' + error.message, 'error');
+            })
+            .finally(() => {
+                // 如果是手動觸發，恢復更新按鈕狀態
+                if (isManual) {
+                    refreshDataBtn.disabled = false;
+                    refreshDataBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 更新資料';
+                }
             });
     }
     
@@ -836,7 +854,7 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 顯示通知
      */
-    function showNotification(message, type = 'info', duration = 3000) {
+    function showNotification(message, type = 'info') {
         const notification = document.createElement('div');
         notification.className = `notification ${type}`;
         notification.textContent = message;
@@ -847,18 +865,12 @@ document.addEventListener('DOMContentLoaded', function() {
             notification.classList.add('show');
         }, 10);
         
-        // 如果duration為0，則不自動關閉通知
-        if (duration > 0) {
+        setTimeout(function() {
+            notification.classList.remove('show');
             setTimeout(function() {
-                notification.classList.remove('show');
-                setTimeout(function() {
-                    notification.remove();
-                }, 300);
-            }, duration);
-        }
-        
-        // 返回通知元素，以便可以手動關閉
-        return notification;
+                notification.remove();
+            }, 300);
+        }, 3000);
     }
     
     /**
