@@ -62,6 +62,8 @@ document.addEventListener('DOMContentLoaded', function() {
         bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
         // 檢查是否已登入
         checkLoginStatus();
+        // 更新類別過濾器
+        updateCategoryFilter();
         // 自動獲取最新的books_data.json文件
         fetchLatestBooksData(false); // 傳入false表示自動觸發
     }
@@ -312,10 +314,8 @@ document.addEventListener('DOMContentLoaded', function() {
         template.querySelector('.book-publisher').textContent = book.publisher || '無';
         template.querySelector('.book-description').textContent = book.description || '無';
         template.querySelector('.book-notes').textContent = book.notes || '無';
-        template.querySelector('.book-isbn').textContent = book.isbn;
-        template.querySelector('.book-year').textContent = book.year;
-        template.querySelector('.book-location').textContent = book.location;
-        template.querySelector('.book-status').textContent = getStatusText(book.status);
+        template.querySelector('.book-created-at').textContent = formatDate(book.createdAt) || '無';
+        template.querySelector('.book-updated-at').textContent = formatDate(book.updatedAt) || '無';
         
         modalContent.innerHTML = '';
         modalContent.appendChild(template);
@@ -383,13 +383,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 category: document.getElementById('category').value,
                 publisher: document.getElementById('publisher').value,
                 description: document.getElementById('description').value,
-                notes: document.getElementById('notes').value,
-                isbn: document.getElementById('isbn').value,
-                createdAt: new Date().toISOString(),
-                updatedAt: new Date().toISOString()
+                notes: document.getElementById('notes').value
+                // 創建和更新時間由BookData.addBook處理
             };
             
             BookData.addBook(newBook);
+            // 更新類別過濾器以包含可能的新類別
+            updateCategoryFilter();
             displayAdminBookList();
             displayBooks(BookData.getBooks());
             closeModalWindow();
@@ -414,7 +414,6 @@ document.addEventListener('DOMContentLoaded', function() {
         const titleInput = template.querySelector('#title');
         const authorInput = template.querySelector('#author');
         const volumeInput = template.querySelector('#volume');
-        const isbnInput = template.querySelector('#isbn');
         const categoryInput = template.querySelector('#category');
         const publisherInput = template.querySelector('#publisher');
         const cabinetInput = template.querySelector('#cabinet');
@@ -428,7 +427,6 @@ document.addEventListener('DOMContentLoaded', function() {
         titleInput.value = book.title;
         authorInput.value = book.author;
         volumeInput.value = book.volume || '';
-        isbnInput.value = book.isbn;
         categoryInput.value = book.category;
         publisherInput.value = book.publisher || '';
         cabinetInput.value = book.cabinet || '';
@@ -449,13 +447,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 category: categoryInput.value,
                 publisher: publisherInput.value,
                 description: descriptionInput.value,
-                notes: notesInput.value,
-                isbn: isbnInput.value,
-                createdAt: book.createdAt, // 保留原創建時間
-                updatedAt: new Date().toISOString() // 更新時間為當前時間
+                notes: notesInput.value
+                // 創建和更新時間由BookData.updateBook處理
             };
             
             BookData.updateBook(updatedBook);
+            // 更新類別過濾器以包含可能的新類別
+            updateCategoryFilter();
             displayAdminBookList();
             displayBooks(BookData.getBooks());
             closeModalWindow();
@@ -897,6 +895,43 @@ document.addEventListener('DOMContentLoaded', function() {
             'technology': '科技'
         };
         return categoryMap[category] || category;
+    }
+    
+    /**
+     * 更新類別過濾器
+     */
+    function updateCategoryFilter() {
+        // 獲取所有書籍的類別
+        const books = BookData.getBooks();
+        const categories = new Set();
+        
+        // 添加默認類別
+        categories.add('fiction');
+        categories.add('science');
+        categories.add('history');
+        categories.add('biography');
+        categories.add('technology');
+        
+        // 添加書籍中的自定義類別
+        books.forEach(book => {
+            if (book.category) {
+                categories.add(book.category);
+            }
+        });
+        
+        // 清空並重建類別過濾器
+        categoryFilter.innerHTML = '<option value="">所有類別</option>';
+        
+        // 按字母順序排序類別
+        const sortedCategories = Array.from(categories).sort();
+        
+        // 添加類別選項
+        sortedCategories.forEach(category => {
+            const option = document.createElement('option');
+            option.value = category;
+            option.textContent = getCategoryText(category);
+            categoryFilter.appendChild(option);
+        });
     }
 });
 
