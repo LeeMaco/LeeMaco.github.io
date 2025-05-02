@@ -119,6 +119,10 @@ const BookData = {
         book.updatedAt = now;
         books.push(book);
         this.saveBooks(books);
+        
+        // 自動同步到 GitHub
+        this.syncToGitHub(books);
+        
         return book;
     },
     
@@ -134,6 +138,10 @@ const BookData = {
             updatedBook.updatedAt = new Date().toISOString();
             books[index] = updatedBook;
             this.saveBooks(books);
+            
+            // 自動同步到 GitHub
+            this.syncToGitHub(books);
+            
             return true;
         }
         return false;
@@ -145,6 +153,10 @@ const BookData = {
         const filteredBooks = books.filter(book => book.id !== id);
         if (filteredBooks.length < books.length) {
             this.saveBooks(filteredBooks);
+            
+            // 自動同步到 GitHub
+            this.syncToGitHub(filteredBooks);
+            
             return true;
         }
         return false;
@@ -263,6 +275,9 @@ const BookData = {
                 linkElement.click();
                 document.body.removeChild(linkElement);
                 
+                // 自動同步到 GitHub
+                this.syncToGitHub(validatedBooks);
+                
                 return { success: true, message: '數據已成功導入並保存', count: validatedBooks.length };
             } catch (exportError) {
                 console.error('導出到JSON文件失敗:', exportError);
@@ -274,11 +289,43 @@ const BookData = {
         }
     },
     
-    // 備份數據到GitHub (使用AdminModule)
+    // 備份數據到GitHub
     backupToGitHub: function() {
-        // 此功能已移至AdminModule
-        console.log('數據備份功能已移至AdminModule');
-        return false;
+        const books = this.getBooks();
+        return this.syncToGitHub(books, true);
+    },
+    
+    // 同步數據到 GitHub
+    syncToGitHub: function(books, isManualBackup = false) {
+        // 檢查是否已配置 GitHub
+        if (!window.GitHubSync || !window.GitHubSync.isConfigured()) {
+            if (isManualBackup) {
+                // 如果是手動備份，則顯示配置表單
+                return { success: false, needConfig: true, message: '請先配置 GitHub 連接' };
+            } else {
+                // 如果是自動同步，則靜默失敗
+                console.log('GitHub 未配置，無法自動同步');
+                return { success: false, needConfig: true };
+            }
+        }
+        
+        // 執行同步
+        return window.GitHubSync.syncData(books)
+            .then(result => {
+                if (isManualBackup && result.success) {
+                    console.log('手動備份到 GitHub 成功:', result);
+                } else if (isManualBackup) {
+                    console.error('手動備份到 GitHub 失敗:', result);
+                }
+                return result;
+            })
+            .catch(error => {
+                console.error('同步到 GitHub 時發生錯誤:', error);
+                return { 
+                    success: false, 
+                    error: error.message || '同步到 GitHub 時發生未知錯誤' 
+                };
+            });
     }
 };
 
