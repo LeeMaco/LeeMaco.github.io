@@ -58,17 +58,8 @@ document.addEventListener('DOMContentLoaded', function() {
      * 初始化應用程序
      */
     function init() {
-        // 获取所有书籍数据
-        const allBooks = BookData.getBooks();
-        // 显示数据更新信息
-        displayBooks(allBooks);
-        // 初始顯示提示信息，如果没有搜索条件
-        if (!searchInput.value.trim() && !categoryFilter.value) {
-            const booksContainer = document.querySelector('.books-container');
-            if (booksContainer) {
-                booksContainer.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
-            }
-        }
+        // 初始顯示提示信息，而不是所有書籍
+        bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
         // 檢查是否已登入
         checkLoginStatus();
         // 更新類別過濾器
@@ -237,26 +228,6 @@ function displayBooks(books) {
         // 保存原始书籍列表的副本
         let displayedBooks = [...books];
         
-        // 获取数据更新信息
-        const updateInfo = BookData.getUpdateInfo();
-        
-        // 添加数据更新信息面板
-        const updateInfoHTML = `
-            <div class="update-info-panel">
-                <div class="update-info-header">
-                    <h3><i class="fas fa-info-circle"></i> 數據更新信息</h3>
-                </div>
-                <div class="update-info-content">
-                    <p><strong>最後更新時間:</strong> ${formatDate(updateInfo.lastUpdated)}</p>
-                    <p><strong>書籍總數:</strong> ${updateInfo.totalBooks} 本</p>
-                    ${updateInfo.recentChanges.length > 0 ? '<div class="recent-changes"><strong>最近變更:</strong><ul>' + 
-                        updateInfo.recentChanges.map(change => 
-                            `<li>${change.action}: ${change.title} (${change.author}) - ${formatDate(change.updatedAt)}</li>`
-                        ).join('') + '</ul></div>' : ''}
-                </div>
-            </div>
-        `;
-        
         // 添加排序控制区域
         const sortControlsHTML = `
             <div class="sort-controls">
@@ -269,16 +240,8 @@ function displayBooks(books) {
             </div>
         `;
         
-        // 清空结果区域并添加更新信息和排序控制
+        // 清空结果区域并添加排序控制
         bookResults.innerHTML = '';
-        
-        // 添加更新信息面板
-        const updateInfoContainer = document.createElement('div');
-        updateInfoContainer.className = 'update-info-container';
-        updateInfoContainer.innerHTML = updateInfoHTML;
-        bookResults.appendChild(updateInfoContainer);
-        
-        // 添加排序控制
         const sortControlsContainer = document.createElement('div');
         sortControlsContainer.className = 'sort-controls-container';
         sortControlsContainer.innerHTML = sortControlsHTML;
@@ -379,9 +342,6 @@ function displayAdminBookList() {
         let books = BookData.getBooks();
         filteredBooks = [...books]; // 保存一份完整的书籍列表副本
         
-        // 获取数据更新信息
-        const updateInfo = BookData.getUpdateInfo();
-        
         // 应用筛选条件
         const filterTitle = document.getElementById('filterTitle')?.value || '';
         const filterAuthor = document.getElementById('filterAuthor')?.value || '';
@@ -434,26 +394,8 @@ function displayAdminBookList() {
             </div>
         `;
         
-        // 创建更新信息面板HTML
-        const updateInfoHTML = `
-            <div class="update-info-panel admin-update-info">
-                <div class="update-info-header">
-                    <h3><i class="fas fa-info-circle"></i> 數據更新信息</h3>
-                </div>
-                <div class="update-info-content">
-                    <p><strong>最後更新時間:</strong> ${formatDate(updateInfo.lastUpdated)}</p>
-                    <p><strong>書籍總數:</strong> ${updateInfo.totalBooks} 本</p>
-                    <p><strong>當前篩選:</strong> ${filteredBooks.length} 本</p>
-                    ${updateInfo.recentChanges.length > 0 ? '<div class="recent-changes"><strong>最近變更:</strong><ul>' + 
-                        updateInfo.recentChanges.map(change => 
-                            `<li>${change.action}: ${change.title} (${change.author}) - ${formatDate(change.updatedAt)}</li>`
-                        ).join('') + '</ul></div>' : ''}
-                </div>
-            </div>
-        `;
-        
         // 添加表头和排序按钮
-        adminBookList.innerHTML = updateInfoHTML + filterHTML + `
+        adminBookList.innerHTML = filterHTML + `
             <div class="book-list-item book-list-header">
                 <div class="sortable" data-sort="title">書名 <i class="fas fa-sort"></i></div>
                 <div class="sortable" data-sort="author">作者 <i class="fas fa-sort"></i></div>
