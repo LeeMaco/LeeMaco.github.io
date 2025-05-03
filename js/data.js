@@ -113,10 +113,6 @@ const BookData = {
         const books = this.getBooks();
         // 生成唯一ID
         book.id = Date.now().toString();
-        // 設置創建和更新時間
-        const now = new Date().toISOString();
-        book.createdAt = now;
-        book.updatedAt = now;
         books.push(book);
         this.saveBooks(books);
         return book;
@@ -127,11 +123,6 @@ const BookData = {
         const books = this.getBooks();
         const index = books.findIndex(book => book.id === updatedBook.id);
         if (index !== -1) {
-            // 保留原始創建時間
-            const createdAt = books[index].createdAt;
-            // 更新修改時間
-            updatedBook.createdAt = createdAt;
-            updatedBook.updatedAt = new Date().toISOString();
             books[index] = updatedBook;
             this.saveBooks(books);
             return true;
@@ -173,15 +164,15 @@ const BookData = {
                     const authorMatch = book.author && typeof book.author === 'string' ? 
                         book.author.toLowerCase().includes(safeQuery) : false;
                     
-                    // 安全地檢查出版社匹配
-                    const publisherMatch = book.publisher && typeof book.publisher === 'string' ? 
-                        book.publisher.toLowerCase().includes(safeQuery) : false;
+                    // 安全地檢查ISBN匹配
+                    const isbnMatch = book.isbn ? 
+                        book.isbn.toString().toLowerCase().includes(safeQuery) : false;
                     
                     // 安全地檢查分類匹配
                     const matchesCategory = !category || 
                         (book.category && book.category === category);
                     
-                    const matchesQuery = !query || titleMatch || authorMatch || publisherMatch;
+                    const matchesQuery = !query || titleMatch || authorMatch || isbnMatch;
                     
                     return matchesQuery && matchesCategory;
                 } catch (filterError) {

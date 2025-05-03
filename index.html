@@ -21,26 +21,10 @@
     </header>
 
     <main class="container">
-        <!-- 管理員面板 (默認隱藏) -->
-        <section id="adminPanel" class="admin-panel hidden">
-            <h2>管理員面板</h2>
-            <div class="admin-controls">
-                <button id="addBookBtn" class="btn"><i class="fas fa-plus"></i> 新增書籍</button>
-                <button id="exportBtn" class="btn"><i class="fas fa-file-export"></i> 導出數據</button>
-                <button id="importBtn" class="btn"><i class="fas fa-file-import"></i> 導入數據</button>
-                <button id="backupBtn" class="btn"><i class="fas fa-save"></i> 備份數據</button>
-                <button id="trashBinBtn" class="btn"><i class="fas fa-trash"></i> 垃圾桶</button>
-                <button id="logoutBtn" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> 登出</button>
-            </div>
-            <div id="adminBookList" class="book-list">
-                <!-- 管理員書籍列表將在這裡動態生成 -->
-            </div>
-        </section>
-
         <section class="search-section">
             <h2>搜索書籍</h2>
             <div class="search-container">
-                <input type="text" id="searchInput" placeholder="輸入書名、作者...">
+                <input type="text" id="searchInput" placeholder="輸入書名、作者或ISBN...">
                 <button id="searchBtn" class="btn"><i class="fas fa-search"></i> 搜索</button>
                 <button id="refreshDataBtn" class="btn"><i class="fas fa-sync-alt"></i> 更新資料</button>
             </div>
@@ -62,6 +46,9 @@
                 <!-- 書籍結果將在這裡動態生成 -->
             </div>
         </section>
+
+        <!-- 管理員面板 (默認隱藏) -->
+        <section id="adminPanel" class="admin-panel hidden">
             <h2>管理員面板</h2>
             <div class="admin-controls">
                 <button id="addBookBtn" class="btn"><i class="fas fa-plus"></i> 新增書籍</button>
@@ -139,6 +126,7 @@
                 <p><strong>出版社:</strong> <span class="book-publisher"></span></p>
                 <p><strong>描述:</strong> <span class="book-description"></span></p>
                 <p><strong>備註:</strong> <span class="book-notes"></span></p>
+                <p><strong>ISBN:</strong> <span class="book-isbn"></span></p>
                 <p><strong>創建時間:</strong> <span class="book-created-at"></span></p>
                 <p><strong>更新時間:</strong> <span class="book-updated-at"></span></p>
             </div>
@@ -172,14 +160,13 @@
             </div>
             <div class="form-group">
                 <label for="category">類別</label>
-                <input type="text" id="category" list="categoryOptions" required>
-                <datalist id="categoryOptions">
+                <select id="category" required>
                     <option value="fiction">小說</option>
                     <option value="science">科學</option>
                     <option value="history">歷史</option>
                     <option value="biography">傳記</option>
                     <option value="technology">科技</option>
-                </datalist>
+                </select>
             </div>
             <div class="form-group">
                 <label for="publisher">出版社</label>
@@ -192,6 +179,10 @@
             <div class="form-group">
                 <label for="notes">備註</label>
                 <textarea id="notes" rows="2"></textarea>
+            </div>
+            <div class="form-group">
+                <label for="isbn">ISBN</label>
+                <input type="text" id="isbn" required>
             </div>
             <!-- 創建時間和更新時間將在後端自動生成 -->
             <div class="form-actions">
