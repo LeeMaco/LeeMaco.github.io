@@ -20,7 +20,6 @@ document.addEventListener('DOMContentLoaded', function() {
     const modal = document.getElementById('modal');
     const modalContent = document.getElementById('modalContent');
     const closeModal = document.querySelector('.close');
-    const refreshDataBtn = document.getElementById('refreshDataBtn');
     
     // 模板
     const bookDetailTemplate = document.getElementById('bookDetailTemplate');
@@ -45,9 +44,6 @@ document.addEventListener('DOMContentLoaded', function() {
     exportBtn.addEventListener('click', handleExport);
     importBtn.addEventListener('click', showImportForm);
     backupBtn.addEventListener('click', handleBackup);
-    refreshDataBtn.addEventListener('click', function() {
-        fetchLatestBooksData(true); // 傳入true表示手動觸發
-    });
     document.getElementById('trashBinBtn').addEventListener('click', showTrashBin);
     closeModal.addEventListener('click', closeModalWindow);
     window.addEventListener('click', function(e) {
@@ -62,89 +58,6 @@ document.addEventListener('DOMContentLoaded', function() {
         bookResults.innerHTML = '<p class="no-results">請輸入關鍵字搜索書籍</p>';
         // 檢查是否已登入
         checkLoginStatus();
-        // 自動獲取最新的books_data.json文件
-        fetchLatestBooksData(false); // 傳入false表示自動觸發
-    }
-    
-    /**
-     * 獲取最新的books_data.json文件
-     * @param {boolean} isManual - 是否為手動觸發更新
-     */
-    function fetchLatestBooksData(isManual = false) {
-        // 如果是手動觸發，顯示加載中通知
-        if (isManual) {
-            showNotification('正在獲取最新書籍資料...', 'info');
-            // 禁用更新按鈕，防止重複點擊
-            refreshDataBtn.disabled = true;
-            refreshDataBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> 更新中...';
-        }
-        
-        fetch('books_data.json')
-            .then(response => {
-                if (!response.ok) {
-                    throw new Error('無法獲取books_data.json文件');
-                }
-                return response.json();
-            })
-            .then(data => {
-                // 檢查數據是否為有效的書籍數組
-                if (Array.isArray(data) && data.length > 0) {
-                    // 獲取本地數據
-                    const localBooks = BookData.getBooks();
-                    
-                    // 檢查是否需要更新（比較數量或最後更新時間）
-                    let needUpdate = false;
-                    
-                    if (localBooks.length !== data.length) {
-                        needUpdate = true;
-                    } else {
-                        // 檢查最新更新時間
-                        const latestLocalUpdate = Math.max(...localBooks.map(book => new Date(book.updatedAt).getTime()));
-                        const latestRemoteUpdate = Math.max(...data.map(book => new Date(book.updatedAt).getTime()));
-                        
-                        if (latestRemoteUpdate > latestLocalUpdate) {
-                            needUpdate = true;
-                        }
-                    }
-                    
-                    if (needUpdate) {
-                        // 更新本地數據
-                        BookData.saveBooks(data);
-                        console.log(isManual ? '已手動更新書籍數據' : '已自動更新書籍數據');
-                        
-                        // 顯示通知
-                        showNotification(isManual ? '書籍資料已成功更新！' : '書籍數據已自動更新', 'success');
-                        
-                        // 如果用戶已經搜索過，重新顯示結果
-                        if (searchInput.value.trim() || categoryFilter.value) {
-                            handleSearch();
-                        } else {
-                            // 顯示所有書籍
-                            displayBooks(data);
-                        }
-                    } else if (isManual) {
-                        // 如果是手動觸發但沒有需要更新的內容
-                        showNotification('書籍資料已是最新狀態', 'info');
-                    }
-                } else if (isManual) {
-                    // 如果是手動觸發但數據無效
-                    showNotification('獲取的書籍資料無效', 'error');
-                }
-            })
-            .catch(error => {
-                console.error('獲取books_data.json文件時發生錯誤:', error);
-                // 錯誤處理：使用本地數據繼續
-                if (isManual) {
-                    showNotification('更新書籍資料失敗: ' + error.message, 'error');
-                }
-            })
-            .finally(() => {
-                // 如果是手動觸發，恢復更新按鈕狀態
-                if (isManual) {
-                    refreshDataBtn.disabled = false;
-                    refreshDataBtn.innerHTML = '<i class="fas fa-sync-alt"></i> 更新資料';
-                }
-            });
     }
     
     /**
