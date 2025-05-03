@@ -1,0 +1,57 @@
+/* 數據更新信息區域樣式 */
+.data-update-info {
+    margin-top: 20px;
+}
+
+.update-info {
+    padding: 15px;
+    background-color: #f8f9fa;
+    border-radius: 5px;
+    border-left: 4px solid #3498db;
+}
+
+.update-info p {
+    margin-bottom: 10px;
+}
+
+.recent-updates {
+    margin-top: 10px;
+    max-height: 200px;
+    overflow-y: auto;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    padding: 10px;
+}
+
+.recent-book-item {
+    padding: 8px;
+    border-bottom: 1px solid #eee;
+    display: flex;
+    justify-content: space-between;
+}
+
+.recent-book-item:last-child {
+    border-bottom: none;
+}
+
+.recent-book-title {
+    font-weight: bold;
+    color: #2c3e50;
+}
+
+.recent-book-time {
+    color: #7f8c8d;
+    font-size: 0.9em;
+}
+
+/* 更新時間格式化 */
+.update-time {
+    color: #3498db;
+    font-weight: bold;
+}
+
+/* 書籍數量顯示 */
+.books-count {
+    font-weight: bold;
+    color: #2ecc71;
+}
