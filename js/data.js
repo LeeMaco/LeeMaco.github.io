@@ -97,7 +97,42 @@ const BookData = {
     
     // 保存書籍數據到本地存儲
     saveBooks: function(books) {
+        // 保存更新信息
+        const now = new Date().toISOString();
+        const updateInfo = {
+            lastUpdated: now,
+            totalBooks: books.length,
+            recentChanges: this.getRecentChanges(books) || []
+        };
+        localStorage.setItem('booksUpdateInfo', JSON.stringify(updateInfo));
         localStorage.setItem('books', JSON.stringify(books));
+    },
+    
+    // 获取数据更新信息
+    getUpdateInfo: function() {
+        const updateInfo = localStorage.getItem('booksUpdateInfo');
+        return updateInfo ? JSON.parse(updateInfo) : {
+            lastUpdated: new Date().toISOString(),
+            totalBooks: this.getBooks().length,
+            recentChanges: []
+        };
+    },
+    
+    // 获取最近变更的书籍（最多5本）
+    getRecentChanges: function(books) {
+        if (!books) books = this.getBooks();
+        
+        // 按更新时间排序
+        return [...books]
+            .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+            .slice(0, 5)
+            .map(book => ({
+                id: book.id,
+                title: book.title,
+                author: book.author,
+                updatedAt: book.updatedAt,
+                action: book.createdAt === book.updatedAt ? '新增' : '更新'
+            }));
     },
     
     // 初始化數據

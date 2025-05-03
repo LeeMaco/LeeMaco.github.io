@@ -1,0 +1,74 @@
+/* 数据更新信息面板样式 */
+.update-info-panel {
+    background-color: #f8f9fa;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.update-info-header {
+    background-color: #e9ecef;
+    padding: 10px 15px;
+    border-bottom: 1px solid #ddd;
+    border-top-left-radius: 5px;
+    border-top-right-radius: 5px;
+}
+
+.update-info-header h3 {
+    margin: 0;
+    font-size: 16px;
+    color: #495057;
+    display: flex;
+    align-items: center;
+}
+
+.update-info-header h3 i {
+    margin-right: 8px;
+    color: #6c757d;
+}
+
+.update-info-content {
+    padding: 15px;
+}
+
+.update-info-content p {
+    margin: 5px 0;
+    font-size: 14px;
+}
+
+.recent-changes {
+    margin-top: 10px;
+}
+
+.recent-changes ul {
+    margin: 8px 0 0 0;
+    padding-left: 20px;
+    font-size: 13px;
+}
+
+.recent-changes li {
+    margin-bottom: 5px;
+}
+
+/* 管理员面板中的更新信息面板样式 */
+.admin-update-info {
+    margin-top: 10px;
+    margin-bottom: 20px;
+}
+
+/* 响应式样式 */
+@media (max-width: 768px) {
+    .update-info-panel {
+        margin-bottom: 15px;
+    }
+    
+    .update-info-header h3 {
+        font-size: 15px;
+    }
+    
+    .update-info-content p,
+    .recent-changes ul {
+        font-size: 13px;
+    }
+}
