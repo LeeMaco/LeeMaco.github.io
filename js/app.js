@@ -22,6 +22,11 @@ document.addEventListener('DOMContentLoaded', function() {
     const closeModal = document.querySelector('.close');
     const refreshDataBtn = document.getElementById('refreshDataBtn');
     
+    // 書籍統計元素
+    const totalBooksElement = document.getElementById('totalBooks');
+    const lastUpdateElement = document.getElementById('lastUpdate');
+    const recentChangesElement = document.getElementById('recentChanges');
+    
     // 模板
     const bookDetailTemplate = document.getElementById('bookDetailTemplate');
     const bookFormTemplate = document.getElementById('bookFormTemplate');
@@ -64,6 +69,8 @@ document.addEventListener('DOMContentLoaded', function() {
         checkLoginStatus();
         // 更新類別過濾器
         updateCategoryFilter();
+        // 更新書籍統計數據
+        updateBookStats();
         // 自動獲取最新的books_data.json文件
         fetchLatestBooksData(false); // 傳入false表示自動觸發
     }
@@ -117,6 +124,9 @@ document.addEventListener('DOMContentLoaded', function() {
                         // 顯示通知
                         showNotification(isManual ? '書籍資料已成功更新！' : '書籍數據已自動更新', 'success');
                         
+                        // 更新書籍統計數據
+                        updateBookStats();
+                        
                         // 如果用戶已經搜索過，重新顯示結果
                         if (searchInput.value.trim() || categoryFilter.value) {
                             handleSearch();
@@ -169,6 +179,8 @@ document.addEventListener('DOMContentLoaded', function() {
             loginBtn.classList.remove('hidden');
             adminPanel.classList.add('hidden');
         }
+        // 更新書籍統計數據
+        updateBookStats();
     }
     
     /**
@@ -316,10 +328,13 @@ function displayBooks(books) {
     
     /**
      * 格式化日期
+     * @param {Date} date - 日期對象
+     * @returns {string} - 格式化後的日期字符串
      */
     function formatDate(dateString) {
         if (!dateString) return '無';
         const date = new Date(dateString);
+        if (isNaN(date.getTime())) return '無';
         return date.toLocaleString('zh-TW', { 
             year: 'numeric', 
             month: '2-digit', 
@@ -544,6 +559,47 @@ function displayAdminBookList() {
         sessionStorage.removeItem('adminLoggedIn');
         updateUIForLoginStatus();
         showNotification('已登出', 'info');
+    }
+    
+    /**
+     * 更新書籍統計數據
+     */
+    function updateBookStats() {
+        const books = BookData.getBooks();
+        
+        // 更新總書籍數量
+        if (totalBooksElement) {
+            totalBooksElement.textContent = books.length;
+        }
+        
+        // 更新最後更新時間
+        if (lastUpdateElement && books.length > 0) {
+            // 找出最新的更新時間
+            const latestUpdate = new Date(Math.max(...books.map(book => new Date(book.updatedAt).getTime())));
+            lastUpdateElement.textContent = formatDate(latestUpdate);
+        } else if (lastUpdateElement) {
+            lastUpdateElement.textContent = '-';
+        }
+        
+        // 更新最近異動資料
+        if (recentChangesElement && books.length > 0) {
+            // 按更新時間排序，取最近3本更新的書籍
+            const recentBooks = [...books]
+                .sort((a, b) => new Date(b.updatedAt) - new Date(a.updatedAt))
+                .slice(0, 3);
+                
+            if (recentBooks.length > 0) {
+                const recentChangesHTML = recentBooks.map(book => 
+                    `<div class="recent-change">${book.title} (${formatDate(new Date(book.updatedAt))})</div>`
+                ).join('');
+                
+                recentChangesElement.innerHTML = recentChangesHTML;
+            } else {
+                recentChangesElement.textContent = '-';
+            }
+        } else if (recentChangesElement) {
+            recentChangesElement.textContent = '-';
+        }
     }
     
     /**
