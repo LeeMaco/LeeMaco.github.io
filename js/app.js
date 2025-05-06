@@ -72,6 +72,33 @@ document.addEventListener('DOMContentLoaded', function() {
      * 獲取最新的books_data.json文件
      * @param {boolean} isManual - 是否為手動觸發更新
      */
+    /**
+     * 錯誤處理模塊 - 封裝錯誤處理相關功能
+     */
+    const ErrorHandler = {
+        // 處理API請求錯誤
+        handleFetchError: function(error, isManual) {
+            console.error('獲取books_data.json文件時發生錯誤:', error);
+            
+            if (isManual) {
+                showNotification('更新書籍資料失敗: ' + error.message, 'error');
+            }
+            
+            // 使用本地數據更新數據信息顯示
+            const localBooks = BookData.getBooks();
+            if (localBooks && localBooks.length > 0) {
+                updateDataInfo(localBooks);
+            }
+        },
+        
+        // 處理數據驗證錯誤
+        handleDataValidationError: function(isManual) {
+            if (isManual) {
+                showNotification('獲取的書籍資料無效', 'error');
+            }
+        }
+    };
+    
     function fetchLatestBooksData(isManual = false) {
         // 如果是手動觸發，顯示加載中通知
         if (isManual) {
@@ -133,21 +160,12 @@ document.addEventListener('DOMContentLoaded', function() {
                     updateDataInfo(data);
                 } else if (isManual) {
                     // 如果是手動觸發但數據無效
-                    showNotification('獲取的書籍資料無效', 'error');
+                    ErrorHandler.handleDataValidationError(isManual);
                 }
             })
             .catch(error => {
-                console.error('獲取books_data.json文件時發生錯誤:', error);
-                // 錯誤處理：使用本地數據繼續
-                if (isManual) {
-                    showNotification('更新書籍資料失敗: ' + error.message, 'error');
-                }
-                
-                // 使用本地數據更新數據信息顯示
-                const localBooks = BookData.getBooks();
-                if (localBooks && localBooks.length > 0) {
-                    updateDataInfo(localBooks);
-                }
+                // 使用錯誤處理模塊處理錯誤
+                ErrorHandler.handleFetchError(error, isManual);
             })
             .finally(() => {
                 // 如果是手動觸發，恢復更新按鈕狀態
@@ -272,17 +290,17 @@ document.addEventListener('DOMContentLoaded', function() {
                 displayBooks(results);
                 showNotification(`找到 ${results.length} 本符合條件的書籍`, 'success');
                 
-                // 如果用户之前已经选择了排序方式，显示排序状态提示
-                if (userSortField) {
+                // 如果用戶之前已經選擇了排序方式，顯示排序狀態提示
+                if (UIModule.sortState.field) {
                     const sortFieldText = {
                         'title': '書名',
                         'author': '作者',
                         'volume': '集數',
                         'cabinet': '櫃號',
                         'row': '行號'
-                    }[userSortField];
+                    }[UIModule.sortState.field];
                     
-                    const sortDirectionText = userSortDirection === 'asc' ? '升序' : '降序';
+                    const sortDirectionText = UIModule.sortState.direction === 'asc' ? '升序' : '降序';
                     showNotification(`結果已按 ${sortFieldText} ${sortDirectionText} 排序`, 'info');
                 }
             }
@@ -296,15 +314,34 @@ document.addEventListener('DOMContentLoaded', function() {
     /**
      * 顯示書籍列表
      */
-    // 用户界面排序状态变量
-let userSortField = '';
-let userSortDirection = 'asc';
+    // 用戶界面模塊 - 封裝UI相關狀態和操作
+const UIModule = {
+    // 排序狀態
+    sortState: {
+        field: '',
+        direction: 'asc'
+    },
+    
+    // 通用排序函數
+    sortBooks: function(books, field, direction) {
+        if (!field) return [...books];
+        
+        return [...books].sort((a, b) => {
+            let valueA = (a[field] || '').toString().toLowerCase();
+            let valueB = (b[field] || '').toString().toLowerCase();
+            
+            if (valueA < valueB) return direction === 'asc' ? -1 : 1;
+            if (valueA > valueB) return direction === 'asc' ? 1 : -1;
+            return 0;
+        });
+    }
+};
 
 function displayBooks(books) {
-        // 保存原始书籍列表的副本
-        let displayedBooks = [...books];
+        // 應用排序獲取顯示的書籍列表
+        let displayedBooks = UIModule.sortBooks(books, UIModule.sortState.field, UIModule.sortState.direction);
         
-        // 添加排序控制区域
+        // 添加排序控制區域
         const sortControlsHTML = `
             <div class="sort-controls">
                 <span>排序方式: </span>
@@ -316,46 +353,36 @@ function displayBooks(books) {
             </div>
         `;
         
-        // 清空结果区域并添加排序控制
+        // 清空結果區域並添加排序控制
         bookResults.innerHTML = '';
         const sortControlsContainer = document.createElement('div');
         sortControlsContainer.className = 'sort-controls-container';
         sortControlsContainer.innerHTML = sortControlsHTML;
         bookResults.appendChild(sortControlsContainer);
         
-        // 应用排序
-        if (userSortField) {
-            displayedBooks.sort((a, b) => {
-                let valueA = (a[userSortField] || '').toString().toLowerCase();
-                let valueB = (b[userSortField] || '').toString().toLowerCase();
-                
-                if (valueA < valueB) return userSortDirection === 'asc' ? -1 : 1;
-                if (valueA > valueB) return userSortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
-            
-            // 更新排序按钮图标
-            const sortBtn = sortControlsContainer.querySelector(`[data-sort="${userSortField}"]`);
+        // 更新排序按鈕圖標
+        if (UIModule.sortState.field) {
+            const sortBtn = sortControlsContainer.querySelector(`[data-sort="${UIModule.sortState.field}"]`);
             if (sortBtn) {
                 const icon = sortBtn.querySelector('i');
-                icon.className = userSortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                icon.className = UIModule.sortState.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
             }
         }
         
-        // 添加排序按钮事件监听器
+        // 添加排序按鈕事件監聽器
         const sortBtns = sortControlsContainer.querySelectorAll('.sort-btn');
         sortBtns.forEach(btn => {
             btn.addEventListener('click', function() {
                 const field = this.dataset.sort;
-                if (userSortField === field) {
-                    // 如果已经按这个字段排序，则切换排序方向
-                    userSortDirection = userSortDirection === 'asc' ? 'desc' : 'asc';
+                if (UIModule.sortState.field === field) {
+                    // 如果已經按這個字段排序，則切換排序方向
+                    UIModule.sortState.direction = UIModule.sortState.direction === 'asc' ? 'desc' : 'asc';
                 } else {
-                    // 如果是新的排序字段，设置为升序
-                    userSortField = field;
-                    userSortDirection = 'asc';
+                    // 如果是新的排序字段，設置為升序
+                    UIModule.sortState.field = field;
+                    UIModule.sortState.direction = 'asc';
                 }
-                displayBooks(books); // 重新显示列表
+                displayBooks(books); // 重新顯示列表
             });
         });
         
@@ -408,43 +435,59 @@ function displayBooks(books) {
     /**
      * 顯示管理員書籍列表
      */
-    // 全局变量，用于跟踪排序状态
-let currentSortField = '';
-let currentSortDirection = 'asc';
-let filteredBooks = [];
+    // 管理員界面模塊 - 封裝管理員UI相關狀態和操作
+const AdminUIModule = {
+    // 排序狀態
+    sortState: {
+        field: '',
+        direction: 'asc'
+    },
+    // 過濾後的書籍列表
+    filteredBooks: [],
+    
+    // 過濾書籍函數
+    filterBooks: function(books, filters) {
+        return books.filter(book => {
+            return (!filters.title || book.title.toLowerCase().includes(filters.title.toLowerCase())) &&
+                   (!filters.author || book.author.toLowerCase().includes(filters.author.toLowerCase())) &&
+                   (!filters.volume || (book.volume && book.volume.toString().toLowerCase().includes(filters.volume.toLowerCase()))) &&
+                   (!filters.cabinet || (book.cabinet && book.cabinet.toString().toLowerCase().includes(filters.cabinet.toLowerCase()))) &&
+                   (!filters.row || (book.row && book.row.toString().toLowerCase().includes(filters.row.toLowerCase())));
+        });
+    }
+};
 
 function displayAdminBookList() {
-        // 获取所有书籍并应用筛选
-        let books = BookData.getBooks();
-        filteredBooks = [...books]; // 保存一份完整的书籍列表副本
-        
-        // 应用筛选条件
-        const filterTitle = document.getElementById('filterTitle')?.value || '';
-        const filterAuthor = document.getElementById('filterAuthor')?.value || '';
-        const filterVolume = document.getElementById('filterVolume')?.value || '';
-        const filterCabinet = document.getElementById('filterCabinet')?.value || '';
-        const filterRow = document.getElementById('filterRow')?.value || '';
-        
-        if (filterTitle || filterAuthor || filterVolume || filterCabinet || filterRow) {
-            filteredBooks = filteredBooks.filter(book => {
-                return (!filterTitle || book.title.toLowerCase().includes(filterTitle.toLowerCase())) &&
-                       (!filterAuthor || book.author.toLowerCase().includes(filterAuthor.toLowerCase())) &&
-                       (!filterVolume || (book.volume && book.volume.toString().toLowerCase().includes(filterVolume.toLowerCase()))) &&
-                       (!filterCabinet || (book.cabinet && book.cabinet.toString().toLowerCase().includes(filterCabinet.toLowerCase()))) &&
-                       (!filterRow || (book.row && book.row.toString().toLowerCase().includes(filterRow.toLowerCase())));
-            });
-        }
-        
-        // 应用排序
-        if (currentSortField) {
-            filteredBooks.sort((a, b) => {
-                let valueA = (a[currentSortField] || '').toString().toLowerCase();
-                let valueB = (b[currentSortField] || '').toString().toLowerCase();
-                
-                if (valueA < valueB) return currentSortDirection === 'asc' ? -1 : 1;
-                if (valueA > valueB) return currentSortDirection === 'asc' ? 1 : -1;
-                return 0;
-            });
+        try {
+            // 獲取所有書籍
+            let books = BookData.getBooks();
+            AdminUIModule.filteredBooks = [...books]; // 保存一份完整的書籍列表副本
+            
+            // 應用過濾條件
+            const filters = {
+                title: document.getElementById('filterTitle')?.value || '',
+                author: document.getElementById('filterAuthor')?.value || '',
+                volume: document.getElementById('filterVolume')?.value || '',
+                cabinet: document.getElementById('filterCabinet')?.value || '',
+                row: document.getElementById('filterRow')?.value || ''
+            };
+            
+            if (filters.title || filters.author || filters.volume || filters.cabinet || filters.row) {
+                AdminUIModule.filteredBooks = AdminUIModule.filterBooks(AdminUIModule.filteredBooks, filters);
+            }
+            
+            // 應用排序
+            if (AdminUIModule.sortState.field) {
+                AdminUIModule.filteredBooks = UIModule.sortBooks(
+                    AdminUIModule.filteredBooks, 
+                    AdminUIModule.sortState.field, 
+                    AdminUIModule.sortState.direction
+                );
+            }
+        } catch (error) {
+            console.error('處理管理員書籍列表時發生錯誤:', error);
+            showNotification('載入書籍列表失敗: ' + error.message, 'error');
+            AdminUIModule.filteredBooks = [];
         }
         
         // 添加筛选输入框
@@ -482,49 +525,61 @@ function displayAdminBookList() {
             </div>
         `;
         
-        // 添加排序图标
-        if (currentSortField) {
-            const sortHeader = adminBookList.querySelector(`[data-sort="${currentSortField}"]`);
+        // 添加排序圖標
+        if (AdminUIModule.sortState.field) {
+            const sortHeader = adminBookList.querySelector(`[data-sort="${AdminUIModule.sortState.field}"]`);
             if (sortHeader) {
                 const icon = sortHeader.querySelector('i');
-                icon.className = currentSortDirection === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
+                icon.className = AdminUIModule.sortState.direction === 'asc' ? 'fas fa-sort-up' : 'fas fa-sort-down';
             }
         }
         
-        // 添加排序事件监听器
+        // 添加排序事件監聽器
         const sortableHeaders = adminBookList.querySelectorAll('.sortable');
         sortableHeaders.forEach(header => {
             header.addEventListener('click', function() {
                 const field = this.dataset.sort;
-                if (currentSortField === field) {
-                    // 如果已经按这个字段排序，则切换排序方向
-                    currentSortDirection = currentSortDirection === 'asc' ? 'desc' : 'asc';
+                if (AdminUIModule.sortState.field === field) {
+                    // 如果已經按這個字段排序，則切換排序方向
+                    AdminUIModule.sortState.direction = AdminUIModule.sortState.direction === 'asc' ? 'desc' : 'asc';
                 } else {
-                    // 如果是新的排序字段，设置为升序
-                    currentSortField = field;
-                    currentSortDirection = 'asc';
+                    // 如果是新的排序字段，設置為升序
+                    AdminUIModule.sortState.field = field;
+                    AdminUIModule.sortState.direction = 'asc';
                 }
-                displayAdminBookList(); // 重新显示列表
+                displayAdminBookList(); // 重新顯示列表
             });
         });
         
-        // 添加筛选按钮事件监听器
+        // 添加過濾按鈕事件監聽器
         document.getElementById('applyFilterBtn').addEventListener('click', function() {
-            displayAdminBookList();
+            try {
+                displayAdminBookList();
+            } catch (error) {
+                console.error('應用過濾時發生錯誤:', error);
+                showNotification('應用過濾失敗: ' + error.message, 'error');
+            }
         });
         
         document.getElementById('resetFilterBtn').addEventListener('click', function() {
-            // 清空所有筛选输入框
-            document.getElementById('filterTitle').value = '';
-            document.getElementById('filterAuthor').value = '';
-            document.getElementById('filterVolume').value = '';
-            document.getElementById('filterCabinet').value = '';
-            document.getElementById('filterRow').value = '';
-            displayAdminBookList();
+            try {
+                // 重置所有過濾輸入框
+                document.getElementById('filterTitle').value = '';
+                document.getElementById('filterAuthor').value = '';
+                document.getElementById('filterVolume').value = '';
+                document.getElementById('filterCabinet').value = '';
+                document.getElementById('filterRow').value = '';
+                
+                // 重新顯示列表
+                displayAdminBookList();
+            } catch (error) {
+                console.error('重置過濾時發生錯誤:', error);
+                showNotification('重置過濾失敗: ' + error.message, 'error');
+            }
         });
         
-        // 显示筛选后的书籍列表
-        filteredBooks.forEach(book => {
+        // 顯示過濾後的書籍列表
+        AdminUIModule.filteredBooks.forEach(book => {
             const listItem = document.createElement('div');
             listItem.className = 'book-list-item';
             listItem.dataset.id = book.id;
