@@ -6,7 +6,6 @@
     <title>書籍管理系統</title>
     <link rel="stylesheet" href="css/style.css">
     <link rel="stylesheet" href="css/github-excel.css">
-    <link rel="stylesheet" href="css/update-info.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
     <!-- SheetJS (Excel處理庫) -->
     <script src="https://cdn.sheetjs.com/xlsx-0.19.3/package/dist/xlsx.full.min.js"></script>
@@ -63,17 +62,17 @@
                 <!-- 書籍結果將在這裡動態生成 -->
             </div>
         </section>
-        
-        <!-- 數據更新信息區域 -->
-        <section class="data-update-info">
-            <h2>數據更新信息</h2>
-            <div id="dataUpdateInfo" class="update-info">
-                <p><strong>最後更新時間:</strong> <span id="lastUpdateTime">-</span></p>
-                <p><strong>書籍總數:</strong> <span id="totalBooksCount">-</span></p>
-                <p><strong>最近更新書籍:</strong></p>
-                <div id="recentlyUpdatedBooks" class="recent-updates">
-                    <!-- 最近更新的書籍將在這裡動態生成 -->
-                </div>
+            <h2>管理員面板</h2>
+            <div class="admin-controls">
+                <button id="addBookBtn" class="btn"><i class="fas fa-plus"></i> 新增書籍</button>
+                <button id="exportBtn" class="btn"><i class="fas fa-file-export"></i> 導出數據</button>
+                <button id="importBtn" class="btn"><i class="fas fa-file-import"></i> 導入數據</button>
+                <button id="backupBtn" class="btn"><i class="fas fa-save"></i> 備份數據</button>
+                <button id="trashBinBtn" class="btn"><i class="fas fa-trash"></i> 垃圾桶</button>
+                <button id="logoutBtn" class="btn btn-danger"><i class="fas fa-sign-out-alt"></i> 登出</button>
+            </div>
+            <div id="adminBookList" class="book-list">
+                <!-- 管理員書籍列表將在這裡動態生成 -->
             </div>
         </section>
     </main>
@@ -223,7 +222,7 @@
 
     <footer>
         <div class="container">
-            <p>&copy; 2025 書籍管理系統 | <a href="#" target="_blank">E書漫</a></p>
+            <p>&copy; 2023 書籍管理系統 | <a href="https://github.com/yourusername/book-management-system" target="_blank">GitHub</a></p>
         </div>
     </footer>
 
