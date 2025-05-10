@@ -9,7 +9,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportExcelBtn = document.getElementById('exportExcelBtn');
     const importFile = document.getElementById('importFile');
     const importBtn = document.getElementById('importBtn');
-    // const backupGithubBtn = document.getElementById('backupGithubBtn'); // GitHub備份功能較複雜，暫時註釋
+    const backupGithubBtn = document.getElementById('backupGithubBtn'); // GitHub備份功能較複雜，暫時註釋 -> const backupGithubBtn = document.getElementById('backupGithubBtn');
 
     const bookModal = document.getElementById('bookModal');
     const adminLoginModal = document.getElementById('adminLoginModal');
