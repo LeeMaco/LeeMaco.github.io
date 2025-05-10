@@ -1,0 +1,242 @@
+body {
+    font-family: sans-serif;
+    margin: 0;
+    background-color: #f4f4f4;
+    color: #333;
+    line-height: 1.6;
+}
+
+header {
+    background: #333;
+    color: #fff;
+    padding: 1rem 0;
+    text-align: center;
+}
+
+header h1 {
+    margin: 0;
+}
+
+#adminLoginBtn {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    padding: 0.5rem 1rem;
+    background: #4CAF50;
+    color: white;
+    border: none;
+    cursor: pointer;
+    border-radius: 5px;
+}
+
+main {
+    padding: 20px;
+    max-width: 1200px;
+    margin: auto;
+}
+
+.search-container {
+    margin-bottom: 20px;
+    display: flex;
+    gap: 10px;
+}
+
+#searchInput {
+    flex-grow: 1;
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+#categoryFilter {
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+}
+
+.book-list-container h2, .admin-controls h2 {
+    border-bottom: 2px solid #333;
+    padding-bottom: 10px;
+    margin-bottom: 20px;
+}
+
+.book-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.book-card {
+    background: #fff;
+    border: 1px solid #ddd;
+    border-radius: 5px;
+    padding: 15px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.book-card h3 {
+    margin-top: 0;
+    color: #333;
+}
+
+.book-card p {
+    font-size: 0.9rem;
+    margin-bottom: 5px;
+}
+
+.book-card .actions button {
+    margin-right: 5px;
+    padding: 5px 10px;
+    border: none;
+    border-radius: 3px;
+    cursor: pointer;
+}
+
+.book-card .edit-btn {
+    background-color: #ffc107;
+}
+
+.book-card .delete-btn {
+    background-color: #dc3545;
+    color: white;
+}
+
+.admin-controls {
+    background: #fff;
+    padding: 20px;
+    margin-top: 20px;
+    border-radius: 5px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.admin-controls button, .admin-controls input[type="file"] {
+    margin: 5px;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+}
+
+#addBookBtn {
+    background-color: #28a745;
+    color: white;
+}
+
+#exportJsonBtn, #exportExcelBtn {
+    background-color: #007bff;
+    color: white;
+}
+
+#importBtn {
+    background-color: #17a2b8;
+    color: white;
+}
+
+#backupGithubBtn {
+    background-color: #6c757d;
+    color: white;
+}
+
+/* Modal Styles */
+.modal {
+    display: none; 
+    position: fixed; 
+    z-index: 1; 
+    left: 0;
+    top: 0;
+    width: 100%; 
+    height: 100%; 
+    overflow: auto; 
+    background-color: rgb(0,0,0); 
+    background-color: rgba(0,0,0,0.4); 
+    padding-top: 60px;
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto; 
+    padding: 20px;
+    border: 1px solid #888;
+    width: 80%; 
+    max-width: 500px;
+    border-radius: 5px;
+}
+
+.close-btn, .close-login-btn {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.close-btn:hover,
+.close-btn:focus,
+.close-login-btn:hover,
+.close-login-btn:focus {
+    color: black;
+    text-decoration: none;
+    cursor: pointer;
+}
+
+#bookForm div, #adminLoginForm div {
+    margin-bottom: 15px;
+}
+
+#bookForm label, #adminLoginForm label {
+    display: block;
+    margin-bottom: 5px;
+}
+
+#bookForm input[type="text"],
+#bookForm input[type="hidden"],
+#bookForm textarea,
+#adminLoginForm input[type="text"],
+#adminLoginForm input[type="password"] {
+    width: calc(100% - 22px);
+    padding: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+#bookForm textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+#bookForm button[type="submit"], #adminLoginForm button[type="submit"] {
+    background-color: #4CAF50;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+#bookForm button[type="submit"]:hover, #adminLoginForm button[type="submit"]:hover {
+    background-color: #45a049;
+}
+
+footer {
+    text-align: center;
+    padding: 20px;
+    margin-top: 20px;
+    background: #333;
+    color: #fff;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .search-container {
+        flex-direction: column;
+    }
+
+    .book-list {
+        grid-template-columns: 1fr;
+    }
+
+    #adminLoginBtn {
+        position: static;
+        display: block;
+        margin: 10px auto;
+    }
+}
