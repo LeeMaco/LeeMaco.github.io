@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍管理系統</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <header>
+        <h1>書籍管理系統</h1>
+        <button id="admin-login-btn">管理員登入</button>
+    </header>
+    <main>
+        <section id="search-section">
+            <input type="text" id="search-input" placeholder="輸入書名、作者或ISBN...">
+            <select id="category-filter">
+                <option value="">所有類別</option>
+            </select>
+            <button id="search-btn">搜尋</button>
+        </section>
+        <section id="books-list"></section>
+        <section id="book-detail" style="display:none;"></section>
+        <section id="admin-panel" style="display:none;">
+            <button id="add-book-btn">新增書籍</button>
+            <button id="export-json-btn">導出JSON</button>
+            <button id="import-json-btn">導入JSON</button>
+            <button id="export-excel-btn">導出Excel</button>
+            <button id="import-excel-btn">導入Excel</button>
+            <button id="backup-github-btn">備份到GitHub</button>
+            <input type="file" id="import-file" style="display:none;">
+        </section>
+    </main>
+    <div id="modal" style="display:none;"></div>
+    <script src="main.js"></script>
+</body>
+</html>
