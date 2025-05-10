@@ -124,9 +124,201 @@ document.addEventListener("DOMContentLoaded", function() {
     };
     document.getElementById("book-detail").onclick = function(e) {
         if (e.target.id === "close-detail-btn") hideBookDetail();
-        // 編輯與刪除功能後續補充
+        if (isAdmin && e.target.id === "edit-book-btn") {
+            const id = parseInt(document.querySelector("#book-detail").dataset.id || books.find(b => b.title === document.querySelector("#book-detail h2").textContent).id);
+            const book = books.find(b => b.id === id);
+            showBookForm(book, true);
+        }
+        if (isAdmin && e.target.id === "delete-book-btn") {
+            const id = parseInt(document.querySelector("#book-detail").dataset.id || books.find(b => b.title === document.querySelector("#book-detail h2").textContent).id);
+            if (confirm("確定要刪除這本書嗎？")) {
+                books = books.filter(b => b.id !== id);
+                saveBooks(books);
+                renderBooksList(books);
+                hideBookDetail();
+            }
+        }
     };
     document.getElementById("admin-login-btn").onclick = function() {
         adminLogin();
     };
+    document.getElementById("add-book-btn").onclick = function() {
+        showBookForm(null, false);
+    };
+    document.getElementById("export-json-btn").onclick = function() {
+        const blob = new Blob([JSON.stringify(books, null, 2)], {type: "application/json"});
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = "books.json";
+        a.click();
+        URL.revokeObjectURL(url);
+    };
+    document.getElementById("import-json-btn").onclick = function() {
+        document.getElementById("import-file").accept = ".json";
+        document.getElementById("import-file").click();
+    };
+    document.getElementById("import-file").onchange = function(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+        if (file.name.endsWith(".json")) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                try {
+                    const imported = JSON.parse(evt.target.result);
+                    mergeBooks(imported);
+                } catch {
+                    alert("JSON格式錯誤");
+                }
+            };
+            reader.readAsText(file);
+        } else if (file.name.endsWith(".xls") || file.name.endsWith(".xlsx")) {
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+                const data = new Uint8Array(evt.target.result);
+                const workbook = XLSX.read(data, {type: 'array'});
+                const sheet = workbook.Sheets[workbook.SheetNames[0]];
+                const imported = XLSX.utils.sheet_to_json(sheet);
+                mergeBooks(imported);
+            };
+            reader.readAsArrayBuffer(file);
+        }
+        e.target.value = "";
+    };
+    document.getElementById("export-excel-btn").onclick = function() {
+        const ws = XLSX.utils.json_to_sheet(books);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Books");
+        XLSX.writeFile(wb, "books.xlsx");
+    };
+    document.getElementById("import-excel-btn").onclick = function() {
+        document.getElementById("import-file").accept = ".xls,.xlsx";
+        document.getElementById("import-file").click();
+    };
+    document.getElementById("backup-github-btn").onclick = function() {
+        showGithubBackupForm();
+    };
 });
+
+function showBookForm(book, isEdit) {
+    const modal = document.getElementById("modal");
+    modal.innerHTML = `
+        <div style="background:#fff;padding:2rem;border-radius:8px;min-width:260px;">
+            <h2>${isEdit ? "編輯書籍" : "新增書籍"}</h2>
+            <input id="book-title" placeholder="書名" value="${book ? book.title : ''}"/><br/>
+            <input id="book-author" placeholder="作者" value="${book ? book.author : ''}"/><br/>
+            <input id="book-isbn" placeholder="ISBN" value="${book ? book.isbn : ''}"/><br/>
+            <input id="book-category" placeholder="類別" value="${book ? book.category : ''}"/><br/>
+            <input id="book-location" placeholder="位置" value="${book ? book.location : ''}"/><br/>
+            <textarea id="book-description" placeholder="簡介">${book ? book.description : ''}</textarea><br/>
+            <button id="book-save-btn">儲存</button>
+            <button id="book-cancel-btn">取消</button>
+        </div>
+    `;
+    modal.style.display = "flex";
+    document.getElementById("book-save-btn").onclick = function() {
+        const newBook = {
+            id: book ? book.id : Date.now(),
+            title: document.getElementById("book-title").value.trim(),
+            author: document.getElementById("book-author").value.trim(),
+            isbn: document.getElementById("book-isbn").value.trim(),
+            category: document.getElementById("book-category").value.trim(),
+            location: document.getElementById("book-location").value.trim(),
+            description: document.getElementById("book-description").value.trim()
+        };
+        if (!newBook.title || !newBook.author) {
+            alert("書名與作者為必填");
+            return;
+        }
+        if (isEdit) {
+            books = books.map(b => b.id === newBook.id ? newBook : b);
+        } else {
+            books.push(newBook);
+        }
+        saveBooks(books);
+        renderBooksList(books);
+        renderCategoryOptions(books);
+        modal.style.display = "none";
+    };
+    document.getElementById("book-cancel-btn").onclick = function() {
+        modal.style.display = "none";
+    };
+}
+
+function mergeBooks(imported) {
+    let changed = false;
+    imported.forEach(newBook => {
+        if (!books.some(b => b.isbn === newBook.isbn && b.isbn)) {
+            newBook.id = Date.now() + Math.floor(Math.random()*10000);
+            books.push(newBook);
+            changed = true;
+        }
+    });
+    if (changed) {
+        saveBooks(books);
+        renderBooksList(books);
+        renderCategoryOptions(books);
+        alert("導入成功");
+    } else {
+        alert("無新資料被導入（可能全部重複）");
+    }
+}
+
+function showGithubBackupForm() {
+    const modal = document.getElementById("modal");
+    modal.innerHTML = `
+        <div style="background:#fff;padding:2rem;border-radius:8px;min-width:260px;">
+            <h2>備份到GitHub</h2>
+            <input id="github-token" placeholder="GitHub Token" style="width:100%;margin-bottom:0.5rem;"/><br/>
+            <input id="github-repo" placeholder="用戶名/倉庫名" style="width:100%;margin-bottom:0.5rem;"/><br/>
+            <input id="github-path" placeholder="檔案路徑 (如 data/books.json)" style="width:100%;margin-bottom:1rem;"/><br/>
+            <button id="github-backup-confirm">備份</button>
+            <button id="github-backup-cancel">取消</button>
+            <p id="github-backup-msg" style="color:red;"></p>
+        </div>
+    `;
+    modal.style.display = "flex";
+    document.getElementById("github-backup-confirm").onclick = async function() {
+        const token = document.getElementById("github-token").value.trim();
+        const repo = document.getElementById("github-repo").value.trim();
+        const path = document.getElementById("github-path").value.trim();
+        if (!token || !repo || !path) {
+            document.getElementById("github-backup-msg").textContent = "請填寫所有欄位";
+            return;
+        }
+        try {
+            const url = `https://api.github.com/repos/${repo}/contents/${path}`;
+            const content = btoa(unescape(encodeURIComponent(JSON.stringify(books, null, 2))));
+            // 先檢查檔案是否存在
+            let sha = undefined;
+            const getRes = await fetch(url, {headers: {Authorization: `token ${token}`}});
+            if (getRes.status === 200) {
+                const data = await getRes.json();
+                sha = data.sha;
+            }
+            const res = await fetch(url, {
+                method: "PUT",
+                headers: {
+                    "Authorization": `token ${token}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    message: "備份書籍資料",
+                    content,
+                    sha
+                })
+            });
+            if (res.ok) {
+                document.getElementById("github-backup-msg").style.color = "green";
+                document.getElementById("github-backup-msg").textContent = "備份成功！";
+            } else {
+                document.getElementById("github-backup-msg").textContent = "備份失敗，請檢查Token與倉庫資訊";
+            }
+        } catch {
+            document.getElementById("github-backup-msg").textContent = "網路或API錯誤";
+        }
+    };
+    document.getElementById("github-backup-cancel").onclick = function() {
+        modal.style.display = "none";
+    };
+}
