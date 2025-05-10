@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>書籍管理系統</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header>
+        <h1>書籍管理系統</h1>
+        <button id="admin-login">管理員登入</button>
+        <button id="import-data">導入數據</button>
+        <button id="export-data">導出數據</button>
+    </header>
+    <main>
+        <section id="search">
+            <input type="text" id="search-bar" placeholder="輸入書名、作者或ISBN">
+            <select id="category-filter">
+                <option value="">所有類別</option>
+                <!-- Add more categories as needed -->
+            </select>
+        </section>
+        <section id="book-list">
+            <!-- Books will be displayed here -->
+        </section>
+    </main>
+    <script src="app.js"></script>
+</body>
+</html>

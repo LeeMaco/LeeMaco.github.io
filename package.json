@@ -1,0 +1,12 @@
+{
+  "name": "book-management-system",
+  "version": "1.0.0",
+  "description": "A simple book management system",
+  "main": "app.js",
+  "scripts": {
+    "dev": "node app.js"
+  },
+  "dependencies": {
+    "xlsx": "^0.18.5"
+  }
+}
