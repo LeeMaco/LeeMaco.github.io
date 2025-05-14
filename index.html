@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>會員管理系統</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>會員管理系統</h1>
+            <div id="login-status">
+                <span id="user-info">未登入</span>
+                <button id="login-btn" class="btn">管理員登入</button>
+                <button id="logout-btn" class="btn" style="display: none;">登出</button>
+            </div>
+        </header>
+
+        <div id="search-section" class="section">
+            <h2>會員查詢</h2>
+            <div class="search-container">
+                <input type="text" id="search-input" placeholder="請輸入姓名或手機號碼">
+                <button id="search-btn" class="btn"><i class="fas fa-search"></i> 查詢</button>
+            </div>
+            <div id="search-result" class="result-container">
+                <!-- 查詢結果將顯示在這裡 -->
+            </div>
+        </div>
+
+        <div id="admin-section" class="section" style="display: none;">
+            <h2>會員管理</h2>
+            <button id="add-member-btn" class="btn"><i class="fas fa-plus"></i> 新增會員</button>
+            <div id="member-list" class="list-container">
+                <!-- 會員列表將顯示在這裡 -->
+            </div>
+        </div>
+
+        <!-- 登入彈窗 -->
+        <div id="login-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2>管理員登入</h2>
+                <div class="form-group">
+                    <label for="username">帳號:</label>
+                    <input type="text" id="username" placeholder="請輸入帳號">
+                </div>
+                <div class="form-group">
+                    <label for="password">密碼:</label>
+                    <input type="password" id="password" placeholder="請輸入密碼">
+                </div>
+                <button id="login-submit" class="btn">登入</button>
+                <p id="login-error" class="error-message"></p>
+            </div>
+        </div>
+
+        <!-- 會員表單彈窗 -->
+        <div id="member-modal" class="modal">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <h2 id="member-form-title">新增會員</h2>
+                <div class="form-group">
+                    <label for="member-name">姓名:</label>
+                    <input type="text" id="member-name" placeholder="請輸入姓名">
+                </div>
+                <div class="form-group">
+                    <label for="member-phone">手機號碼:</label>
+                    <input type="text" id="member-phone" placeholder="請輸入手機號碼">
+                </div>
+                <div class="form-group">
+                    <label for="member-email">電子郵件:</label>
+                    <input type="email" id="member-email" placeholder="請輸入電子郵件">
+                </div>
+                <div class="form-group">
+                    <label for="member-level">會員等級:</label>
+                    <select id="member-level">
+                        <option value="一般會員">一般會員</option>
+                        <option value="銀卡會員">銀卡會員</option>
+                        <option value="金卡會員">金卡會員</option>
+                        <option value="鑽石會員">鑽石會員</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label for="member-note">備註:</label>
+                    <textarea id="member-note" placeholder="請輸入備註"></textarea>
+                </div>
+                <input type="hidden" id="member-id">
+                <button id="save-member" class="btn">儲存</button>
+                <p id="member-error" class="error-message"></p>
+            </div>
+        </div>
+
+        <!-- 確認刪除彈窗 -->
+        <div id="confirm-modal" class="modal">
+            <div class="modal-content">
+                <h2>確認刪除</h2>
+                <p>確定要刪除此會員資料嗎？此操作無法復原。</p>
+                <div class="button-group">
+                    <button id="confirm-delete" class="btn btn-danger">確定刪除</button>
+                    <button id="cancel-delete" class="btn">取消</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <footer>
+        <p>&copy; 2023 會員管理系統 | <a href="https://github.com/yourusername/member-management" target="_blank">GitHub</a></p>
+    </footer>
+
+    <script src="app.js"></script>
+</body>
+</html>
