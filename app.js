@@ -98,6 +98,8 @@ class MemberManagementSystem {
         // 照片編輯器
         document.getElementById('scaleSlider').addEventListener('input', (e) => this.updatePhotoScale(e.target.value));
         document.getElementById('rotateSlider').addEventListener('input', (e) => this.updatePhotoRotation(e.target.value));
+        document.getElementById('horizontalSlider').addEventListener('input', (e) => this.updatePhotoHorizontal(e.target.value));
+        document.getElementById('verticalSlider').addEventListener('input', (e) => this.updatePhotoVertical(e.target.value));
         document.getElementById('resetPhotoBtn').addEventListener('click', () => this.resetPhotoEditor());
         document.getElementById('cropPhotoBtn').addEventListener('click', () => this.cropPhoto());
         document.getElementById('savePhotoBtn').addEventListener('click', () => this.saveEditedPhoto());
@@ -486,6 +488,24 @@ class MemberManagementSystem {
         }
     }
 
+    // 更新照片水平位置
+    updatePhotoHorizontal(value) {
+        if (this.photoEditor) {
+            this.photoEditor.offsetX = parseInt(value);
+            document.getElementById('horizontalValue').textContent = value + 'px';
+            this.drawPhoto();
+        }
+    }
+
+    // 更新照片垂直位置
+    updatePhotoVertical(value) {
+        if (this.photoEditor) {
+            this.photoEditor.offsetY = parseInt(value);
+            document.getElementById('verticalValue').textContent = value + 'px';
+            this.drawPhoto();
+        }
+    }
+
     // 重置照片編輯器
     resetPhotoEditor() {
         if (this.photoEditor) {
@@ -496,8 +516,12 @@ class MemberManagementSystem {
             
             document.getElementById('scaleSlider').value = 1;
             document.getElementById('rotateSlider').value = 0;
+            document.getElementById('horizontalSlider').value = 0;
+            document.getElementById('verticalSlider').value = 0;
             document.getElementById('scaleValue').textContent = '100%';
             document.getElementById('rotateValue').textContent = '0°';
+            document.getElementById('horizontalValue').textContent = '0px';
+            document.getElementById('verticalValue').textContent = '0px';
             
             this.drawPhoto();
         }
@@ -598,8 +622,9 @@ class MemberManagementSystem {
     // 編輯當前會員
     editCurrentMember() {
         if (this.currentMember) {
+            const memberToEdit = {...this.currentMember};
             this.hideMemberDetailModal();
-            this.showMemberModal(this.currentMember);
+            this.showMemberModal(memberToEdit);
         }
     }
 
