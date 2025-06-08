@@ -14,14 +14,26 @@ class MemberManagementSystem {
     // 初始化系統
     async init() {
         try {
+            // 初始化變數
+            this.currentPage = 1;
+            this.isLoading = false;
+            this.hasMoreMembers = true;
+            this.searchQuery = '';
+            this.searchCache = {};
+            
             await this.initDatabase();
-            await this.loadMembers();
+            const result = await this.loadMembers(1, 30); // 初始加載 30 筆資料
+            this.hasMoreMembers = result.hasMore;
+            
             this.initEventListeners();
             this.updateStorageInfo();
             this.renderMembers();
             
             // 檢查是否支持 PWA
             this.initPWA();
+            
+            // 顯示資料庫統計信息
+            console.log(`已載入 ${this.members.length} 筆會員資料，總計 ${result.total} 筆`);
         } catch (error) {
             console.error('系統初始化失敗:', error);
             this.showNotification('系統初始化失敗', 'error');
@@ -72,11 +84,37 @@ class MemberManagementSystem {
         document.getElementById('exportBtn').addEventListener('click', () => this.showExportModal());
         document.getElementById('backupBtn').addEventListener('click', () => this.createBackup());
         
-        // 搜尋
-        document.getElementById('searchInput').addEventListener('input', (e) => this.searchMembers(e.target.value));
+        // 搜尋 - 使用防抖動優化
+        const searchInput = document.getElementById('searchInput');
+        let debounceTimer;
+        
+        searchInput.addEventListener('input', (e) => {
+            clearTimeout(debounceTimer);
+            debounceTimer = setTimeout(() => {
+                this.searchQuery = e.target.value;
+                this.currentPage = 1; // 重置頁碼
+                this.searchMembers(this.searchQuery, 1);
+            }, 300); // 300ms 防抖動
+        });
+        
         document.getElementById('searchBtn').addEventListener('click', () => {
-            const query = document.getElementById('searchInput').value;
-            this.searchMembers(query);
+            this.searchQuery = searchInput.value;
+            this.currentPage = 1; // 重置頁碼
+            this.searchMembers(this.searchQuery, 1);
+        });
+        
+        // 無限滾動加載
+        window.addEventListener('scroll', () => {
+            if (this.isLoading || !this.hasMoreMembers) return;
+            
+            const scrollY = window.scrollY;
+            const windowHeight = window.innerHeight;
+            const documentHeight = document.documentElement.scrollHeight;
+            
+            // 當滾動到距離底部 200px 時加載更多
+            if (scrollY + windowHeight >= documentHeight - 200) {
+                this.loadMoreMembers();
+            }
         });
         
         // 會員表單
@@ -145,20 +183,94 @@ class MemberManagementSystem {
             }
         });
     }
-
-    // 載入會員資料
-    async loadMembers() {
+    
+    // 加載更多會員
+    async loadMoreMembers() {
+        if (this.isLoading || !this.hasMoreMembers) return;
+        
+        this.isLoading = true;
+        this.currentPage++;
+        
         try {
+            let result;
+            
+            if (this.searchQuery) {
+                // 如果有搜尋查詢，則加載更多搜尋結果
+                result = await this.searchMembers(this.searchQuery, this.currentPage);
+            } else {
+                // 否則加載更多所有會員
+                result = await this.loadMembers(this.currentPage);
+            }
+            
+            this.hasMoreMembers = result.hasMore;
+            
+            if (!this.hasMoreMembers && this.members.length > 0) {
+                this.showNotification('已加載全部會員資料');
+            }
+        } catch (error) {
+            console.error('加載更多會員失敗:', error);
+        } finally {
+            this.isLoading = false;
+        }
+    }
+
+    // 載入會員資料 (優化版本，支持分頁加載)
+    async loadMembers(page = 1, pageSize = 50) {
+        try {
+            // 如果是第一頁，重置會員列表
+            if (page === 1) {
+                this.members = [];
+                this.filteredMembers = [];
+                this.totalMembers = await this.countMembers();
+            }
+            
             const transaction = this.db.transaction(['members'], 'readonly');
             const store = transaction.objectStore('members');
-            const request = store.getAll();
+            
+            // 使用游標進行分頁加載
+            const request = store.openCursor();
+            let count = 0;
+            const skip = (page - 1) * pageSize;
             
             return new Promise((resolve, reject) => {
-                request.onsuccess = () => {
-                    this.members = request.result || [];
-                    this.filteredMembers = [...this.members];
-                    resolve();
+                const pageMembers = [];
+                
+                request.onsuccess = (event) => {
+                    const cursor = event.target.result;
+                    
+                    if (cursor) {
+                        if (count >= skip) {
+                            if (pageMembers.length < pageSize) {
+                                pageMembers.push(cursor.value);
+                            }
+                        }
+                        
+                        count++;
+                        
+                        if (pageMembers.length < pageSize) {
+                            cursor.continue();
+                        } else {
+                            // 已獲取足夠的數據
+                            this.members = [...this.members, ...pageMembers];
+                            this.filteredMembers = [...this.members];
+                            resolve({
+                                members: pageMembers,
+                                hasMore: count < this.totalMembers,
+                                total: this.totalMembers
+                            });
+                        }
+                    } else {
+                        // 沒有更多數據
+                        this.members = [...this.members, ...pageMembers];
+                        this.filteredMembers = [...this.members];
+                        resolve({
+                            members: pageMembers,
+                            hasMore: false,
+                            total: this.totalMembers
+                        });
+                    }
                 };
+                
                 request.onerror = () => reject(request.error);
             });
         } catch (error) {
@@ -166,27 +278,97 @@ class MemberManagementSystem {
             throw error;
         }
     }
+    
+    // 計算會員總數
+    async countMembers() {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['members'], 'readonly');
+            const store = transaction.objectStore('members');
+            const countRequest = store.count();
+            
+            countRequest.onsuccess = () => resolve(countRequest.result);
+            countRequest.onerror = () => reject(countRequest.error);
+        });
+    }
 
     // 渲染會員列表
-    renderMembers() {
+    renderMembers(append = false) {
         const membersList = document.getElementById('membersList');
         const emptyState = document.getElementById('emptyState');
+        const loadingIndicator = document.getElementById('loadingIndicator');
         
+        // 處理空結果
         if (this.filteredMembers.length === 0) {
             membersList.style.display = 'none';
             emptyState.style.display = 'block';
+            
+            // 更新空狀態訊息
+            const emptyTitle = document.querySelector('#emptyState h3');
+            const emptyText = document.querySelector('#emptyState p');
+            
+            if (this.searchQuery) {
+                emptyTitle.textContent = '沒有符合的搜尋結果';
+                emptyText.textContent = `沒有找到符合「${this.searchQuery}」的會員資料`;
+            } else {
+                emptyTitle.textContent = '尚無會員資料';
+                emptyText.textContent = '點擊「新增會員」開始建立您的會員資料庫';
+            }
+            
             return;
         }
         
+        // 顯示會員列表
         membersList.style.display = 'grid';
         emptyState.style.display = 'none';
         
-        membersList.innerHTML = this.filteredMembers.map(member => this.createMemberCard(member)).join('');
+        // 生成 HTML
+        if (append) {
+            // 追加模式：保留現有卡片，添加新卡片
+            const startIndex = membersList.querySelectorAll('.member-card').length;
+            const newMembers = this.filteredMembers.slice(startIndex);
+            
+            const fragment = document.createDocumentFragment();
+            newMembers.forEach(member => {
+                const tempDiv = document.createElement('div');
+                tempDiv.innerHTML = this.createMemberCard(member);
+                fragment.appendChild(tempDiv.firstElementChild);
+            });
+            
+            membersList.appendChild(fragment);
+            
+            // 為新添加的卡片添加點擊事件
+            newMembers.forEach((member, index) => {
+                const newIndex = startIndex + index;
+                const card = membersList.querySelectorAll('.member-card')[newIndex];
+                card.addEventListener('click', () => this.showMemberDetail(this.filteredMembers[newIndex]));
+            });
+        } else {
+            // 重置模式：完全替換所有卡片
+            membersList.innerHTML = this.filteredMembers.map(member => this.createMemberCard(member)).join('');
+            
+            // 添加點擊事件
+            membersList.querySelectorAll('.member-card').forEach((card, index) => {
+                card.addEventListener('click', () => this.showMemberDetail(this.filteredMembers[index]));
+            });
+        }
         
-        // 添加點擊事件
-        membersList.querySelectorAll('.member-card').forEach((card, index) => {
-            card.addEventListener('click', () => this.showMemberDetail(this.filteredMembers[index]));
-        });
+        // 顯示加載狀態
+        if (this.hasMoreMembers) {
+            // 如果還有更多資料，顯示加載指示器
+            if (!document.getElementById('loadMoreIndicator')) {
+                const loadMoreIndicator = document.createElement('div');
+                loadMoreIndicator.id = 'loadMoreIndicator';
+                loadMoreIndicator.className = 'load-more-indicator';
+                loadMoreIndicator.innerHTML = '<div class="spinner"></div><p>載入更多...</p>';
+                membersList.after(loadMoreIndicator);
+            }
+        } else {
+            // 如果沒有更多資料，移除加載指示器
+            const loadMoreIndicator = document.getElementById('loadMoreIndicator');
+            if (loadMoreIndicator) {
+                loadMoreIndicator.remove();
+            }
+        }
     }
 
     // 創建會員卡片
@@ -347,19 +529,165 @@ class MemberManagementSystem {
         });
     }
 
-    // 搜尋會員
-    searchMembers(query) {
-        if (!query.trim()) {
-            this.filteredMembers = [...this.members];
-        } else {
-            const searchTerm = query.toLowerCase();
-            this.filteredMembers = this.members.filter(member => 
-                member.name.toLowerCase().includes(searchTerm) ||
-                member.phone.includes(searchTerm) ||
-                (member.email && member.email.toLowerCase().includes(searchTerm))
-            );
+    // 搜尋會員 (優化版本，使用 IndexedDB 索引)
+    async searchMembers(query, page = 1, pageSize = 50) {
+        try {
+            this.showLoading();
+            
+            // 如果搜尋詞為空，則載入所有會員
+            if (!query.trim()) {
+                const result = await this.loadMembers(page, pageSize);
+                this.renderMembers();
+                this.hideLoading();
+                return result;
+            }
+            
+            // 重置搜尋結果（如果是第一頁）
+            if (page === 1) {
+                this.filteredMembers = [];
+                this.searchCache = {}; // 重置搜尋緩存
+            }
+            
+            // 檢查緩存
+            const cacheKey = `${query}_${page}_${pageSize}`;
+            if (this.searchCache && this.searchCache[cacheKey]) {
+                this.filteredMembers = this.searchCache[cacheKey];
+                this.renderMembers();
+                this.hideLoading();
+                return {
+                    members: this.filteredMembers,
+                    hasMore: false,
+                    total: this.filteredMembers.length
+                };
+            }
+            
+            // 分割搜尋詞，支持多關鍵字搜尋
+            const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+            
+            // 使用 IndexedDB 的索引進行搜尋
+            const transaction = this.db.transaction(['members'], 'readonly');
+            const store = transaction.objectStore('members');
+            
+            // 獲取所有索引
+            const nameIndex = store.index('name');
+            const phoneIndex = store.index('phone');
+            const emailIndex = store.index('email');
+            
+            // 使用 Promise.all 並行搜尋多個索引
+            const searchResults = await Promise.all([
+                this.searchByIndex(nameIndex, searchTerms),
+                this.searchByIndex(phoneIndex, searchTerms),
+                this.searchByIndex(emailIndex, searchTerms)
+            ]);
+            
+            // 合併搜尋結果並去重
+            const allResults = [];
+            const uniqueIds = new Set();
+            
+            searchResults.flat().forEach(member => {
+                if (!uniqueIds.has(member.id)) {
+                    uniqueIds.add(member.id);
+                    allResults.push(member);
+                }
+            });
+            
+            // 根據相關性排序結果
+            const sortedResults = this.sortSearchResults(allResults, searchTerms);
+            
+            // 分頁處理
+            const start = (page - 1) * pageSize;
+            const end = start + pageSize;
+            const pagedResults = sortedResults.slice(start, end);
+            
+            // 更新過濾後的會員列表
+            if (page === 1) {
+                this.filteredMembers = pagedResults;
+            } else {
+                this.filteredMembers = [...this.filteredMembers, ...pagedResults];
+            }
+            
+            // 緩存搜尋結果
+            if (!this.searchCache) this.searchCache = {};
+            this.searchCache[cacheKey] = this.filteredMembers;
+            
+            this.renderMembers();
+            this.hideLoading();
+            
+            return {
+                members: pagedResults,
+                hasMore: end < sortedResults.length,
+                total: sortedResults.length
+            };
+            
+        } catch (error) {
+            console.error('搜尋會員失敗:', error);
+            this.showNotification('搜尋失敗，請重試', 'error');
+            this.hideLoading();
+            return { members: [], hasMore: false, total: 0 };
         }
-        this.renderMembers();
+    }
+    
+    // 使用索引搜尋
+    async searchByIndex(index, searchTerms) {
+        return new Promise((resolve, reject) => {
+            const results = [];
+            const request = index.openCursor();
+            
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    const member = cursor.value;
+                    const fieldValue = String(member[index.name] || '').toLowerCase();
+                    
+                    // 檢查是否匹配所有搜尋詞
+                    const isMatch = searchTerms.some(term => fieldValue.includes(term));
+                    
+                    if (isMatch) {
+                        results.push(member);
+                    }
+                    
+                    cursor.continue();
+                } else {
+                    resolve(results);
+                }
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    // 根據相關性排序搜尋結果
+    sortSearchResults(results, searchTerms) {
+        return results.sort((a, b) => {
+            const aScore = this.calculateRelevanceScore(a, searchTerms);
+            const bScore = this.calculateRelevanceScore(b, searchTerms);
+            return bScore - aScore; // 降序排列，分數高的排前面
+        });
+    }
+    
+    // 計算相關性分數
+    calculateRelevanceScore(member, searchTerms) {
+        let score = 0;
+        const name = String(member.name || '').toLowerCase();
+        const phone = String(member.phone || '');
+        const email = String(member.email || '').toLowerCase();
+        
+        searchTerms.forEach(term => {
+            // 姓名匹配權重最高
+            if (name.includes(term)) score += 10;
+            // 精確匹配加分
+            if (name === term) score += 15;
+            
+            // 電話匹配
+            if (phone.includes(term)) score += 8;
+            if (phone === term) score += 12;
+            
+            // 電子郵件匹配
+            if (email.includes(term)) score += 5;
+            if (email === term) score += 10;
+        });
+        
+        return score;
     }
 
     // 照片上傳處理

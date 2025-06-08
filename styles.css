@@ -602,6 +602,31 @@ body {
     margin-bottom: 20px;
 }
 
+/* 無限滾動加載指示器 */
+.load-more-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 20px 0;
+    margin: 10px auto;
+    width: 100%;
+    text-align: center;
+}
+
+.load-more-indicator .spinner {
+    width: 30px;
+    height: 30px;
+    border-width: 3px;
+    margin-bottom: 10px;
+}
+
+.load-more-indicator p {
+    color: #666;
+    font-size: 14px;
+    margin: 5px 0 0 0;
+}
+
 @keyframes spin {
     0% { transform: rotate(0deg); }
     100% { transform: rotate(360deg); }
