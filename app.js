@@ -72,6 +72,20 @@ class MemberManagementSystem {
                     const backupStore = db.createObjectStore('backups', { keyPath: 'id', autoIncrement: true });
                     backupStore.createIndex('timestamp', 'timestamp', { unique: false });
                 }
+                
+                // 創建搜尋紀錄資料表
+                if (!db.objectStoreNames.contains('searchHistory')) {
+                    const searchStore = db.createObjectStore('searchHistory', { keyPath: 'id', autoIncrement: true });
+                    searchStore.createIndex('query', 'query', { unique: false });
+                    searchStore.createIndex('timestamp', 'timestamp', { unique: false });
+                }
+                
+                // 創建會員統計資料表
+                if (!db.objectStoreNames.contains('memberStats')) {
+                    const statsStore = db.createObjectStore('memberStats', { keyPath: 'memberId' });
+                    statsStore.createIndex('viewCount', 'viewCount', { unique: false });
+                    statsStore.createIndex('lastViewed', 'lastViewed', { unique: false });
+                }
             };
         });
     }
@@ -529,9 +543,12 @@ class MemberManagementSystem {
         });
     }
 
-    // 搜尋會員 (優化版本，使用 IndexedDB 索引)
+    // 搜尋會員 (優化版本，提升反應速度)
     async searchMembers(query, page = 1, pageSize = 50) {
+        const startTime = performance.now();
+        
         try {
+            // 立即顯示載入狀態
             this.showLoading();
             
             // 如果搜尋詞為空，則載入所有會員
@@ -542,54 +559,80 @@ class MemberManagementSystem {
                 return result;
             }
             
+            const normalizedQuery = query.trim().toLowerCase();
+            
+            // 記錄搜尋紀錄（僅在第一頁時記錄，異步執行不阻塞搜尋）
+            if (page === 1) {
+                this.saveSearchHistory(normalizedQuery).catch(console.error);
+            }
+            
             // 重置搜尋結果（如果是第一頁）
             if (page === 1) {
                 this.filteredMembers = [];
-                this.searchCache = {}; // 重置搜尋緩存
+                // 初始化搜尋緩存為 Map 以提升性能
+                if (!this.searchCache || !(this.searchCache instanceof Map)) {
+                    this.searchCache = new Map();
+                }
             }
             
-            // 檢查緩存
-            const cacheKey = `${query}_${page}_${pageSize}`;
-            if (this.searchCache && this.searchCache[cacheKey]) {
-                this.filteredMembers = this.searchCache[cacheKey];
-                this.renderMembers();
-                this.hideLoading();
-                return {
-                    members: this.filteredMembers,
-                    hasMore: false,
-                    total: this.filteredMembers.length
-                };
+            // 優化緩存鍵和檢查
+            const cacheKey = `${normalizedQuery}_${page}_${pageSize}`;
+            if (this.searchCache && this.searchCache.has && this.searchCache.has(cacheKey)) {
+                const cachedData = this.searchCache.get(cacheKey);
+                // 檢查緩存是否過期（5分鐘）
+                if (cachedData && Date.now() - cachedData.timestamp < 300000) {
+                    this.filteredMembers = cachedData.results;
+                    this.renderMembers();
+                    this.hideLoading();
+                    console.log(`搜尋完成 (緩存): ${performance.now() - startTime}ms`);
+                    return {
+                        members: cachedData.results,
+                        hasMore: cachedData.hasMore,
+                        total: cachedData.total
+                    };
+                } else if (this.searchCache.delete) {
+                    // 清除過期緩存
+                    this.searchCache.delete(cacheKey);
+                }
             }
             
             // 分割搜尋詞，支持多關鍵字搜尋
-            const searchTerms = query.toLowerCase().split(/\s+/).filter(term => term.length > 0);
+            const searchTerms = normalizedQuery.split(/\s+/).filter(term => term.length > 0);
             
-            // 使用 IndexedDB 的索引進行搜尋
-            const transaction = this.db.transaction(['members'], 'readonly');
-            const store = transaction.objectStore('members');
-            
-            // 獲取所有索引
-            const nameIndex = store.index('name');
-            const phoneIndex = store.index('phone');
-            const emailIndex = store.index('email');
-            
-            // 使用 Promise.all 並行搜尋多個索引
-            const searchResults = await Promise.all([
-                this.searchByIndex(nameIndex, searchTerms),
-                this.searchByIndex(phoneIndex, searchTerms),
-                this.searchByIndex(emailIndex, searchTerms)
-            ]);
-            
-            // 合併搜尋結果並去重
-            const allResults = [];
-            const uniqueIds = new Set();
-            
-            searchResults.flat().forEach(member => {
-                if (!uniqueIds.has(member.id)) {
-                    uniqueIds.add(member.id);
-                    allResults.push(member);
-                }
-            });
+            // 對於短關鍵字，使用內存搜尋提升速度
+            let allResults;
+            if (searchTerms.length === 1 && searchTerms[0].length <= 2 && this.allMembers && this.allMembers.length > 0) {
+                allResults = this.searchInMemory(searchTerms[0]);
+            } else {
+                // 使用 IndexedDB 的索引進行搜尋
+                const transaction = this.db.transaction(['members'], 'readonly');
+                const store = transaction.objectStore('members');
+                
+                // 獲取所有索引
+                const nameIndex = store.index('name');
+                const phoneIndex = store.index('phone');
+                const emailIndex = store.index('email');
+                
+                // 使用 Promise.all 並行搜尋多個索引
+                const searchResults = await Promise.all([
+                    this.searchByIndex(nameIndex, searchTerms),
+                    this.searchByIndex(phoneIndex, searchTerms),
+                    this.searchByIndex(emailIndex, searchTerms)
+                ]);
+                
+                // 快速合併搜尋結果並去重
+                const uniqueIds = new Set();
+                allResults = [];
+                
+                searchResults.forEach(results => {
+                    results.forEach(member => {
+                        if (!uniqueIds.has(member.id)) {
+                            uniqueIds.add(member.id);
+                            allResults.push(member);
+                        }
+                    });
+                });
+            }
             
             // 根據相關性排序結果
             const sortedResults = this.sortSearchResults(allResults, searchTerms);
@@ -598,6 +641,7 @@ class MemberManagementSystem {
             const start = (page - 1) * pageSize;
             const end = start + pageSize;
             const pagedResults = sortedResults.slice(start, end);
+            const hasMore = end < sortedResults.length;
             
             // 更新過濾後的會員列表
             if (page === 1) {
@@ -606,16 +650,31 @@ class MemberManagementSystem {
                 this.filteredMembers = [...this.filteredMembers, ...pagedResults];
             }
             
-            // 緩存搜尋結果
-            if (!this.searchCache) this.searchCache = {};
-            this.searchCache[cacheKey] = this.filteredMembers;
+            // 緩存搜尋結果（包含時間戳）
+            if (this.searchCache && this.searchCache.set) {
+                this.searchCache.set(cacheKey, {
+                    results: this.filteredMembers,
+                    hasMore: hasMore,
+                    total: sortedResults.length,
+                    timestamp: Date.now()
+                });
+                
+                // 清理過期緩存
+                this.cleanupSearchCache();
+            } else {
+                // 降級到普通對象緩存
+                if (!this.searchCache) this.searchCache = {};
+                this.searchCache[cacheKey] = this.filteredMembers;
+            }
             
             this.renderMembers();
             this.hideLoading();
             
+            console.log(`搜尋完成: ${performance.now() - startTime}ms, 結果數: ${sortedResults.length}`);
+            
             return {
                 members: pagedResults,
-                hasMore: end < sortedResults.length,
+                hasMore: hasMore,
                 total: sortedResults.length
             };
             
@@ -624,6 +683,51 @@ class MemberManagementSystem {
             this.showNotification('搜尋失敗，請重試', 'error');
             this.hideLoading();
             return { members: [], hasMore: false, total: 0 };
+        }
+    }
+    
+    // 內存搜尋（用於短關鍵字快速搜尋）
+    searchInMemory(keyword) {
+        const results = [];
+        const lowerKeyword = keyword.toLowerCase();
+        
+        for (const member of this.allMembers) {
+            const name = (member.name || '').toLowerCase();
+            const phone = (member.phone || '').toLowerCase();
+            const email = (member.email || '').toLowerCase();
+            
+            if (name.includes(lowerKeyword) || 
+                phone.includes(lowerKeyword) || 
+                email.includes(lowerKeyword)) {
+                results.push(member);
+            }
+        }
+        
+        return results;
+    }
+    
+    // 清理搜尋緩存
+    cleanupSearchCache() {
+        if (!this.searchCache || !(this.searchCache instanceof Map)) return;
+        
+        const now = Date.now();
+        const maxAge = 300000; // 5分鐘
+        const maxSize = 50; // 最多保留50個緩存項目
+        
+        // 清理過期緩存
+        for (const [key, value] of this.searchCache.entries()) {
+            if (now - value.timestamp > maxAge) {
+                this.searchCache.delete(key);
+            }
+        }
+        
+        // 如果緩存過多，清理最舊的
+        if (this.searchCache.size > maxSize) {
+            const entries = Array.from(this.searchCache.entries())
+                .sort((a, b) => a[1].timestamp - b[1].timestamp);
+            
+            const toDelete = entries.slice(0, entries.length - maxSize);
+            toDelete.forEach(([key]) => this.searchCache.delete(key));
         }
     }
     
@@ -879,14 +983,20 @@ class MemberManagementSystem {
     }
 
     // 顯示會員詳情
-    showMemberDetail(member) {
+    async showMemberDetail(member) {
         this.currentMember = member;
         const modal = document.getElementById('memberDetailModal');
         const content = document.getElementById('memberDetailContent');
         
+        // 記錄會員點擊統計
+        await this.updateMemberStats(member.id);
+        
         const avatar = member.photo ? 
             `<img src="${member.photo}" alt="${member.name}" class="detail-avatar">` :
             `<div class="detail-avatar-placeholder">${member.name.charAt(0)}</div>`;
+        
+        // 獲取該會員的搜尋統計
+        const memberSearchStats = await this.getMemberSearchStats(member.name, member.phone);
         
         content.innerHTML = `
             <div class="detail-header">
@@ -894,6 +1004,22 @@ class MemberManagementSystem {
                 <div class="detail-info">
                     <h2>${this.escapeHtml(member.name)}</h2>
                     <p>會員編號: ${member.id}</p>
+                    <div class="member-stats">
+                        <span class="stat-item">🔍 搜尋次數: ${memberSearchStats.searchCount}</span>
+                    </div>
+                    ${memberSearchStats.recentSearches.length > 0 ? `
+                        <div class="recent-searches">
+                            <label>最近3筆搜尋紀錄:</label>
+                            <div class="search-records">
+                                ${memberSearchStats.recentSearches.map(search => `
+                                    <span class="search-record">
+                                        <span class="search-query">${this.escapeHtml(search.query)}</span>
+                                        <span class="search-time">${this.formatDateTime(search.timestamp)}</span>
+                                    </span>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                 </div>
             </div>
             <div class="detail-fields">
@@ -935,6 +1061,7 @@ class MemberManagementSystem {
                         <span>${this.formatDateTime(member.updatedAt)}</span>
                     </div>
                 ` : ''}
+
             </div>
         `;
         
@@ -1461,6 +1588,276 @@ class MemberManagementSystem {
         if (!dateString) return '';
         const date = new Date(dateString);
         return date.toLocaleString('zh-TW');
+    }
+    
+    // 保存搜尋紀錄（只有完整姓名或電話號碼才記錄）
+    async saveSearchHistory(query) {
+        try {
+            // 檢查是否為完整姓名或電話號碼
+            const isValidForRecord = this.isValidSearchForRecord(query);
+            if (!isValidForRecord) {
+                return; // 不符合記錄條件，直接返回
+            }
+            
+            // 檢查是否已存在相同的搜尋詞（避免重複記錄）
+            const existingRecord = await this.getRecentSearchHistory(query);
+            if (existingRecord && 
+                new Date() - new Date(existingRecord.timestamp) < 60000) { // 1分鐘內不重複記錄
+                return;
+            }
+            
+            const searchRecord = {
+                query: query,
+                timestamp: new Date().toISOString(),
+                resultCount: this.filteredMembers.length,
+                searchType: this.getSearchType(query) // 記錄搜尋類型
+            };
+            
+            const transaction = this.db.transaction(['searchHistory'], 'readwrite');
+            const store = transaction.objectStore('searchHistory');
+            await store.add(searchRecord);
+            
+            // 清理舊的搜尋紀錄（保留最近100筆）
+            await this.cleanupSearchHistory();
+        } catch (error) {
+            console.error('保存搜尋紀錄失敗:', error);
+        }
+    }
+    
+    // 獲取最近的搜尋紀錄
+    async getRecentSearchHistory(query = null, limit = 10) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['searchHistory'], 'readonly');
+            const store = transaction.objectStore('searchHistory');
+            const index = store.index('timestamp');
+            const request = index.openCursor(null, 'prev'); // 降序排列
+            
+            const results = [];
+            
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor && results.length < limit) {
+                    const record = cursor.value;
+                    if (!query || record.query === query) {
+                        results.push(record);
+                        if (query) {
+                            // 如果查找特定搜尋詞，找到第一個就返回
+                            resolve(record);
+                            return;
+                        }
+                    }
+                    cursor.continue();
+                } else {
+                    resolve(query ? null : results);
+                }
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    // 清理舊的搜尋紀錄
+    async cleanupSearchHistory() {
+        try {
+            const transaction = this.db.transaction(['searchHistory'], 'readwrite');
+            const store = transaction.objectStore('searchHistory');
+            const index = store.index('timestamp');
+            const request = index.openCursor(null, 'prev');
+            
+            let count = 0;
+            const maxRecords = 100;
+            
+            request.onsuccess = (event) => {
+                const cursor = event.target.result;
+                if (cursor) {
+                    count++;
+                    if (count > maxRecords) {
+                        cursor.delete();
+                    }
+                    cursor.continue();
+                }
+            };
+        } catch (error) {
+            console.error('清理搜尋紀錄失敗:', error);
+        }
+    }
+    
+    // 更新會員統計
+    async updateMemberStats(memberId) {
+        try {
+            const transaction = this.db.transaction(['memberStats'], 'readwrite');
+            const store = transaction.objectStore('memberStats');
+            
+            // 獲取現有統計資料
+            const getRequest = store.get(memberId);
+            
+            getRequest.onsuccess = () => {
+                const existingStats = getRequest.result;
+                const now = new Date().toISOString();
+                
+                const stats = {
+                    memberId: memberId,
+                    viewCount: existingStats ? existingStats.viewCount + 1 : 1,
+                    lastViewed: now,
+                    firstViewed: existingStats ? existingStats.firstViewed : now,
+                    viewHistory: existingStats ? [...existingStats.viewHistory, now] : [now]
+                };
+                
+                // 只保留最近10次查看紀錄
+                if (stats.viewHistory.length > 10) {
+                    stats.viewHistory = stats.viewHistory.slice(-10);
+                }
+                
+                store.put(stats);
+            };
+        } catch (error) {
+            console.error('更新會員統計失敗:', error);
+        }
+    }
+    
+    // 獲取會員統計資料
+    async getMemberStats(memberId) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['memberStats'], 'readonly');
+            const store = transaction.objectStore('memberStats');
+            const request = store.get(memberId);
+            
+            request.onsuccess = () => {
+                const stats = request.result;
+                resolve(stats || {
+                    memberId: memberId,
+                    viewCount: 0,
+                    lastViewed: null,
+                    firstViewed: null,
+                    viewHistory: []
+                });
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
+    }
+    
+    // 獲取近期查看紀錄
+    async getRecentViewHistory(memberId, limit = 3) {
+        try {
+            const stats = await this.getMemberStats(memberId);
+            const viewHistory = stats.viewHistory || [];
+            
+            return viewHistory
+                .slice(-limit) // 取最後幾筆
+                .reverse() // 反轉順序，最新的在前
+                .map(timestamp => ({ timestamp }));
+        } catch (error) {
+            console.error('獲取查看紀錄失敗:', error);
+            return [];
+        }
+    }
+    
+    // 獲取搜尋統計
+    async getSearchStats() {
+        try {
+            const recentSearches = await this.getRecentSearchHistory(null, 20);
+            
+            // 統計搜尋頻率
+            const searchFrequency = {};
+            recentSearches.forEach(record => {
+                searchFrequency[record.query] = (searchFrequency[record.query] || 0) + 1;
+            });
+            
+            // 排序並取前10個熱門搜尋
+            const popularSearches = Object.entries(searchFrequency)
+                .sort(([,a], [,b]) => b - a)
+                .slice(0, 10)
+                .map(([query, count]) => ({ query, count }));
+            
+            return {
+                totalSearches: recentSearches.length,
+                popularSearches: popularSearches,
+                recentSearches: recentSearches.slice(0, 5)
+            };
+        } catch (error) {
+            console.error('獲取搜尋統計失敗:', error);
+            return {
+                totalSearches: 0,
+                popularSearches: [],
+                recentSearches: []
+            };
+        }
+    }
+    
+    // 檢查搜尋詞是否符合記錄條件（完整姓名或電話號碼）
+    isValidSearchForRecord(query) {
+        const trimmedQuery = query.trim();
+        
+        // 檢查是否為電話號碼（包含各種格式）
+        const phonePattern = /^[0-9+\-\s\(\)]{8,}$/;
+        if (phonePattern.test(trimmedQuery.replace(/[\s\-\(\)]/g, ''))) {
+            return true;
+        }
+        
+        // 檢查是否為完整姓名（中文姓名通常2-4個字，英文姓名包含空格）
+        const chineseNamePattern = /^[\u4e00-\u9fff]{2,4}$/;
+        const englishNamePattern = /^[a-zA-Z]+\s+[a-zA-Z]+/;
+        
+        if (chineseNamePattern.test(trimmedQuery) || englishNamePattern.test(trimmedQuery)) {
+            return true;
+        }
+        
+        return false;
+    }
+    
+    // 獲取搜尋類型
+    getSearchType(query) {
+        const trimmedQuery = query.trim();
+        const phonePattern = /^[0-9+\-\s\(\)]{8,}$/;
+        
+        if (phonePattern.test(trimmedQuery.replace(/[\s\-\(\)]/g, ''))) {
+            return 'phone';
+        }
+        
+        const chineseNamePattern = /^[\u4e00-\u9fff]{2,4}$/;
+        const englishNamePattern = /^[a-zA-Z]+\s+[a-zA-Z]+/;
+        
+        if (chineseNamePattern.test(trimmedQuery) || englishNamePattern.test(trimmedQuery)) {
+            return 'name';
+        }
+        
+        return 'other';
+    }
+    
+    // 獲取特定會員的搜尋統計
+    async getMemberSearchStats(memberName, memberPhone) {
+        return new Promise((resolve, reject) => {
+            const transaction = this.db.transaction(['searchHistory'], 'readonly');
+            const store = transaction.objectStore('searchHistory');
+            const request = store.getAll();
+            
+            request.onsuccess = () => {
+                const records = request.result;
+                
+                // 篩選與該會員相關的搜尋紀錄
+                const memberSearches = records.filter(record => {
+                    const query = record.query.toLowerCase().trim();
+                    const name = memberName.toLowerCase().trim();
+                    const phone = memberPhone.replace(/[\s\-\(\)]/g, '');
+                    const queryPhone = query.replace(/[\s\-\(\)]/g, '');
+                    
+                    return query === name || queryPhone === phone;
+                });
+                
+                // 按時間排序，取最近3筆
+                memberSearches.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+                
+                const stats = {
+                    searchCount: memberSearches.length,
+                    recentSearches: memberSearches.slice(0, 3)
+                };
+                
+                resolve(stats);
+            };
+            
+            request.onerror = () => reject(request.error);
+        });
     }
 }
 

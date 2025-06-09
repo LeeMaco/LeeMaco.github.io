@@ -549,6 +549,90 @@ body {
     border-bottom: 1px solid #f8f9fa;
 }
 
+/* 會員統計樣式 */
+.member-stats {
+    display: flex;
+    gap: 15px;
+    flex-wrap: wrap;
+    margin-top: 10px;
+}
+
+.stat-item {
+    background: rgba(102, 126, 234, 0.1);
+    padding: 6px 12px;
+    border-radius: 20px;
+    font-size: 14px;
+    color: #495057;
+    border: 1px solid rgba(102, 126, 234, 0.2);
+}
+
+/* 最近搜尋紀錄樣式 */
+.recent-searches {
+    margin-top: 15px;
+    padding: 15px;
+    background: #f8f9fa;
+    border-radius: 8px;
+    border-left: 4px solid #667eea;
+}
+
+.recent-searches label {
+    font-weight: 600;
+    color: #495057;
+    font-size: 14px;
+    margin-bottom: 10px;
+    display: block;
+}
+
+.search-records {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.search-record {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: white;
+    border-radius: 6px;
+    border: 1px solid #e9ecef;
+    transition: all 0.2s ease;
+}
+
+.search-record:hover {
+    background: #f1f3f4;
+    border-color: #667eea;
+}
+
+.search-query {
+    font-weight: 500;
+    color: #2c3e50;
+    font-size: 14px;
+}
+
+.search-time {
+    font-size: 12px;
+    color: #6c757d;
+    white-space: nowrap;
+}
+
+/* 近期查看紀錄樣式 */
+.recent-views {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.view-record {
+    background: rgba(40, 167, 69, 0.1);
+    padding: 4px 8px;
+    border-radius: 12px;
+    font-size: 12px;
+    color: #495057;
+    border: 1px solid rgba(40, 167, 69, 0.2);
+}
+
 /* 表單動作 */
 .form-actions,
 .modal-actions {
