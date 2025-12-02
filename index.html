@@ -3,15 +3,19 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V3.5 (旗艦版)</title>
+    <title>AI 智能會員系統 V3.6 (穩定版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
     <style>
@@ -19,9 +23,8 @@
         .tab-btn { position: relative; color: #64748b; transition: all 0.3s; }
         .tab-active { color: #4f46e5; font-weight: bold; }
         .tab-active::after { content: ''; position: absolute; bottom: -12px; left: 0; width: 100%; height: 3px; background: #4f46e5; border-radius: 3px 3px 0 0; }
-        .loader { width: 20px; height: 20px; border: 3px solid #e2e8f0; border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite; }
+        .loader { width: 18px; height: 18px; border: 2px solid #e2e8f0; border-top-color: #4f46e5; border-radius: 50%; animation: spin 1s linear infinite; }
         @keyframes spin { 100% { transform: rotate(360deg); } }
-        /* 掃描相關 */
         #video-container video { width: 100%; height: 100%; object-fit: cover; }
         .scan-line { position: absolute; width: 100%; height: 2px; background: #4f46e5; box-shadow: 0 0 10px #4f46e5; animation: scanning 2s infinite; }
         @keyframes scanning { 0% {top:0} 50% {top:100%} 100% {top:0} }
@@ -44,7 +47,7 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-brain text-indigo-600 mr-2"></i>會員系統 V3.5</h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-brain text-indigo-600 mr-2"></i>會員系統 V3.6</h1>
             <div class="flex gap-4">
                 <button @click="modals.io = true" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
                 <span v-if="isLoading" class="loader"></span>
@@ -101,18 +104,17 @@
             </div>
 
             <div class="bg-white p-5 rounded-2xl shadow-sm">
-                <h3 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-clock text-indigo-500 mr-2"></i>熱門時段分析 (Peak Hours)</h3>
+                <h3 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-clock text-indigo-500 mr-2"></i>熱門時段 (Peak Hours)</h3>
                 <div class="h-48"><canvas id="hourChart"></canvas></div>
-                <p class="text-xs text-slate-400 mt-2 text-center">分析所有歷史搜尋記錄的時間分佈</p>
             </div>
 
             <div class="grid sm:grid-cols-2 gap-4">
                 <div class="bg-white p-5 rounded-2xl shadow-sm">
-                    <h3 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-users text-rose-500 mr-2"></i>客群結構 (Loyalty)</h3>
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-users text-rose-500 mr-2"></i>客群結構</h3>
                     <div class="h-40 relative"><canvas id="loyaltyChart"></canvas></div>
                 </div>
                 <div class="bg-white p-5 rounded-2xl shadow-sm">
-                    <h3 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-chart-area text-blue-500 mr-2"></i>近七日趨勢</h3>
+                    <h3 class="font-bold text-slate-700 mb-4 flex items-center"><i class="fa-solid fa-chart-area text-blue-500 mr-2"></i>七日流量</h3>
                     <div class="h-40"><canvas id="trendChart"></canvas></div>
                 </div>
             </div>
@@ -128,7 +130,7 @@
             <div class="p-6 overflow-y-auto space-y-5">
                 <div class="grid grid-cols-2 gap-4">
                     <div class="col-span-2">
-                        <label class="text-xs font-bold text-slate-500 uppercase">姓名</label>
+                        <label class="text-xs font-bold text-slate-500 uppercase">姓名 <span class="text-red-500">*</span></label>
                         <input v-model="form.name" class="w-full border-2 border-slate-200 p-3 rounded-xl mt-1 focus:border-indigo-500 outline-none transition bg-slate-50 focus:bg-white">
                     </div>
                     <div class="col-span-2">
@@ -142,7 +144,7 @@
                 </div>
                 
                 <div class="bg-slate-50 p-4 rounded-xl border border-slate-200">
-                    <label class="text-xs font-bold text-slate-500 uppercase block mb-3">照片與 AI 人臉模型</label>
+                    <label class="text-xs font-bold text-slate-500 uppercase block mb-3">照片與 AI</label>
                     <div class="flex gap-4">
                         <div class="w-24 h-24 bg-white rounded-xl overflow-hidden border shadow-sm relative group">
                             <img v-if="photoPreview" :src="photoPreview" class="w-full h-full object-cover">
@@ -155,6 +157,11 @@
                             </button>
                         </div>
                     </div>
+                </div>
+                
+                <div v-if="isEditing" class="flex justify-between text-xs text-slate-400 pt-2">
+                    <span>新增: {{ formatDate(form.created_at) }}</span>
+                    <span>修改: {{ formatDate(form.updated_at) }}</span>
                 </div>
             </div>
             <div class="p-4 border-t bg-slate-50 flex justify-between items-center">
@@ -188,7 +195,7 @@
                                 <h3 class="font-bold text-xl text-slate-800 truncate">{{ scannedMember?.name }}</h3>
                                 <span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded font-bold">已記錄</span>
                             </div>
-                            <p class="text-sm text-slate-500">來訪次數: <span class="text-indigo-600 font-black">{{ scannedMember?.search_history?.length }}</span></p>
+                            <p class="text-sm text-slate-500">來訪: <span class="text-indigo-600 font-black">{{ scannedMember?.search_history?.length }}</span> 次</p>
                         </div>
                     </div>
                     <div v-if="scannedMember?.notes" class="mt-3 bg-amber-50 border border-amber-100 p-3 rounded-xl flex gap-3">
@@ -206,30 +213,28 @@
                 <div class="absolute inset-0 border-4 border-indigo-500/50 rounded-3xl"></div>
             </div>
             <div class="absolute bottom-10 bg-black/50 backdrop-blur px-4 py-2 rounded-full text-white/80 text-sm font-mono flex items-center gap-2">
-                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>
-                AI 視覺辨識中...
+                <div class="w-2 h-2 bg-emerald-500 rounded-full animate-pulse"></div>AI 辨識中...
             </div>
         </div>
     </div>
 
     <div v-if="modals.io" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl">
-            <h3 class="font-bold text-lg mb-4 text-slate-800">資料管理中心</h3>
+            <h3 class="font-bold text-lg mb-4 text-slate-800">資料管理</h3>
             <div class="space-y-3">
-                <button @click="exportHighResExcel" class="w-full py-3.5 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-100 hover:bg-emerald-100 transition flex items-center justify-center gap-2 disabled:opacity-50" :disabled="isExporting">
+                <button @click="exportFastExcel" class="w-full py-3.5 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-100 hover:bg-emerald-100 transition flex items-center justify-center gap-2 disabled:opacity-50" :disabled="isExporting">
                     <i v-if="isExporting" class="fa-solid fa-circle-notch fa-spin"></i>
                     <i v-else class="fa-solid fa-file-excel"></i> 
-                    {{ isExporting ? '生成中 (請稍候)...' : '導出 Excel (含高畫質照片)' }}
+                    {{ isExporting ? '壓縮處理中...' : '極速導出 (含預覽圖)' }}
                 </button>
                 <div class="border-t border-slate-100 pt-4 mt-2">
                      <p class="text-xs font-bold text-slate-400 mb-2 uppercase">資料還原 (Excel/JSON)</p>
                      <input type="file" @change="handleImport" accept=".xlsx,.xls,.json" class="block w-full text-sm text-slate-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100 cursor-pointer"/>
                 </div>
             </div>
-            <button @click="modals.io = false" class="mt-6 w-full text-slate-400 py-2 hover:text-slate-600 transition">關閉視窗</button>
+            <button @click="modals.io = false" class="mt-6 w-full text-slate-400 py-2 hover:text-slate-600 transition">關閉</button>
         </div>
     </div>
-    
     <input type="file" ref="fileInput" @change="handleFileSelect" accept="image/*" class="hidden">
 </div>
 
@@ -247,7 +252,7 @@ createApp({
         const searchQuery = ref('');
         const modals = reactive({ form: false, faceScan: false, io: false });
         const isEditing = ref(false);
-        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, search_history: [], face_descriptor: null });
+        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, search_history: [], face_descriptor: null, created_at: null, updated_at: null });
         const photoPreview = ref(null);
         
         const videoDevices = ref([]);
@@ -256,15 +261,12 @@ createApp({
         const scannedMember = ref(null);
         let supabase = null, charts = {}, videoStream = null, faceMatcher = null, isFaceModelLoaded = false;
         let lastScanTime = 0;
-
-        // 統計數據
         const stats = reactive({ todayVisits: 0, activeRate: 0 });
 
         onMounted(async () => {
             const saved = localStorage.getItem('supabase_config');
             if(saved) { Object.assign(config, JSON.parse(saved)); initSystem(); }
-            loadFaceModels();
-            getCameras();
+            loadFaceModels(); getCameras();
         });
 
         const initSystem = async () => {
@@ -303,67 +305,94 @@ createApp({
             if(currentTab.value === 'dashboard') updateDashboard();
         };
 
-        // --- ExcelJS 高畫質導出核心 (突破限制) ---
-        const exportHighResExcel = async () => {
+        // --- 核心修復：新增會員 ---
+        const saveMember = async () => {
+            if(!form.name) return alert('請輸入姓名');
+            isLoading.value = true;
+            const payload = { 
+                name: form.name, phone: form.phone, notes: form.notes, 
+                photo: photoPreview.value, face_descriptor: form.face_descriptor,
+                updated_at: new Date().toISOString()
+            };
+
+            if(form.id) {
+                await supabase.from('members').update(payload).eq('id', form.id);
+            } else {
+                // 修復重點：手動生成 ID 和 Created_at，確保寫入成功
+                payload.id = Date.now().toString(); 
+                payload.created_at = new Date().toISOString();
+                payload.search_history = [];
+                await supabase.from('members').insert(payload);
+            }
+            modals.form = false;
+            fetchMembers();
+        };
+
+        // --- 優化導出：極速壓縮圖片嵌入 ---
+        const compressImage = (base64, targetWidth) => {
+            return new Promise(resolve => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    const scale = targetWidth / img.width;
+                    canvas.width = targetWidth;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    resolve(canvas.toDataURL('image/jpeg', 0.6)); // 使用 JPEG 0.6 壓縮，極小
+                };
+                img.src = base64;
+            });
+        };
+
+        const exportFastExcel = async () => {
             if(isExporting.value) return;
             isExporting.value = true;
             try {
                 const workbook = new ExcelJS.Workbook();
                 const sheet = workbook.addWorksheet('會員名單');
                 
-                // 設定標頭
                 sheet.columns = [
                     { header: 'ID', key: 'id', width: 10 },
-                    { header: '照片', key: 'photo', width: 15 }, // 預留給照片
-                    { header: '姓名', key: 'name', width: 20 },
+                    { header: '照片', key: 'photo', width: 12 },
+                    { header: '姓名', key: 'name', width: 15 },
                     { header: '電話', key: 'phone', width: 15 },
-                    { header: '備註', key: 'notes', width: 30 },
-                    { header: '來訪次數', key: 'visits', width: 10 },
-                    { header: '新增時間', key: 'created', width: 20 }
+                    { header: '備註', key: 'notes', width: 25 },
+                    { header: '次數', key: 'visits', width: 8 },
+                    { header: '新增日期', key: 'created', width: 15 }
                 ];
 
-                // 寫入資料
                 for (let i = 0; i < members.value.length; i++) {
                     const m = members.value[i];
-                    const rowIndex = i + 2; // 1是標頭，所以從2開始
-                    const row = sheet.getRow(rowIndex);
+                    const rowId = i + 2;
+                    const row = sheet.getRow(rowId);
                     
                     row.values = {
                         id: i + 1,
-                        name: m.name,
-                        phone: m.phone,
-                        notes: m.notes,
+                        name: m.name, phone: m.phone, notes: m.notes,
                         visits: m.search_history?.length || 0,
                         created: formatDate(m.created_at)
                     };
-                    
-                    // 設定行高以容納圖片
-                    row.height = 100;
+                    row.height = 60; // 設定行高
 
-                    // 處理圖片嵌入
                     if (m.photo) {
-                        // 移除 Base64 前綴
-                        const base64Data = m.photo.split(',')[1];
-                        if(base64Data) {
-                            const imageId = workbook.addImage({
-                                base64: base64Data,
-                                extension: 'png',
-                            });
-                            // 將圖片「浮動」在 B 欄 (col: 1)
-                            sheet.addImage(imageId, {
-                                tl: { col: 1, row: rowIndex - 1 }, // Top-Left
-                                ext: { width: 100, height: 100 }, // 顯示尺寸 (可調整，不影響原圖)
-                                editAs: 'oneCell'
-                            });
-                        }
+                        // 關鍵優化：先壓縮再嵌入
+                        const resizedBase64 = await compressImage(m.photo, 150);
+                        const imageId = workbook.addImage({
+                            base64: resizedBase64.split(',')[1],
+                            extension: 'jpeg',
+                        });
+                        sheet.addImage(imageId, {
+                            tl: { col: 1, row: rowId - 1 },
+                            ext: { width: 80, height: 80 },
+                            editAs: 'oneCell'
+                        });
                     }
                 }
 
-                // 導出檔案
                 const buffer = await workbook.xlsx.writeBuffer();
                 const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-                saveAs(blob, `會員名單_Pro_${new Date().toISOString().slice(0,10)}.xlsx`);
-                
+                saveAs(blob, `會員名單_Fast_${new Date().toISOString().slice(0,10)}.xlsx`);
             } catch (e) {
                 alert("導出失敗: " + e.message);
             } finally {
@@ -371,85 +400,43 @@ createApp({
             }
         };
 
-        // --- 資料分析 (大數據優化) ---
         const calcStats = () => {
             const today = new Date().toISOString().slice(0,10);
             stats.todayVisits = members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.startsWith(today)).length||0), 0);
-            
-            const activeThreshold = new Date();
-            activeThreshold.setDate(activeThreshold.getDate() - 60); // 60天內有來算活躍
-            const activeCount = members.value.filter(m => m.search_history?.some(h => new Date(h.timestamp) > activeThreshold)).length;
+            const activeCount = members.value.filter(m => m.search_history?.some(h => new Date(h.timestamp) > new Date(Date.now() - 5184000000))).length;
             stats.activeRate = Math.round((activeCount / (members.value.length || 1)) * 100);
         };
 
         const updateDashboard = () => {
             nextTick(() => {
-                // 1. 熱門時段分析 (Bar)
                 const hours = Array(24).fill(0);
-                members.value.forEach(m => m.search_history?.forEach(h => {
-                    const hour = new Date(h.timestamp).getHours();
-                    hours[hour]++;
-                }));
-                renderChart('hourChart', 'bar', {
-                    labels: hours.map((_, i) => `${i}時`),
-                    datasets: [{ label: '來客量', data: hours, backgroundColor: '#4f46e5', borderRadius: 4 }]
-                });
+                members.value.forEach(m => m.search_history?.forEach(h => hours[new Date(h.timestamp).getHours()]++));
+                renderChart('hourChart', 'bar', { labels: hours.map((_, i) => `${i}時`), datasets: [{ label: '來客', data: hours, backgroundColor: '#4f46e5', borderRadius: 4 }] });
 
-                // 2. 客群結構 (Pie)
                 const loyalty = { new:0, regular:0, vip:0, lost:0 };
-                members.value.forEach(m => {
-                    const type = getLoyaltyType(m);
-                    loyalty[type]++;
-                });
-                renderChart('loyaltyChart', 'doughnut', {
-                    labels: ['新客', '常客', 'VIP', '沈睡'],
-                    datasets: [{ data: [loyalty.new, loyalty.regular, loyalty.vip, loyalty.lost], backgroundColor: ['#38bdf8', '#4f46e5', '#f59e0b', '#94a3b8'] }]
-                });
+                members.value.forEach(m => loyalty[getLoyaltyType(m)]++);
+                renderChart('loyaltyChart', 'doughnut', { labels: ['新客', '常客', 'VIP', '沈睡'], datasets: [{ data: Object.values(loyalty), backgroundColor: ['#38bdf8', '#4f46e5', '#f59e0b', '#94a3b8'] }] });
 
-                // 3. 七日趨勢 (Line)
-                const last7Days = Array(7).fill(0).map((_, i) => {
-                    const d = new Date(); d.setDate(d.getDate() - i);
-                    return d.toISOString().slice(0,10);
-                }).reverse();
-                const trendData = last7Days.map(date => 
-                    members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.startsWith(date)).length||0), 0)
-                );
-                renderChart('trendChart', 'line', {
-                    labels: last7Days.map(d => d.slice(5)),
-                    datasets: [{ label: '流量', data: trendData, borderColor: '#10b981', tension: 0.4, fill: true, backgroundColor: '#10b98120' }]
-                });
+                const days = Array(7).fill(0).map((_, i) => { const d=new Date(); d.setDate(d.getDate()-i); return d.toISOString().slice(5,10); }).reverse();
+                const trends = days.map(d => members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.includes(d)).length||0), 0));
+                renderChart('trendChart', 'line', { labels: days, datasets: [{ label: '流量', data: trends, borderColor: '#10b981', tension: 0.4, fill: true, backgroundColor: '#10b98120' }] });
             });
         };
 
         const renderChart = (id, type, data) => {
-            const ctx = document.getElementById(id);
-            if(!ctx) return;
+            const ctx = document.getElementById(id); if(!ctx) return;
             if(charts[id]) charts[id].destroy();
             charts[id] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: type!=='bar' } } } });
         };
 
         const getLoyaltyType = (m) => {
-            const visits = m.search_history?.length || 0;
-            const lastVisit = m.search_history?.length ? new Date(m.search_history[m.search_history.length-1].timestamp) : null;
-            const daysSince = lastVisit ? (new Date() - lastVisit)/(1000*60*60*24) : 999;
-            
-            if(daysSince > 60) return 'lost';
-            if(visits > 20) return 'vip';
-            if(visits > 5) return 'regular';
-            return 'new';
+            const v = m.search_history?.length || 0;
+            const last = m.search_history?.length ? new Date(m.search_history[m.search_history.length-1].timestamp) : null;
+            if(last && (new Date()-last)/(86400000) > 60) return 'lost';
+            if(v > 20) return 'vip'; if(v > 5) return 'regular'; return 'new';
         };
         const getLoyaltyLabel = (m) => ({lost:'沈睡客', vip:'VIP', regular:'常客', new:'新客'}[getLoyaltyType(m)]);
         const getLoyaltyClass = (m) => ({lost:'bg-slate-100 text-slate-500', vip:'bg-amber-100 text-amber-700', regular:'bg-indigo-100 text-indigo-700', new:'bg-sky-100 text-sky-700'}[getLoyaltyType(m)]);
-
-        // 一般功能
-        const saveMember = async () => {
-            if(!form.name) return alert('請輸入姓名');
-            isLoading.value = true;
-            const payload = { name: form.name, phone: form.phone, notes: form.notes, photo: photoPreview.value, face_descriptor: form.face_descriptor, updated_at: new Date().toISOString() };
-            if(form.id) await supabase.from('members').update(payload).eq('id', form.id);
-            else { payload.created_at = new Date().toISOString(); payload.search_history = []; await supabase.from('members').insert(payload); }
-            modals.form = false; fetchMembers();
-        };
 
         const deleteMember = async () => { if(confirm('確定刪除？')) { await supabase.from('members').delete().eq('id', form.id); modals.form = false; fetchMembers(); } };
         const handleCameraSwitch = async () => { if(videoStream) { videoStream.getTracks().forEach(t=>t.stop()); await startVideo(); } };
@@ -521,7 +508,7 @@ createApp({
                     const j=XLSX.utils.sheet_to_json(wb.Sheets[wb.SheetNames[0]]);
                     if(confirm(`導入 ${j.length} 筆?`)) {
                         isLoading.value=true;
-                        for(let row of j) await supabase.from('members').insert({name:row['姓名']||row.name, phone:row['電話']||row.phone, notes:row['備註']||row.notes, created_at:new Date().toISOString()});
+                        for(let row of j) await supabase.from('members').insert({id:Date.now().toString()+Math.random(), name:row['姓名']||row.name, phone:row['電話']||row.phone, notes:row['備註']||row.notes, created_at:new Date().toISOString(), search_history:[]});
                         fetchMembers(); alert('完成'); modals.io=false;
                     }
                 } catch(e){ alert('格式錯誤'); }
@@ -535,9 +522,9 @@ createApp({
         return {
             config, isConfigured, saveConfig, isLoading, isExporting, currentTab, searchQuery, members, filteredMembers, stats,
             modals, form, photoPreview, isEditing, videoDevices, currentDeviceId, scanMessage, scannedMember,
-            saveMember, deleteMember, editMember, openModal, handleFileSelect, exportHighResExcel, handleImport,
+            saveMember, deleteMember, editMember, openModal, handleFileSelect, exportFastExcel, handleImport,
             startFaceRegistration, showFaceSearch, stopFaceScan, handleCameraSwitch, 
-            getLoyaltyLabel, getLoyaltyClass
+            getLoyaltyLabel, getLoyaltyClass, formatDate
         };
     }
 }).mount('#app');
