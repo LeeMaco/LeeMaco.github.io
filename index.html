@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V4.2 (音效修復版)</title>
+    <title>AI 智能會員系統 V4.3 (自助刷臉版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -36,7 +36,7 @@
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-slate-800">系統初始化 V4.2</h2>
+                <h2 class="text-2xl font-bold text-slate-800">系統初始化 V4.3</h2>
                 <button @click="resetConfig" class="text-xs text-rose-500 underline">清除設定</button>
             </div>
             
@@ -60,7 +60,7 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-shield-halved text-indigo-600 mr-2"></i>會員系統 V4.2</h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-shield-halved text-indigo-600 mr-2"></i>會員系統 V4.3</h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfig" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
@@ -92,12 +92,17 @@
                     <div class="space-y-2">
                         <i class="fa-solid fa-mobile-screen-button text-5xl text-indigo-500 mb-2"></i>
                         <h2 class="text-2xl font-black text-slate-800">會員自助認證</h2>
-                        <p class="text-slate-400 text-sm">請輸入您的手機號碼進行報到</p>
+                        <p class="text-slate-400 text-sm">請選擇驗證方式</p>
                     </div>
 
-                    <div class="flex justify-center gap-2 mb-4">
-                         <span class="text-xs font-bold px-2 py-1 rounded cursor-pointer transition" :class="searchMode === 'phone' ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400'" @click="searchMode='phone'">手機搜尋</span>
-                         <span class="text-xs font-bold px-2 py-1 rounded cursor-pointer transition" :class="searchMode === 'name' ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400'" @click="searchMode='name'">姓名搜尋</span>
+                    <div class="flex justify-center items-center gap-3 mb-4">
+                         <button class="text-xs font-bold px-3 py-1.5 rounded-full transition border" :class="searchMode === 'phone' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-400 border-slate-200'" @click="searchMode='phone'">手機</button>
+                         
+                         <button @click="startSelfServiceFaceScan" class="text-xs font-bold px-4 py-1.5 rounded-full transition border bg-gradient-to-r from-purple-500 to-indigo-500 text-white border-transparent shadow-md flex items-center gap-1 hover:scale-105 active:scale-95">
+                             <i class="fa-solid fa-face-smile"></i> 刷臉
+                         </button>
+
+                         <button class="text-xs font-bold px-3 py-1.5 rounded-full transition border" :class="searchMode === 'name' ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-400 border-slate-200'" @click="searchMode='name'">姓名</button>
                     </div>
 
                     <input v-model="selfServiceInput" :type="searchMode === 'phone' ? 'tel' : 'text'" :placeholder="searchMode === 'phone' ? '請輸入電話號碼...' : '請輸入姓名...'" class="w-full text-center text-2xl font-bold py-4 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent transition placeholder:text-slate-300" @keyup.enter="performVerification">
@@ -107,7 +112,6 @@
                     <div v-if="verifyStatus === 'fail'" class="mt-4 bg-rose-50 border border-rose-100 p-4 rounded-xl animate-pulse">
                         <p class="text-rose-600 font-bold text-lg"><i class="fa-solid fa-circle-xmark mr-1"></i> 驗證失敗</p>
                         <p class="text-slate-500 text-sm mt-1">找不到此資料</p>
-                        <p class="text-indigo-600 text-sm font-bold mt-2 cursor-pointer underline" @click="searchMode = searchMode === 'phone' ? 'name' : 'phone'">改試試{{ searchMode === 'phone' ? '姓名' : '電話' }}查詢？</p>
                     </div>
                 </div>
 
@@ -337,14 +341,21 @@ const app = createApp({
         const scannedMember = ref(null);
         let supabase = null, charts = {}, videoStream = null, faceMatcher = null, isFaceModelLoaded = false;
         let lastScanTime = 0;
-        // 1. 音效解鎖狀態
         let audioContext = null; 
         const stats = reactive({ todayVisits: 0, activeRate: 0 });
 
+        // 1. 初始化修復：加入 try-catch 與空值處理
         onMounted(async () => {
             try {
                 const saved = localStorage.getItem('supabase_config');
-                if(saved) { Object.assign(config, JSON.parse(saved)); initSystem(); }
+                if(saved) {
+                    const parsed = JSON.parse(saved);
+                    // 確保讀取到的資料結構正確
+                    if(parsed && parsed.url && parsed.key) {
+                        Object.assign(config, parsed);
+                        initSystem();
+                    }
+                }
             } catch(e) { console.error("Init error", e); resetConfig(); }
             loadFaceModels(); getCameras();
         });
@@ -398,41 +409,23 @@ const app = createApp({
         const saveConfig = () => { localStorage.setItem('supabase_config', JSON.stringify(config)); initSystem(); };
         const resetConfig = () => { if(confirm('確定重設系統設定？')) { localStorage.removeItem('supabase_config'); location.reload(); } };
 
-        // 1. 音效解鎖與播放邏輯
         const unlockAudio = () => {
-            if (!audioContext) {
-                audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            }
-            if (audioContext.state === 'suspended') {
-                audioContext.resume();
-            }
+            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioContext.state === 'suspended') audioContext.resume();
         };
 
         const playSound = (type) => {
             if (!audioContext) unlockAudio();
-            const osc = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            osc.connect(gain);
-            gain.connect(audioContext.destination);
-
+            const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
+            osc.connect(gain); gain.connect(audioContext.destination);
             if (type === 'success') {
-                // 叮咚 (C5 -> E5)
-                osc.type = 'sine';
-                osc.frequency.setValueAtTime(523.25, audioContext.currentTime);
-                osc.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
-                gain.gain.setValueAtTime(0.1, audioContext.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
-                osc.start();
-                osc.stop(audioContext.currentTime + 0.5);
+                osc.type = 'sine'; osc.frequency.setValueAtTime(523.25, audioContext.currentTime); osc.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+                osc.start(); osc.stop(audioContext.currentTime + 0.5);
             } else {
-                // 失敗 (低頻)
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, audioContext.currentTime);
-                osc.frequency.linearRampToValueAtTime(100, audioContext.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.1, audioContext.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioContext.currentTime + 0.3);
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioContext.currentTime); osc.frequency.linearRampToValueAtTime(100, audioContext.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.1, audioContext.currentTime); gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+                osc.start(); osc.stop(audioContext.currentTime + 0.3);
             }
         };
 
@@ -452,6 +445,12 @@ const app = createApp({
 
         const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; };
         const registerFaceFromSelfService = () => { editMember(verifiedMember.value); startFaceRegistration(); };
+
+        // 3. 自助刷臉模式入口
+        const startSelfServiceFaceScan = () => {
+            // 切換為自助搜尋模式，並開啟 AI 掃描
+            showFaceSearch(true); // 傳入 true 代表自助模式
+        };
 
         const saveMember = async () => {
             if(!form.name) return alert('請輸入姓名');
@@ -480,46 +479,24 @@ const app = createApp({
             });
         };
 
-        // 2. Excel 圖片導出修復 (設定 Row Height 和 Column Width)
         const exportFastExcel = async () => {
             if(isExporting.value) return; isExporting.value = true;
             try {
-                const workbook = new ExcelJS.Workbook(); 
-                const sheet = workbook.addWorksheet('會員名單');
-                
+                const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('會員名單');
                 sheet.columns = [
-                    { header: 'ID', key: 'id', width: 10 }, 
-                    { header: '照片', key: 'photo', width: 15 }, // 增加照片欄位寬度
-                    { header: '姓名', key: 'name', width: 15 }, 
-                    { header: '電話', key: 'phone', width: 15 },
-                    { header: '備註', key: 'notes', width: 25 }, 
-                    { header: '次數', key: 'visits', width: 8 },
+                    { header: 'ID', key: 'id', width: 10 }, { header: '照片', key: 'photo', width: 15 },
+                    { header: '姓名', key: 'name', width: 15 }, { header: '電話', key: 'phone', width: 15 },
+                    { header: '備註', key: 'notes', width: 25 }, { header: '次數', key: 'visits', width: 8 },
                     { header: '新增日期', key: 'created', width: 15 }
                 ];
-
                 for (let i = 0; i < members.value.length; i++) {
-                    const m = members.value[i]; 
-                    const rowId = i + 2; 
-                    const row = sheet.getRow(rowId);
-                    
-                    row.values = { 
-                        id: i + 1, name: m.name, phone: m.phone, notes: m.notes, 
-                        visits: m.search_history ? m.search_history.length : 0, 
-                        created: m.created_at ? m.created_at.slice(0,10) : '-' 
-                    };
-                    
-                    // 強制設定列高 100px (確保看得到照片)
+                    const m = members.value[i]; const rowId = i + 2; const row = sheet.getRow(rowId);
+                    row.values = { id: i + 1, name: m.name, phone: m.phone, notes: m.notes, visits: m.search_history ? m.search_history.length : 0, created: m.created_at ? m.created_at.slice(0,10) : '-' };
                     row.height = 100; 
-
                     if (m.photo) {
                         const resizedBase64 = await compressImage(m.photo, 150);
                         const imageId = workbook.addImage({ base64: resizedBase64.split(',')[1], extension: 'jpeg' });
-                        
-                        sheet.addImage(imageId, { 
-                            tl: { col: 1, row: rowId - 1 }, // 放在第 2 欄 (Index 1)
-                            ext: { width: 100, height: 100 }, // 設定顯示尺寸
-                            editAs: 'oneCell' 
-                        });
+                        sheet.addImage(imageId, { tl: { col: 1, row: rowId - 1 }, ext: { width: 100, height: 100 }, editAs: 'oneCell' });
                     }
                 }
                 const buffer = await workbook.xlsx.writeBuffer();
@@ -545,10 +522,16 @@ const app = createApp({
             }, 500);
         };
 
-        const showFaceSearch = async () => {
+        const isSelfServiceScan = ref(false); // 標記是否為自助掃描
+
+        const showFaceSearch = async (isSelfService = false) => {
             if(!isFaceModelLoaded) return alert('AI 載入中...');
             if(members.value.filter(m => m.face_descriptor).length === 0) return alert('尚無 AI 數據');
-            modals.faceScan = true; const video = await startVideo(); if(!video) return;
+            
+            isSelfServiceScan.value = isSelfService;
+            modals.faceScan = true; 
+            const video = await startVideo(); if(!video) return;
+            
             const labeled = members.value.filter(m=>m.face_descriptor).map(m=>new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
             faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
             
@@ -561,8 +544,23 @@ const app = createApp({
                         if(m.label !== 'unknown') {
                             const member = members.value.find(x=>x.id === m.label);
                             if(member) {
-                                lastScanTime = Date.now(); scannedMember.value = member; scanMessage.value = true;
-                                playSound('success'); // AI 掃描成功也播放音效
+                                lastScanTime = Date.now(); 
+                                
+                                // 自助模式邏輯
+                                if(isSelfServiceScan.value) {
+                                    verifyStatus.value = 'success';
+                                    verifiedMember.value = member;
+                                    playSound('success');
+                                    stopFaceScan(); // 掃描成功後關閉鏡頭
+                                    // 記錄
+                                    const h = member.search_history||[]; h.push({timestamp:new Date().toISOString()});
+                                    member.search_history = h; supabase.from('members').update({search_history:h}).eq('id',member.id).then();
+                                    return; // 結束迴圈
+                                } 
+                                
+                                // 一般後台模式邏輯
+                                scannedMember.value = member; scanMessage.value = true;
+                                playSound('success');
                                 const h = member.search_history||[]; h.push({timestamp:new Date().toISOString()});
                                 member.search_history = h; supabase.from('members').update({search_history:h}).eq('id',member.id).then();
                                 setTimeout(()=>scanMessage.value=false, 2500);
@@ -605,6 +603,43 @@ const app = createApp({
             }; r.readAsBinaryString(f);
         };
 
+        const calcStats = () => {
+            const today = new Date().toISOString().slice(0,10);
+            stats.todayVisits = members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.startsWith(today)).length||0), 0);
+            const activeCount = members.value.filter(m => m.search_history?.some(h => new Date(h.timestamp) > new Date(Date.now() - 5184000000))).length;
+            stats.activeRate = Math.round((activeCount / (members.value.length || 1)) * 100);
+        };
+
+        const updateDashboard = () => {
+            nextTick(() => {
+                const hours = Array(24).fill(0); members.value.forEach(m => m.search_history?.forEach(h => hours[new Date(h.timestamp).getHours()]++));
+                renderChart('hourChart', 'bar', { labels: hours.map((_, i) => `${i}時`), datasets: [{ label: '來客', data: hours, backgroundColor: '#4f46e5', borderRadius: 4 }] });
+                const loyalty = { new:0, regular:0, vip:0, lost:0 }; members.value.forEach(m => loyalty[getLoyaltyType(m)]++);
+                renderChart('loyaltyChart', 'doughnut', { labels: ['新客', '常客', 'VIP', '沈睡'], datasets: [{ data: Object.values(loyalty), backgroundColor: ['#38bdf8', '#4f46e5', '#f59e0b', '#94a3b8'] }] });
+                const days = Array(7).fill(0).map((_, i) => { const d=new Date(); d.setDate(d.getDate()-i); return d.toISOString().slice(5,10); }).reverse();
+                const trends = days.map(d => members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.includes(d)).length||0), 0));
+                renderChart('trendChart', 'line', { labels: days, datasets: [{ label: '流量', data: trends, borderColor: '#10b981', tension: 0.4, fill: true, backgroundColor: '#10b98120' }] });
+            });
+        };
+
+        const renderChart = (id, type, data) => {
+            const ctx = document.getElementById(id); if(!ctx) return;
+            if(charts[id]) charts[id].destroy();
+            charts[id] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: type!=='bar' } } } });
+        };
+
+        const getLoyaltyType = (m) => {
+            const v = m.search_history ? m.search_history.length : 0; 
+            const last = m.search_history && m.search_history.length ? new Date(m.search_history[m.search_history.length-1].timestamp) : null;
+            if(last && (new Date()-last)/(86400000) > 60) return 'lost';
+            if(v > 20) return 'vip'; if(v > 5) return 'regular'; return 'new';
+        };
+        const getLoyaltyLabel = (m) => ({lost:'沈睡客', vip:'VIP', regular:'常客', new:'新客'}[getLoyaltyType(m)]);
+        const getLoyaltyClass = (m) => ({lost:'bg-slate-100 text-slate-500', vip:'bg-amber-100 text-amber-700', regular:'bg-indigo-100 text-indigo-700', new:'bg-sky-100 text-sky-700'}[getLoyaltyType(m)]);
+
+        // 2. 變數遺失修復：將 deleteMember 正確宣告並導出
+        const deleteMember = async () => { if(confirm('確定刪除？')) { await supabase.from('members').delete().eq('id', form.id); modals.form = false; fetchMembers(); } };
+
         watch(currentTab, v => { if(v==='dashboard') updateDashboard(); });
         const filteredMembers = computed(() => members.value.filter(m => m.name.includes(searchQuery.value) || m.phone.includes(searchQuery.value)));
 
@@ -614,14 +649,14 @@ const app = createApp({
             selfServiceInput, verifyStatus, verifiedMember, searchMode,
             saveMember, deleteMember, editMember, openModal, handleFileSelect, exportFastExcel, handleImport,
             startFaceRegistration, showFaceSearch, stopFaceScan, handleCameraSwitch, performVerification, resetSelfService, registerFaceFromSelfService, checkAdmin,
-            getLoyaltyLabel, getLoyaltyClass, unlockAudio
+            getLoyaltyLabel, getLoyaltyClass, unlockAudio, startSelfServiceFaceScan // 導出新功能
         };
     }
 });
 
 app.config.errorHandler = (err) => {
     console.error(err);
-    alert("系統發生錯誤，請截圖給開發者:\n" + err.message);
+    alert("系統發生錯誤:\n" + err.message);
 };
 
 app.mount('#app');
