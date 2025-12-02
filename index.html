@@ -3,16 +3,18 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V3.8 (UI優化版)</title>
+    <title>AI 智能會員系統 V3.9 (安全旗艦版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     <script src="https://cdn.sheetjs.com/xlsx-0.20.0/package/dist/xlsx.full.min.js"></script>
+
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
     <style>
@@ -35,29 +37,49 @@
     
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">系統初始化</h2>
+            <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">系統初始化 & 安全設定</h2>
             <div class="space-y-4">
-                <input v-model="config.url" placeholder="Supabase Project URL" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
-                <input v-model="config.key" placeholder="Supabase API Key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
-                <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">開始使用</button>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Supabase URL</label>
+                    <input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase">Supabase Key</label>
+                    <input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
+                </div>
+                <div>
+                    <label class="text-xs font-bold text-slate-500 uppercase text-rose-500">設定管理員密碼 (刪除/匯出用)</label>
+                    <input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 outline-none transition bg-rose-50">
+                </div>
+                <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">儲存並啟動</button>
             </div>
         </div>
     </div>
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-brain text-indigo-600 mr-2"></i>會員系統 V3.8</h1>
-            <div class="flex gap-4">
-                <button @click="modals.io = true" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
-                <span v-if="isLoading" class="loader"></span>
-                <span v-else class="text-emerald-500 flex items-center font-bold text-sm"><i class="fa-solid fa-circle text-[10px] mr-1.5"></i>連線中</span>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-shield-halved text-indigo-600 mr-2"></i>會員系統 V3.9</h1>
+            <div class="flex gap-4 items-center">
+                <button @click="resetConfig" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
+                
+                <button @click="checkAdmin(modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
+                
+                <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
+                    <span v-if="isLoading" class="loader"></span>
+                    <span v-else class="text-emerald-500 flex items-center"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i>DB連線</span>
+                    <span class="w-[1px] h-3 bg-slate-300 mx-1"></span>
+                    <span :class="isFaceModelLoaded ? 'text-indigo-500' : 'text-slate-400'" class="flex items-center">
+                        <i class="fa-solid" :class="isFaceModelLoaded ? 'fa-brain' : 'fa-circle-notch fa-spin'"></i>
+                        <span class="ml-1">{{ isFaceModelLoaded ? 'AI 就緒' : 'AI 載入中' }}</span>
+                    </span>
+                </div>
             </div>
         </div>
         <div class="flex border-t border-slate-100 bg-white px-2">
             <button @click="currentTab = 'self_service'" :class="{'tab-active': currentTab === 'self_service'}" class="tab-btn flex-1 py-3 text-sm text-indigo-600"><i class="fa-solid fa-user-check mr-1.5"></i>自助認證</button>
             <button @click="currentTab = 'list'" :class="{'tab-active': currentTab === 'list'}" class="tab-btn flex-1 py-3 text-sm"><i class="fa-solid fa-list-ul mr-1.5"></i>列表</button>
             <button @click="currentTab = 'dashboard'" :class="{'tab-active': currentTab === 'dashboard'}" class="tab-btn flex-1 py-3 text-sm"><i class="fa-solid fa-chart-line mr-1.5"></i>分析</button>
-            <button @click="currentTab = 'scan'" @click="showFaceSearch" class="tab-btn flex-1 py-3 text-sm text-indigo-600 bg-indigo-50/50"><i class="fa-solid fa-expand mr-1.5"></i>AI 掃描</button>
+            <button @click="showFaceSearch" class="tab-btn flex-1 py-3 text-sm text-indigo-600 bg-indigo-50/50"><i class="fa-solid fa-expand mr-1.5"></i>AI 掃描</button>
         </div>
     </header>
 
@@ -65,7 +87,6 @@
         
         <div v-show="currentTab === 'self_service'" class="max-w-md mx-auto mt-4">
             <div class="bg-white rounded-3xl shadow-lg overflow-hidden border border-slate-100 p-8 min-h-[60vh] flex flex-col items-center justify-center text-center">
-                
                 <div v-if="verifyStatus === 'idle' || verifyStatus === 'fail'" class="w-full space-y-6">
                     <div class="space-y-2">
                         <i class="fa-solid fa-mobile-screen-button text-5xl text-indigo-500 mb-2"></i>
@@ -78,25 +99,15 @@
                          <span class="text-xs font-bold px-2 py-1 rounded cursor-pointer transition" :class="searchMode === 'name' ? 'bg-indigo-100 text-indigo-600' : 'text-slate-400'" @click="searchMode='name'">姓名搜尋</span>
                     </div>
 
-                    <input 
-                        v-model="selfServiceInput" 
-                        :type="searchMode === 'phone' ? 'tel' : 'text'"
-                        :placeholder="searchMode === 'phone' ? '請輸入電話號碼...' : '請輸入姓名...'"
-                        class="w-full text-center text-2xl font-bold py-4 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent transition placeholder:text-slate-300"
-                        @keyup.enter="performVerification"
-                    >
+                    <input v-model="selfServiceInput" :type="searchMode === 'phone' ? 'tel' : 'text'" :placeholder="searchMode === 'phone' ? '請輸入電話號碼...' : '請輸入姓名...'" class="w-full text-center text-2xl font-bold py-4 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent transition placeholder:text-slate-300" @keyup.enter="performVerification">
 
-                    <button @click="performVerification" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl text-lg font-bold shadow-lg shadow-indigo-200 active:scale-95 transition">
-                        確認送出
-                    </button>
+                    <button @click="performVerification" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl text-lg font-bold shadow-lg shadow-indigo-200 active:scale-95 transition">確認送出</button>
 
                     <transition name="bounce">
                         <div v-if="verifyStatus === 'fail'" class="mt-4 bg-rose-50 border border-rose-100 p-4 rounded-xl">
                             <p class="text-rose-600 font-bold text-lg"><i class="fa-solid fa-circle-xmark mr-1"></i> 驗證失敗</p>
                             <p class="text-slate-500 text-sm mt-1">找不到此資料</p>
-                            <p class="text-indigo-600 text-sm font-bold mt-2 cursor-pointer underline" @click="searchMode = searchMode === 'phone' ? 'name' : 'phone'">
-                                改試試輸入{{ searchMode === 'phone' ? '姓名' : '電話' }}查詢？
-                            </p>
+                            <p class="text-indigo-600 text-sm font-bold mt-2 cursor-pointer underline" @click="searchMode = searchMode === 'phone' ? 'name' : 'phone'">改試試{{ searchMode === 'phone' ? '姓名' : '電話' }}查詢？</p>
                         </div>
                     </transition>
                 </div>
@@ -113,22 +124,15 @@
                     <div v-if="!verifiedMember.face_descriptor" class="bg-indigo-50 border border-indigo-100 p-5 rounded-2xl mt-4">
                         <h4 class="font-bold text-indigo-800 mb-1"><i class="fa-solid fa-face-smile mr-1"></i> 還沒註冊人臉嗎？</h4>
                         <p class="text-indigo-600/80 text-sm mb-4">註冊後，下次只要「刷臉」就能秒速報到喔！</p>
-                        <button @click="registerFaceFromSelfService" class="w-full bg-white border border-indigo-200 text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition shadow-sm">
-                            <i class="fa-solid fa-camera mr-1"></i> 立即掃描人臉
-                        </button>
+                        <button @click="registerFaceFromSelfService" class="w-full bg-white border border-indigo-200 text-indigo-600 py-3 rounded-xl font-bold hover:bg-indigo-50 transition shadow-sm"><i class="fa-solid fa-camera mr-1"></i> 立即掃描人臉</button>
                     </div>
                     
                     <div v-else class="bg-emerald-50 border border-emerald-100 p-4 rounded-2xl mt-4">
-                        <p class="text-emerald-700 font-bold flex items-center justify-center">
-                            <i class="fa-solid fa-check-circle mr-2"></i> 您已完成 AI 人臉註冊
-                        </p>
+                        <p class="text-emerald-700 font-bold flex items-center justify-center"><i class="fa-solid fa-check-circle mr-2"></i> 您已完成 AI 人臉註冊</p>
                     </div>
 
-                    <button @click="resetSelfService" class="text-slate-400 hover:text-slate-600 text-sm mt-6">
-                        返回首頁
-                    </button>
+                    <button @click="resetSelfService" class="text-slate-400 hover:text-slate-600 text-sm mt-6">返回首頁</button>
                 </div>
-
             </div>
         </div>
 
@@ -212,13 +216,11 @@
                 
                 <div class="border-t border-slate-100 pt-4">
                     <label class="text-xs font-bold text-slate-500 uppercase block mb-3">會員照片與 AI 識別</label>
-                    
                     <div class="flex gap-4 mb-4">
-                         <div class="w-24 h-24 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner relative flex-shrink-0">
+                        <div class="w-24 h-24 bg-slate-100 rounded-xl overflow-hidden border border-slate-200 shadow-inner relative flex-shrink-0">
                             <img v-if="photoPreview" :src="photoPreview" class="w-full h-full object-cover">
                             <div v-else class="flex items-center justify-center h-full text-slate-300"><i class="fa-solid fa-user text-3xl"></i></div>
                         </div>
-                        
                         <div class="flex flex-col justify-center gap-2 flex-1">
                              <button @click="$refs.fileInput.click()" class="w-full bg-white border border-slate-200 hover:bg-slate-50 py-2 rounded-lg text-sm font-bold text-slate-600 transition shadow-sm">
                                 <i class="fa-solid fa-upload mr-1"></i> 上傳照片
@@ -226,26 +228,16 @@
                             <p class="text-xs text-slate-400">支援 JPG/PNG，系統自動優化畫質</p>
                         </div>
                     </div>
-
-                    <button @click="startFaceRegistration" 
-                        class="w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg shadow-indigo-200 transition transform active:scale-95 flex items-center justify-center relative overflow-hidden group"
-                        :class="form.face_descriptor ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-indigo-500 to-purple-600 animate-pulse'"
-                    >
+                    <button @click="startFaceRegistration" class="w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg shadow-indigo-200 transition transform active:scale-95 flex items-center justify-center relative overflow-hidden group" :class="form.face_descriptor ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-indigo-500 to-purple-600 animate-pulse'">
                         <div class="absolute inset-0 bg-white opacity-0 group-hover:opacity-20 transition"></div>
-                        
                         <i class="fa-solid fa-camera text-2xl mr-3"></i>
                         <span>{{ form.face_descriptor ? '重新錄入 AI 人臉' : '註冊 AI 人臉辨識' }}</span>
-                        
                         <span v-if="form.face_descriptor" class="absolute right-4 bg-white/20 px-2 py-0.5 rounded text-xs">已完成</span>
                     </button>
-                    <p class="text-center text-xs text-slate-400 mt-2" v-if="!form.face_descriptor">
-                        <i class="fa-solid fa-arrow-up mr-1 text-indigo-400"></i> 請點擊上方按鈕開啟鏡頭
-                    </p>
                 </div>
             </div>
-            
             <div class="p-4 border-t bg-slate-50 flex justify-between items-center">
-                <button v-if="isEditing" @click="deleteMember" class="text-rose-500 font-bold text-sm px-2 hover:text-rose-600">刪除會員</button>
+                <button v-if="isEditing" @click="checkAdmin(deleteMember)" class="text-rose-500 font-bold text-sm px-2 hover:text-rose-600"><i class="fa-solid fa-lock mr-1"></i>刪除會員</button>
                 <div class="flex gap-3 ml-auto">
                     <button @click="modals.form = false" class="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-200 rounded-lg transition">取消</button>
                     <button @click="saveMember" class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg shadow-lg shadow-indigo-200 font-bold hover:bg-indigo-700 transition">儲存資料</button>
@@ -305,7 +297,7 @@
                 <button @click="exportFastExcel" class="w-full py-3.5 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-100 hover:bg-emerald-100 transition flex items-center justify-center gap-2 disabled:opacity-50" :disabled="isExporting">
                     <i v-if="isExporting" class="fa-solid fa-circle-notch fa-spin"></i>
                     <i v-else class="fa-solid fa-file-excel"></i> 
-                    {{ isExporting ? '處理中...' : '極速導出 (含預覽圖)' }}
+                    {{ isExporting ? '處理中...' : '極速導出 (含照片)' }}
                 </button>
                 <div class="border-t border-slate-100 pt-4 mt-2">
                      <p class="text-xs font-bold text-slate-400 mb-2 uppercase">資料還原 (Excel/JSON)</p>
@@ -323,7 +315,7 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 
 createApp({
     setup() {
-        const config = reactive({ url: '', key: '' });
+        const config = reactive({ url: '', key: '', adminPwd: '' });
         const isConfigured = ref(false);
         const members = ref([]);
         const isLoading = ref(false);
@@ -390,6 +382,19 @@ createApp({
             if(currentTab.value === 'dashboard') updateDashboard();
         };
 
+        const checkAdmin = (action) => {
+            const pwd = prompt("請輸入管理員密碼以繼續：");
+            const targetPwd = config.adminPwd || '0000'; // 預設密碼 0000
+            if(pwd === targetPwd) {
+                if(typeof action === 'function') action();
+            } else {
+                alert("密碼錯誤，拒絕存取");
+            }
+        };
+
+        const saveConfig = () => { localStorage.setItem('supabase_config', JSON.stringify(config)); initSystem(); };
+        const resetConfig = () => { if(confirm('確定重設系統設定？')) { localStorage.removeItem('supabase_config'); location.reload(); } };
+
         const playSound = (type) => {
             const ctx = new (window.AudioContext || window.webkitAudioContext)();
             const osc = ctx.createOscillator(); const gain = ctx.createGain();
@@ -426,12 +431,17 @@ createApp({
             if(!form.name) return alert('請輸入姓名');
             isLoading.value = true;
             const payload = { name: form.name, phone: form.phone, notes: form.notes, photo: photoPreview.value, face_descriptor: form.face_descriptor, updated_at: new Date().toISOString() };
-            if(form.id) await supabase.from('members').update(payload).eq('id', form.id);
-            else { payload.id = Date.now().toString(); payload.created_at = new Date().toISOString(); payload.search_history = []; await supabase.from('members').insert(payload); }
+            if(form.id) {
+                await supabase.from('members').update(payload).eq('id', form.id);
+            } else {
+                payload.id = Date.now().toString(); payload.created_at = new Date().toISOString(); payload.search_history = [];
+                await supabase.from('members').insert(payload);
+            }
             modals.form = false; fetchMembers();
             if(currentTab.value === 'self_service') verifyStatus.value = 'success';
         };
 
+        // ExcelJS 導出
         const compressImage = (base64, targetWidth) => {
             return new Promise(resolve => {
                 const img = new Image();
@@ -506,6 +516,7 @@ createApp({
         const handleCameraSwitch = async () => { if(videoStream) { videoStream.getTracks().forEach(t=>t.stop()); await startVideo(); } };
         
         const startVideo = async () => {
+            if(!isFaceModelLoaded) { alert("AI 模型載入中，請稍候..."); return null; }
             const video = document.getElementById('video');
             try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined } });
@@ -533,6 +544,7 @@ createApp({
 
         const showFaceSearch = async () => {
             if(!isFaceModelLoaded) return alert('AI 載入中...');
+            if(members.value.filter(m => m.face_descriptor).length === 0) return alert('尚無 AI 數據');
             modals.faceScan = true; const video = await startVideo(); if(!video) return;
             const labeled = members.value.filter(m=>m.face_descriptor).map(m=>new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
             faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
@@ -560,9 +572,6 @@ createApp({
         };
 
         const stopFaceScan = () => { if(videoStream) { videoStream.getTracks().forEach(t=>t.stop()); videoStream=null; } modals.faceScan = false; };
-        const saveConfig = () => { localStorage.setItem('supabase_config', JSON.stringify(config)); initSystem(); };
-        const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); photoPreview.value = m.photo; isEditing.value = true; modals.form = true; };
-        const openModal = (t) => { if(t==='add') { Object.assign(form, {id:null, name:'', phone:'', notes:'', photo:null, face_descriptor:null}); photoPreview.value=null; isEditing.value=false; } modals.form=true; };
         const handleFileSelect = (e) => { const f=e.target.files[0]; if(f){const r=new FileReader(); r.onload=ev=>photoPreview.value=ev.target.result; r.readAsDataURL(f);} };
         const handleImport = (e) => {
             const f=e.target.files[0]; const r=new FileReader();
@@ -578,18 +587,17 @@ createApp({
                 } catch(e){ alert('格式錯誤'); }
             }; r.readAsBinaryString(f);
         };
-        const formatDate = (d) => d ? new Date(d).toLocaleDateString() : '-';
 
         watch(currentTab, v => { if(v==='dashboard') updateDashboard(); });
         const filteredMembers = computed(() => members.value.filter(m => m.name.includes(searchQuery.value) || m.phone.includes(searchQuery.value)));
 
         return {
-            config, isConfigured, saveConfig, isLoading, isExporting, currentTab, searchQuery, members, filteredMembers, stats,
+            config, isConfigured, saveConfig, resetConfig, isLoading, isExporting, currentTab, searchQuery, members, filteredMembers, stats, isFaceModelLoaded,
             modals, form, photoPreview, isEditing, videoDevices, currentDeviceId, scanMessage, scannedMember,
             selfServiceInput, verifyStatus, verifiedMember, searchMode,
             saveMember, deleteMember, editMember, openModal, handleFileSelect, exportFastExcel, handleImport,
-            startFaceRegistration, showFaceSearch, stopFaceScan, handleCameraSwitch, performVerification, resetSelfService, registerFaceFromSelfService,
-            getLoyaltyLabel, getLoyaltyClass, formatDate
+            startFaceRegistration, showFaceSearch, stopFaceScan, handleCameraSwitch, performVerification, resetSelfService, registerFaceFromSelfService, checkAdmin,
+            getLoyaltyLabel, getLoyaltyClass
         };
     }
 }).mount('#app');
