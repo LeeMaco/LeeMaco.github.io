@@ -3,15 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 雲端會員系統 V3</title>
+    <title>AI 雲端會員系統 V3.1</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css" rel="stylesheet">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
     <style>
@@ -21,7 +20,9 @@
         @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
         /* 視訊層樣式 */
         #video-container video { object-fit: cover; width: 100%; height: 100%; transform: scaleX(-1); border-radius: 12px; }
-        #video-container canvas { position: absolute; top: 0; left: 0; transform: scaleX(-1); }
+        /* 掃描結果彈窗動畫 */
+        .scan-result-enter-active, .scan-result-leave-active { transition: all 0.3s ease; }
+        .scan-result-enter-from, .scan-result-leave-to { opacity: 0; transform: scale(0.9) translateY(20px); }
     </style>
 </head>
 <body>
@@ -31,22 +32,21 @@
     <div v-if="!isConfigured" class="fixed inset-0 bg-gray-900 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-xl p-6 w-full max-w-md shadow-2xl">
             <h2 class="text-xl font-bold mb-4 text-center">系統初始化</h2>
-            <p class="text-sm text-gray-500 mb-4">請輸入 Supabase 專案資訊以連接雲端資料庫。</p>
             <div class="space-y-3">
-                <input v-model="config.url" placeholder="Project URL" class="w-full border p-2 rounded">
-                <input v-model="config.key" placeholder="API Key (anon public)" class="w-full border p-2 rounded">
+                <input v-model="config.url" placeholder="Supabase Project URL" class="w-full border p-2 rounded">
+                <input v-model="config.key" placeholder="Supabase API Key (anon)" class="w-full border p-2 rounded">
                 <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-2 rounded font-bold">連接資料庫</button>
             </div>
-            <p class="text-xs text-gray-400 mt-4 text-center">設定將保存在此設備的瀏覽器中。</p>
         </div>
     </div>
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-4 py-3 flex justify-between items-center">
-            <h1 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-cloud text-indigo-600 mr-2"></i>會員系統 V3</h1>
-            <div class="flex gap-2 text-sm">
+            <h1 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-cloud text-indigo-600 mr-2"></i>會員系統 V3.1</h1>
+            <div class="flex gap-2">
+                <button @click="modals.io = true" class="text-gray-500 hover:text-indigo-600"><i class="fa-solid fa-file-export"></i></button>
                 <span v-if="isLoading" class="loader"></span>
-                <span v-else class="text-green-500 font-bold"><i class="fa-solid fa-wifi mr-1"></i>連線中</span>
+                <span v-else class="text-green-500 text-sm font-bold flex items-center"><i class="fa-solid fa-wifi mr-1"></i></span>
             </div>
         </div>
         <div class="flex border-t">
@@ -61,29 +61,27 @@
         <div v-show="currentTab === 'list'" class="space-y-4">
             <div class="relative">
                 <i class="fa-solid fa-magnifying-glass absolute left-3 top-3.5 text-gray-400"></i>
-                <input v-model="searchQuery" @keyup.enter="handleManualSearch" type="text" placeholder="輸入姓名或電話..." class="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
+                <input v-model="searchQuery" @keyup.enter="handleManualSearch" type="text" placeholder="搜尋姓名或電話..." class="w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm">
             </div>
 
             <div class="flex justify-between items-center">
                 <span class="text-sm text-gray-500">共 {{ members.length }} 位會員</span>
-                <button @click="openModal('add')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow"><i class="fa-solid fa-plus mr-1"></i>新增會員</button>
+                <button @click="openModal('add')" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow"><i class="fa-solid fa-plus mr-1"></i>新增</button>
             </div>
 
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div v-for="member in filteredMembers" :key="member.id" @click="viewMember(member)" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 active:bg-gray-50 cursor-pointer">
-                    <div class="w-14 h-14 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                        <img :src="member.photo || 'https://via.placeholder.com/150'" class="w-full h-full object-cover">
+                <div v-for="member in filteredMembers" :key="member.id" @click="viewMember(member)" class="bg-white p-4 rounded-xl shadow-sm border border-gray-100 flex items-center gap-4 active:bg-gray-50 cursor-pointer relative overflow-hidden">
+                    <div class="w-14 h-14 rounded-full bg-gray-200 overflow-hidden flex-shrink-0 border">
+                        <img :src="member.photo || 'https://via.placeholder.com/150?text=No+Img'" class="w-full h-full object-cover">
                     </div>
                     <div class="flex-1 min-w-0">
-                        <div class="flex justify-between">
-                            <h3 class="font-bold text-gray-900">{{ member.name }}</h3>
-                            <span v-if="member.search_history?.length" class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">{{ member.search_history.length }} 次</span>
-                        </div>
+                        <h3 class="font-bold text-gray-900">{{ member.name }}</h3>
                         <p class="text-gray-500 text-sm">{{ member.phone }}</p>
-                        <div class="flex items-center gap-2 mt-1">
-                            <i class="fa-solid fa-id-card text-xs text-indigo-400" v-if="member.face_descriptor" title="已註冊人臉"></i>
-                            <span class="text-xs text-gray-400">{{ formatDateShort(member.updated_at) }}</span>
-                        </div>
+                        <p v-if="member.notes" class="text-xs text-gray-400 truncate mt-1"><i class="fa-solid fa-note-sticky mr-1"></i>{{ member.notes }}</p>
+                    </div>
+                    <div class="flex flex-col items-end gap-1">
+                        <span v-if="member.search_history?.length" class="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-bold">{{ member.search_history.length }}次</span>
+                        <i class="fa-solid fa-id-card text-indigo-400 text-xs" v-if="member.face_descriptor"></i>
                     </div>
                 </div>
             </div>
@@ -92,88 +90,134 @@
         <div v-show="currentTab === 'dashboard'" class="space-y-6">
             <div class="grid grid-cols-2 gap-4">
                 <div class="bg-white p-4 rounded-xl shadow-sm text-center">
-                    <p class="text-gray-500 text-xs">總會員數</p>
-                    <p class="text-2xl font-bold text-indigo-600">{{ members.length }}</p>
+                    <p class="text-gray-500 text-xs">本月活躍</p>
+                    <p class="text-2xl font-bold text-indigo-600">{{ monthlyActiveCount }}</p>
                 </div>
                 <div class="bg-white p-4 rounded-xl shadow-sm text-center">
-                    <p class="text-gray-500 text-xs">本月活躍(搜尋)</p>
-                    <p class="text-2xl font-bold text-green-600">{{ monthlyActiveCount }}</p>
+                    <p class="text-gray-500 text-xs">今日搜尋</p>
+                    <p class="text-2xl font-bold text-green-600">{{ todaySearchCount }}</p>
                 </div>
             </div>
-
             <div class="bg-white p-4 rounded-xl shadow-sm">
-                <h3 class="font-bold text-gray-700 mb-4 text-sm">搜尋熱度排行 (VIP)</h3>
+                <h3 class="font-bold text-gray-700 mb-4 text-sm">VIP 熱度排行</h3>
                 <canvas id="topChart"></canvas>
-            </div>
-
-            <div class="bg-white p-4 rounded-xl shadow-sm">
-                <h3 class="font-bold text-gray-700 mb-4 text-sm">近期活動記錄</h3>
-                <div class="space-y-3">
-                    <div v-for="(log, i) in recentLogs" :key="i" class="flex justify-between text-sm border-b pb-2">
-                        <span>{{ log.name }}</span>
-                        <span class="text-gray-400 text-xs">{{ log.time }}</span>
-                    </div>
-                </div>
             </div>
         </div>
     </main>
 
     <div v-if="modals.form" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col">
-            <div class="p-4 border-b flex justify-between items-center">
-                <h3 class="font-bold">{{ isEditing ? '編輯會員' : '新增會員' }}</h3>
-                <button @click="modals.form = false" class="text-gray-500"><i class="fa-solid fa-times text-xl"></i></button>
+        <div class="bg-white rounded-xl w-full max-w-lg max-h-[90vh] flex flex-col shadow-2xl">
+            <div class="p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-xl">
+                <h3 class="font-bold text-lg">{{ isEditing ? '編輯會員' : '新增會員' }}</h3>
+                <button @click="modals.form = false" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
-            <div class="p-4 overflow-y-auto space-y-4">
-                <input v-model="form.name" placeholder="姓名 *" class="w-full border p-2 rounded">
-                <input v-model="form.phone" type="tel" placeholder="電話 *" class="w-full border p-2 rounded">
+            <div class="p-5 overflow-y-auto space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">姓名 <span class="text-red-500">*</span></label>
+                    <input v-model="form.name" type="text" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
                 
-                <div class="border rounded p-3 bg-gray-50">
-                    <label class="text-xs font-bold text-gray-500 block mb-2">會員照片與 AI 識別</label>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">電話 <span class="text-red-500">*</span></label>
+                    <input v-model="form.phone" type="tel" class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none">
+                </div>
+
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">備註 <span class="text-gray-400 font-normal">(選填)</span></label>
+                    <textarea v-model="form.notes" rows="2" placeholder="例如：喜歡靠窗位置、對蝦子過敏..." class="w-full border border-gray-300 p-2.5 rounded-lg focus:ring-2 focus:ring-indigo-500 outline-none"></textarea>
+                </div>
+                
+                <div class="border border-indigo-100 rounded-lg p-3 bg-indigo-50">
+                    <label class="text-xs font-bold text-indigo-800 block mb-2">會員照片與 AI 識別</label>
                     <div class="flex gap-4 items-center">
-                        <div class="w-20 h-20 bg-gray-200 rounded overflow-hidden relative">
+                        <div class="w-20 h-20 bg-white rounded-lg overflow-hidden relative shadow-sm border">
                             <img v-if="photoPreview" :src="photoPreview" class="w-full h-full object-cover">
-                            <div v-else class="flex items-center justify-center h-full text-gray-400"><i class="fa-solid fa-image"></i></div>
+                            <div v-else class="flex items-center justify-center h-full text-gray-300"><i class="fa-solid fa-image text-2xl"></i></div>
                         </div>
                         <div class="flex flex-col gap-2">
-                            <button @click="$refs.fileInput.click()" class="bg-white border text-xs py-1 px-3 rounded shadow-sm">上傳照片</button>
-                            <button @click="startFaceRegistration" class="bg-indigo-600 text-white text-xs py-1 px-3 rounded shadow-sm flex items-center">
+                            <button @click="$refs.fileInput.click()" class="bg-white border border-gray-300 text-xs py-1.5 px-3 rounded hover:bg-gray-50 text-gray-700 font-medium">上傳照片</button>
+                            <button @click="startFaceRegistration" class="bg-indigo-600 hover:bg-indigo-700 text-white text-xs py-1.5 px-3 rounded shadow-sm flex items-center justify-center font-medium">
                                 <i class="fa-solid fa-camera mr-1"></i>
-                                {{ form.face_descriptor ? '重錄 AI 人臉' : '註冊 AI 人臉' }}
+                                {{ form.face_descriptor ? '重錄人臉' : '註冊人臉' }}
                             </button>
                         </div>
                     </div>
-                    <p v-if="form.face_descriptor" class="text-green-600 text-xs mt-2"><i class="fa-solid fa-check-circle mr-1"></i>AI 人臉模型已建立</p>
+                    <p v-if="form.face_descriptor" class="text-green-600 text-xs mt-2 flex items-center"><i class="fa-solid fa-check-circle mr-1"></i>AI 人臉模型已建立</p>
                 </div>
             </div>
-            <div class="p-4 border-t flex justify-end gap-2">
-                <button @click="saveMember" class="bg-indigo-600 text-white px-6 py-2 rounded font-bold w-full">儲存</button>
+            
+            <div class="p-4 border-t bg-gray-50 rounded-b-xl flex justify-between">
+                <button v-if="isEditing" @click="deleteMember" class="text-red-500 text-sm font-bold px-2">刪除</button>
+                <div class="flex gap-2 ml-auto">
+                    <button @click="modals.form = false" class="px-5 py-2 text-gray-600 font-medium hover:bg-gray-200 rounded-lg">取消</button>
+                    <button @click="saveMember" class="px-6 py-2 bg-indigo-600 text-white rounded-lg shadow font-bold hover:bg-indigo-700">儲存</button>
+                </div>
             </div>
         </div>
     </div>
 
     <div v-show="modals.faceScan" class="fixed inset-0 bg-black z-[60] flex flex-col">
-        <div class="absolute top-4 right-4 z-20">
-            <button @click="stopFaceScan" class="bg-white bg-opacity-20 text-white rounded-full w-10 h-10 flex items-center justify-center backdrop-blur-sm">
-                <i class="fa-solid fa-times text-xl"></i>
-            </button>
-        </div>
-        
+        <button @click="stopFaceScan" class="absolute top-6 right-6 z-30 text-white bg-black bg-opacity-30 p-2 rounded-full"><i class="fa-solid fa-times text-2xl"></i></button>
         <div id="video-container" class="relative flex-1 bg-black flex items-center justify-center overflow-hidden">
             <video id="video" autoplay muted playsinline></video>
-            <div class="absolute w-64 h-64 border-2 border-indigo-500 rounded-lg opacity-70 flex items-center justify-center">
-                <div class="text-indigo-400 text-sm animate-pulse mt-72">AI 辨識中...</div>
+            <div class="absolute w-64 h-64 border-2 border-indigo-500 rounded-lg opacity-80 flex items-center justify-center shadow-[0_0_100px_rgba(79,70,229,0.3)]">
+                <div class="text-indigo-400 text-sm animate-pulse mt-72 font-bold tracking-widest">AI 辨識中</div>
             </div>
         </div>
+    </div>
 
-        <div class="bg-gray-900 p-6 text-white text-center pb-safe">
-            <p v-if="scanStatus" class="text-lg font-bold text-yellow-400">{{ scanStatus }}</p>
-            <p v-else class="text-gray-400 text-sm">請將臉部對準框框</p>
+    <transition name="scan-result">
+        <div v-if="modals.scanResult && scannedMember" class="fixed inset-0 z-[70] flex items-center justify-center p-6 bg-black bg-opacity-60 backdrop-blur-sm" @click="modals.scanResult = false">
+            <div class="bg-gray-900 rounded-2xl w-full max-w-sm overflow-hidden shadow-2xl border border-gray-700" @click.stop>
+                <div class="h-64 w-full bg-gray-800 relative">
+                    <img :src="scannedMember.photo || 'https://via.placeholder.com/300?text=No+Photo'" class="w-full h-full object-cover">
+                    <div class="absolute inset-0 bg-gradient-to-t from-gray-900 to-transparent opacity-90"></div>
+                    <div class="absolute bottom-4 left-6">
+                        <h2 class="text-2xl font-bold text-white">{{ scannedMember.name }}</h2>
+                        <p class="text-indigo-400 font-mono">{{ scannedMember.phone }}</p>
+                    </div>
+                </div>
+                
+                <div class="p-6 space-y-4">
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span class="text-sm">歷史搜尋</span>
+                        <span class="font-bold text-white text-lg">{{ scannedMember.search_history?.length || 0 }} 次</span>
+                    </div>
+                    <div class="flex justify-between items-center text-gray-300">
+                        <span class="text-sm">上次來訪</span>
+                        <span class="text-sm text-gray-400">{{ getLastVisit(scannedMember) }}</span>
+                    </div>
+                    
+                    <div v-if="scannedMember.notes" class="bg-gray-800 p-3 rounded-lg border border-gray-700">
+                        <p class="text-xs text-gray-500 mb-1">備註</p>
+                        <p class="text-gray-200 text-sm">{{ scannedMember.notes }}</p>
+                    </div>
+
+                    <div class="flex gap-3 pt-2">
+                        <button @click="editMember(scannedMember)" class="flex-1 bg-gray-700 hover:bg-gray-600 text-white py-3 rounded-xl font-bold transition-colors">編輯</button>
+                        <button @click="modals.scanResult = false" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white py-3 rounded-xl font-bold transition-colors">關閉</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </transition>
+
+    <div v-if="modals.io" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center p-4">
+        <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-xl">
+            <h3 class="font-bold text-lg mb-4">資料管理</h3>
+            <div class="space-y-3">
+                <button @click="exportData('xlsx')" class="w-full py-3 bg-green-50 text-green-700 rounded-lg font-bold border border-green-200 hover:bg-green-100 flex items-center justify-center"><i class="fa-solid fa-file-excel mr-2"></i>導出 Excel</button>
+                <button @click="exportData('json')" class="w-full py-3 bg-orange-50 text-orange-700 rounded-lg font-bold border border-orange-200 hover:bg-orange-100 flex items-center justify-center"><i class="fa-solid fa-file-code mr-2"></i>導出 JSON</button>
+                <div class="border-t pt-3 mt-2">
+                     <p class="text-xs text-gray-500 mb-2">導入資料 (支援 Excel/JSON)</p>
+                     <input type="file" @change="handleImport" accept=".xlsx,.xls,.json" class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-indigo-50 file:text-indigo-700 hover:file:bg-indigo-100"/>
+                </div>
+            </div>
+            <button @click="modals.io = false" class="mt-4 w-full text-gray-500 py-2">關閉</button>
         </div>
     </div>
 
     <input type="file" ref="fileInput" @change="handleFileSelect" accept="image/*" class="hidden">
-
 </div>
 
 <script>
@@ -181,41 +225,35 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 
 createApp({
     setup() {
-        // --- 狀態變數 ---
         const config = reactive({ url: '', key: '' });
         const isConfigured = ref(false);
         const members = ref([]);
         const isLoading = ref(false);
         const currentTab = ref('list');
         const searchQuery = ref('');
-        const modals = reactive({ form: false, faceScan: false });
+        const modals = reactive({ form: false, faceScan: false, scanResult: false, io: false });
         const isEditing = ref(false);
         
-        // 表單與圖片
-        const form = reactive({ id: null, name: '', phone: '', photo: null, search_history: [], face_descriptor: null });
+        // 表單資料 (新增 notes)
+        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, search_history: [], face_descriptor: null });
         const photoPreview = ref(null);
         const fileInput = ref(null);
+        const scannedMember = ref(null);
         
-        // AI 相關
-        const scanStatus = ref('');
+        // AI & 系統
         let supabase = null;
         let chartInstance = null;
         let videoStream = null;
         let faceMatcher = null;
         let isFaceModelLoaded = false;
 
-        // --- 初始化 ---
         onMounted(async () => {
-            // 1. 檢查設定
             const savedConfig = localStorage.getItem('supabase_config');
             if (savedConfig) {
                 const c = JSON.parse(savedConfig);
-                config.url = c.url;
-                config.key = c.key;
+                config.url = c.url; config.key = c.key;
                 initSystem();
             }
-
-            // 2. 預加載 AI 模型 (背景執行)
             loadFaceModels();
         });
 
@@ -234,33 +272,31 @@ createApp({
         const loadFaceModels = async () => {
             const MODEL_URL = 'https://justadudewhohacks.github.io/face-api.js/models';
             try {
-                await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL);
-                await faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL);
+                await Promise.all([
+                    faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(MODEL_URL),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(MODEL_URL)
+                ]);
                 isFaceModelLoaded = true;
-                console.log("AI Models Loaded");
-            } catch (e) {
-                console.error("AI Model Load Failed", e);
-            }
+            } catch (e) { console.error("AI Model Error", e); }
         };
 
-        // --- Supabase 資料操作 ---
         const fetchMembers = async () => {
             isLoading.value = true;
             const { data, error } = await supabase.from('members').select('*').order('updated_at', { ascending: false });
-            if (error) alert('讀取失敗: ' + error.message);
-            else members.value = data || [];
+            if (!error) members.value = data || [];
             isLoading.value = false;
             updateDashboard();
         };
 
         const saveMember = async () => {
-            if (!form.name || !form.phone) return alert("請輸入姓名電話");
+            if (!form.name || !form.phone) return alert("請填寫姓名與電話");
             isLoading.value = true;
 
             const payload = {
                 name: form.name,
                 phone: form.phone,
+                notes: form.notes, // 新增備註
                 photo: photoPreview.value,
                 face_descriptor: form.face_descriptor,
                 updated_at: new Date().toISOString()
@@ -268,11 +304,9 @@ createApp({
 
             let error;
             if (form.id) {
-                // Update
                 const res = await supabase.from('members').update(payload).eq('id', form.id);
                 error = res.error;
             } else {
-                // Insert
                 payload.id = Date.now().toString();
                 payload.search_history = [];
                 const res = await supabase.from('members').insert(payload);
@@ -280,110 +314,80 @@ createApp({
             }
 
             isLoading.value = false;
-            if (error) alert('儲存失敗: ' + error.message);
+            if (error) alert('錯誤: ' + error.message);
             else {
                 modals.form = false;
                 fetchMembers();
             }
         };
 
-        const updateSearchHistory = async (member) => {
-            const newHistory = member.search_history || [];
-            newHistory.push({ timestamp: new Date().toISOString() });
-            
-            // 本地先更新 UI
-            member.search_history = newHistory;
-            
-            // 背景更新 DB
-            await supabase.from('members').update({ search_history: newHistory }).eq('id', member.id);
-            updateDashboard(); // 更新圖表
+        const deleteMember = async () => {
+            if(!confirm('確定刪除此會員？')) return;
+            isLoading.value = true;
+            const { error } = await supabase.from('members').delete().eq('id', form.id);
+            isLoading.value = false;
+            if(!error) {
+                modals.form = false;
+                modals.scanResult = false; // 如果是從搜尋結果刪除的
+                fetchMembers();
+            }
         };
 
-        // --- 核心功能 1: AI 掃描與註冊 ---
-        
-        // 啟動鏡頭 (通用函數)
+        // --- AI 掃描邏輯 ---
         const startVideo = async () => {
             const video = document.getElementById('video');
             try {
                 videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user' } });
                 video.srcObject = videoStream;
                 return new Promise(resolve => video.onloadedmetadata = () => { video.play(); resolve(video); });
-            } catch (err) {
-                alert("無法啟動相機: " + err);
-                return null;
-            }
+            } catch (err) { alert("無法啟動相機"); return null; }
         };
 
-        // 功能 A: 註冊人臉 (在表單內)
         const startFaceRegistration = async () => {
-            if (!isFaceModelLoaded) return alert("AI 模型載入中，請稍後...");
+            if (!isFaceModelLoaded) return alert("AI 初始化中...");
             modals.faceScan = true;
-            scanStatus.value = "請保持靜止，正在擷取特徵...";
-            
             const video = await startVideo();
             if(!video) return;
 
-            // 檢測一次
             setTimeout(async () => {
                 const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-                
                 if (detection) {
-                    // 將 Float32Array 轉為普通 Array 存入 JSON
                     form.face_descriptor = Array.from(detection.descriptor);
-                    
-                    // 順便截圖當頭像
                     const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
+                    canvas.width = video.videoWidth; canvas.height = video.videoHeight;
                     canvas.getContext('2d').drawImage(video, 0, 0);
                     photoPreview.value = canvas.toDataURL('image/jpeg', 0.7);
-                    
                     stopFaceScan();
-                    alert("人臉註冊成功！");
+                    alert("註冊成功！");
                 } else {
-                    scanStatus.value = "偵測失敗，請調整光線或距離";
+                    alert("偵測失敗，請對準框框");
+                    stopFaceScan();
                 }
-            }, 1500); // 延遲 1.5秒讓相機穩定
+            }, 1000);
         };
 
-        // 功能 B: 搜尋人臉 (主功能)
         const showFaceSearch = async () => {
-            if (!isFaceModelLoaded) return alert("AI 模型載入中...");
+            if (!isFaceModelLoaded) return alert("AI 初始化中...");
+            const labeledDescriptors = members.value.filter(m => m.face_descriptor).map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
+            if (labeledDescriptors.length === 0) return alert("無 AI 資料");
             
-            // 準備匹配器
-            const labeledDescriptors = members.value
-                .filter(m => m.face_descriptor)
-                .map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
-            
-            if (labeledDescriptors.length === 0) return alert("目前沒有會員註冊人臉資料");
-            
-            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.5); // 0.5 是相似度閾值
-            
+            faceMatcher = new faceapi.FaceMatcher(labeledDescriptors, 0.45);
             modals.faceScan = true;
-            scanStatus.value = "正在搜尋會員...";
-            
             const video = await startVideo();
             if(!video) return;
 
-            // 啟動循環檢測
             const detectLoop = async () => {
                 if (!modals.faceScan) return;
-                
                 const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-                
                 if (detection) {
                     const match = faceMatcher.findBestMatch(detection.descriptor);
                     if (match.label !== 'unknown') {
                         const member = members.value.find(m => m.id === match.label);
                         if (member) {
-                            scanStatus.value = `找到：${member.name}`;
                             stopFaceScan();
-                            viewMember(member);
-                            updateSearchHistory(member);
+                            triggerScanResult(member);
                             return;
                         }
-                    } else {
-                        scanStatus.value = "未知的訪客";
                     }
                 }
                 requestAnimationFrame(detectLoop);
@@ -393,72 +397,113 @@ createApp({
 
         const stopFaceScan = () => {
             modals.faceScan = false;
-            scanStatus.value = '';
-            if (videoStream) {
-                videoStream.getTracks().forEach(track => track.stop());
-                videoStream = null;
+            if (videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+        };
+
+        // --- 結果展示邏輯 (取代 alert) ---
+        const triggerScanResult = async (member) => {
+            scannedMember.value = member;
+            modals.scanResult = true; // 開啟深色彈窗
+            
+            // 更新歷史
+            const newHistory = member.search_history || [];
+            newHistory.push({ timestamp: new Date().toISOString() });
+            member.search_history = newHistory;
+            await supabase.from('members').update({ search_history: newHistory }).eq('id', member.id);
+            updateDashboard();
+        };
+
+        const handleManualSearch = () => {
+            const match = members.value.find(m => m.name === searchQuery.value || m.phone === searchQuery.value);
+            if(match) {
+                triggerScanResult(match);
+                searchQuery.value = '';
+            } else {
+                alert('查無資料');
             }
         };
 
-        // --- 核心功能 2: 儀表板 ---
+        // --- 導入導出邏輯 ---
+        const exportData = (type) => {
+            if (type === 'json') {
+                const blob = new Blob([JSON.stringify(members.value)], { type: "application/json" });
+                const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = `backup_${new Date().toISOString().slice(0,10)}.json`; a.click();
+            } else {
+                const data = members.value.map(m => ({ 姓名: m.name, 電話: m.phone, 備註: m.notes || '', 搜尋次數: m.search_history?.length || 0 }));
+                const ws = XLSX.utils.json_to_sheet(data);
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, "Members");
+                XLSX.writeFile(wb, "會員列表.xlsx");
+            }
+        };
+
+        const handleImport = (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            const reader = new FileReader();
+            reader.onload = async (evt) => {
+                let importData = [];
+                if(file.name.endsWith('.json')) {
+                    importData = JSON.parse(evt.target.result);
+                } else {
+                    const workbook = XLSX.read(evt.target.result, { type: 'binary' });
+                    const json = XLSX.utils.sheet_to_json(workbook.Sheets[workbook.SheetNames[0]]);
+                    importData = json.map(row => ({
+                        id: Date.now().toString() + Math.random(),
+                        name: row['姓名'], phone: row['電話'], notes: row['備註'],
+                        search_history: [], updated_at: new Date().toISOString()
+                    }));
+                }
+                
+                if(confirm(`確定導入 ${importData.length} 筆資料？`)) {
+                    isLoading.value = true;
+                    // 批量寫入 Supabase
+                    for(let item of importData) {
+                        // 清理 id 避免衝突
+                        if(!item.id) item.id = Date.now().toString() + Math.random();
+                         await supabase.from('members').insert(item);
+                    }
+                    await fetchMembers();
+                    alert("導入完成！");
+                    modals.io = false;
+                }
+            };
+            if(file.name.endsWith('.json')) reader.readAsText(file);
+            else reader.readAsBinaryString(file);
+        };
+
+        // --- UI 工具 ---
         const updateDashboard = () => {
             if (currentTab.value !== 'dashboard') return;
             nextTick(() => {
                 const ctx = document.getElementById('topChart');
-                if(!ctx) return;
-
-                // 準備數據：搜尋次數前 5 名
-                const topMembers = [...members.value]
-                    .sort((a, b) => (b.search_history?.length || 0) - (a.search_history?.length || 0))
-                    .slice(0, 5);
-
-                if (chartInstance) chartInstance.destroy();
+                if(!ctx || chartInstance) return; // 簡單防止重複
+                const topMembers = [...members.value].sort((a, b) => (b.search_history?.length||0) - (a.search_history?.length||0)).slice(0, 5);
                 chartInstance = new Chart(ctx, {
                     type: 'bar',
                     data: {
                         labels: topMembers.map(m => m.name),
-                        datasets: [{
-                            label: '搜尋次數',
-                            data: topMembers.map(m => m.search_history?.length || 0),
-                            backgroundColor: '#4f46e5',
-                            borderRadius: 4
-                        }]
+                        datasets: [{ label: '次數', data: topMembers.map(m => m.search_history?.length||0), backgroundColor: '#4f46e5', borderRadius: 6 }]
                     },
                     options: { responsive: true, scales: { y: { beginAtZero: true } } }
                 });
             });
         };
 
-        watch(currentTab, (val) => {
-            if(val === 'dashboard') updateDashboard();
-        });
-
-        // --- 其他 UI 邏輯 ---
-        const filteredMembers = computed(() => {
-            const q = searchQuery.value.toLowerCase();
-            return members.value.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q));
-        });
-
-        const handleManualSearch = () => {
-            const match = members.value.find(m => m.name === searchQuery.value || m.phone === searchQuery.value);
-            if(match) {
-                alert(`找到會員：${match.name}`);
-                updateSearchHistory(match);
-                searchQuery.value = '';
-                viewMember(match);
+        const editMember = (m) => {
+            Object.assign(form, JSON.parse(JSON.stringify(m)));
+            photoPreview.value = m.photo;
+            isEditing.value = true;
+            modals.scanResult = false; // 關閉結果窗
+            modals.form = true; // 開啟編輯窗
+        };
+        const openModal = (type) => {
+            if(type === 'add') {
+                Object.assign(form, { id: null, name: '', phone: '', notes: '', photo: null, face_descriptor: null });
+                photoPreview.value = null; isEditing.value = false;
             }
+            modals.form = true;
         };
-
-        const viewMember = (m) => {
-            alert(`
-                姓名: ${m.name}
-                電話: ${m.phone}
-                歷史搜尋: ${m.search_history?.length || 0} 次
-                上次: ${m.search_history?.length ? formatDateShort(m.search_history[m.search_history.length-1].timestamp) : '無'}
-            `);
-            // 這裡可以改成打開詳細 Modal，為求簡化先用 Alert
-        };
-        
         const handleFileSelect = (e) => {
             const file = e.target.files[0];
             if(file) {
@@ -467,42 +512,31 @@ createApp({
                 reader.readAsDataURL(file);
             }
         };
-
-        const openModal = (type) => {
-            if(type === 'add') {
-                Object.assign(form, { id: null, name: '', phone: '', photo: null, face_descriptor: null });
-                photoPreview.value = null;
-                isEditing.value = false;
-            }
-            modals.form = true;
+        const getLastVisit = (m) => {
+            if(!m.search_history?.length) return '首次來訪';
+            const last = m.search_history[m.search_history.length - 1];
+            return new Date(last.timestamp).toLocaleString('zh-TW', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'});
         };
-
-        const monthlyActiveCount = computed(() => {
-            const now = new Date();
-            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-            return members.value.filter(m => 
-                m.search_history?.some(h => h.timestamp >= startOfMonth)
-            ).length;
+        
+        const monthlyActiveCount = computed(() => members.value.filter(m => m.search_history?.some(h => h.timestamp > new Date(new Date().setDate(1)).toISOString())).length);
+        const todaySearchCount = computed(() => {
+            const today = new Date().toISOString().slice(0,10);
+            return members.value.reduce((acc, m) => acc + (m.search_history?.filter(h => h.timestamp.startsWith(today)).length || 0), 0);
+        });
+        
+        const filteredMembers = computed(() => {
+            const q = searchQuery.value.toLowerCase();
+            return members.value.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q));
         });
 
-        const recentLogs = computed(() => {
-            const logs = [];
-            members.value.forEach(m => {
-                if(m.search_history) {
-                    m.search_history.forEach(h => logs.push({ name: m.name, time: formatDateShort(h.timestamp), raw: h.timestamp }));
-                }
-            });
-            return logs.sort((a, b) => new Date(b.raw) - new Date(a.raw)).slice(0, 5);
-        });
-
-        const formatDateShort = (iso) => new Date(iso).toLocaleString('zh-TW', { month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit' });
+        watch(currentTab, (val) => { if(val === 'dashboard') { if(chartInstance) chartInstance.destroy(); chartInstance = null; updateDashboard(); } });
 
         return {
             config, isConfigured, saveConfig, isLoading, currentTab, searchQuery, members, filteredMembers,
-            modals, form, photoPreview, isEditing, scanStatus, fileInput,
-            saveMember, openModal, handleFileSelect, viewMember, handleManualSearch,
+            modals, form, photoPreview, isEditing, fileInput, scannedMember,
+            saveMember, deleteMember, editMember, openModal, handleFileSelect, handleManualSearch,
             startFaceRegistration, showFaceSearch, stopFaceScan,
-            monthlyActiveCount, recentLogs, formatDateShort
+            exportData, handleImport, getLastVisit, monthlyActiveCount, todaySearchCount
         };
     }
 }).mount('#app');
