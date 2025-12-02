@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V3.9 (安全旗艦版)</title>
+    <title>AI 智能會員系統 V4.0 (高壓縮旗艦版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -37,7 +37,7 @@
     
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">系統初始化 & 安全設定</h2>
+            <h2 class="text-2xl font-bold mb-6 text-center text-slate-800">系統初始化 V4.0</h2>
             <div class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-slate-500 uppercase">Supabase URL</label>
@@ -48,29 +48,28 @@
                     <input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
                 </div>
                 <div>
-                    <label class="text-xs font-bold text-slate-500 uppercase text-rose-500">設定管理員密碼 (刪除/匯出用)</label>
+                    <label class="text-xs font-bold text-slate-500 uppercase text-rose-500">設定管理員密碼</label>
                     <input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 outline-none transition bg-rose-50">
                 </div>
-                <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">儲存並啟動</button>
+                <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
             </div>
         </div>
     </div>
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-shield-halved text-indigo-600 mr-2"></i>會員系統 V3.9</h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-rocket text-indigo-600 mr-2"></i>會員系統 V4.0</h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfig" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
-                
-                <button @click="checkAdmin(modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
+                <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
                 
                 <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
                     <span v-if="isLoading" class="loader"></span>
-                    <span v-else class="text-emerald-500 flex items-center"><i class="fa-solid fa-circle text-[8px] mr-1.5"></i>DB連線</span>
+                    <span v-else class="text-emerald-500 flex items-center"><i class="fa-solid fa-database mr-1.5"></i>{{ members.length }}</span>
                     <span class="w-[1px] h-3 bg-slate-300 mx-1"></span>
                     <span :class="isFaceModelLoaded ? 'text-indigo-500' : 'text-slate-400'" class="flex items-center">
                         <i class="fa-solid" :class="isFaceModelLoaded ? 'fa-brain' : 'fa-circle-notch fa-spin'"></i>
-                        <span class="ml-1">{{ isFaceModelLoaded ? 'AI 就緒' : 'AI 載入中' }}</span>
+                        <span class="ml-1">{{ isFaceModelLoaded ? 'AI 就緒' : '載入中' }}</span>
                     </span>
                 </div>
             </div>
@@ -225,7 +224,7 @@
                              <button @click="$refs.fileInput.click()" class="w-full bg-white border border-slate-200 hover:bg-slate-50 py-2 rounded-lg text-sm font-bold text-slate-600 transition shadow-sm">
                                 <i class="fa-solid fa-upload mr-1"></i> 上傳照片
                             </button>
-                            <p class="text-xs text-slate-400">支援 JPG/PNG，系統自動優化畫質</p>
+                            <p class="text-xs text-slate-400">將自動壓縮為 JPEG 以節省空間</p>
                         </div>
                     </div>
                     <button @click="startFaceRegistration" class="w-full py-4 rounded-xl text-white font-bold text-lg shadow-lg shadow-indigo-200 transition transform active:scale-95 flex items-center justify-center relative overflow-hidden group" :class="form.face_descriptor ? 'bg-gradient-to-r from-emerald-500 to-teal-500' : 'bg-gradient-to-r from-indigo-500 to-purple-600 animate-pulse'">
@@ -237,7 +236,7 @@
                 </div>
             </div>
             <div class="p-4 border-t bg-slate-50 flex justify-between items-center">
-                <button v-if="isEditing" @click="checkAdmin(deleteMember)" class="text-rose-500 font-bold text-sm px-2 hover:text-rose-600"><i class="fa-solid fa-lock mr-1"></i>刪除會員</button>
+                <button v-if="isEditing" @click="checkAdmin(() => deleteMember())" class="text-rose-500 font-bold text-sm px-2 hover:text-rose-600"><i class="fa-solid fa-lock mr-1"></i>刪除會員</button>
                 <div class="flex gap-3 ml-auto">
                     <button @click="modals.form = false" class="px-5 py-2.5 text-slate-500 font-bold hover:bg-slate-200 rounded-lg transition">取消</button>
                     <button @click="saveMember" class="px-6 py-2.5 bg-indigo-600 text-white rounded-lg shadow-lg shadow-indigo-200 font-bold hover:bg-indigo-700 transition">儲存資料</button>
@@ -384,7 +383,7 @@ createApp({
 
         const checkAdmin = (action) => {
             const pwd = prompt("請輸入管理員密碼以繼續：");
-            const targetPwd = config.adminPwd || '0000'; // 預設密碼 0000
+            const targetPwd = config.adminPwd || '0000';
             if(pwd === targetPwd) {
                 if(typeof action === 'function') action();
             } else {
@@ -441,7 +440,31 @@ createApp({
             if(currentTab.value === 'self_service') verifyStatus.value = 'success';
         };
 
-        // ExcelJS 導出
+        // 核心更新：使用 JPEG 0.8 進行註冊 (節省 80% 空間)
+        const startFaceRegistration = async () => {
+            if(!isFaceModelLoaded) return alert('AI 載入中...');
+            modals.faceScan = true; 
+            
+            const video = await startVideo();
+            if(!video) return;
+            
+            const t = setInterval(async()=>{
+                if(!modals.faceScan) return clearInterval(t);
+                const d = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+                if(d) {
+                    clearInterval(t);
+                    form.face_descriptor = Array.from(d.descriptor);
+                    const cvs = document.createElement('canvas'); cvs.width=360; cvs.height=360;
+                    const ctx = cvs.getContext('2d'); const b = d.detection.box;
+                    // 擴大截圖範圍
+                    ctx.drawImage(video, b.x-50, b.y-50, b.width+100, b.height+100, 0, 0, 360, 360);
+                    // 關鍵修改：改為 JPEG 0.8
+                    photoPreview.value = cvs.toDataURL('image/jpeg', 0.8);
+                    alert('註冊成功'); modals.faceScan = false; stopFaceScan();
+                }
+            }, 500);
+        };
+
         const compressImage = (base64, targetWidth) => {
             return new Promise(resolve => {
                 const img = new Image();
@@ -523,23 +546,6 @@ createApp({
                 video.srcObject = videoStream;
                 return new Promise(r => video.onloadedmetadata = () => { video.play(); r(video); });
             } catch(e) { alert('鏡頭啟動失敗'); return null; }
-        };
-
-        const startFaceRegistration = async () => {
-            modals.faceScan = true; const video = await startVideo(); if(!video) return;
-            const t = setInterval(async()=>{
-                if(!modals.faceScan) return clearInterval(t);
-                const d = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-                if(d) {
-                    clearInterval(t);
-                    form.face_descriptor = Array.from(d.descriptor);
-                    const cvs = document.createElement('canvas'); cvs.width=360; cvs.height=360;
-                    const ctx = cvs.getContext('2d'); const b = d.detection.box;
-                    ctx.drawImage(video, b.x-50, b.y-50, b.width+100, b.height+100, 0, 0, 360, 360);
-                    photoPreview.value = cvs.toDataURL('image/png');
-                    alert('註冊成功'); modals.faceScan = false; stopFaceScan();
-                }
-            }, 500);
         };
 
         const showFaceSearch = async () => {
