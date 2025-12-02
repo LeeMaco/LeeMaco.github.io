@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V4.1 (修復版)</title>
+    <title>AI 智能會員系統 V4.2 (音效修復版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
@@ -31,23 +31,23 @@
 </head>
 <body>
 
-<div id="app" class="min-h-screen flex flex-col pb-safe">
+<div id="app" class="min-h-screen flex flex-col pb-safe" @click="unlockAudio">
     
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
             <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-bold text-slate-800">系統初始化 V4.1</h2>
+                <h2 class="text-2xl font-bold text-slate-800">系統初始化 V4.2</h2>
                 <button @click="resetConfig" class="text-xs text-rose-500 underline">清除設定</button>
             </div>
             
             <div class="space-y-4">
                 <div>
                     <label class="text-xs font-bold text-slate-500 uppercase">Supabase URL</label>
-                    <input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition" placeholder="https://...">
+                    <input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
                 </div>
                 <div>
                     <label class="text-xs font-bold text-slate-500 uppercase">Supabase Key</label>
-                    <input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition" placeholder="eyJ...">
+                    <input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none transition">
                 </div>
                 <div>
                     <label class="text-xs font-bold text-slate-500 uppercase text-rose-500">管理員密碼</label>
@@ -55,13 +55,12 @@
                 </div>
                 <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
             </div>
-            <p class="text-xs text-slate-400 mt-4 text-center">如遇白畫面，請按左上角「清除設定」重試</p>
         </div>
     </div>
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-shield-halved text-indigo-600 mr-2"></i>會員系統 V4.1</h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-shield-halved text-indigo-600 mr-2"></i>會員系統 V4.2</h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfig" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
@@ -131,7 +130,9 @@
                         <p class="text-emerald-700 font-bold flex items-center justify-center"><i class="fa-solid fa-check-circle mr-2"></i> 您已完成 AI 人臉註冊</p>
                     </div>
 
-                    <button @click="resetSelfService" class="text-slate-400 hover:text-slate-600 text-sm mt-6">返回首頁</button>
+                    <button @click="resetSelfService" class="w-full bg-slate-500 hover:bg-slate-600 text-white py-3 rounded-xl font-bold shadow-md transition mt-6">
+                        <i class="fa-solid fa-house mr-2"></i>返回首頁
+                    </button>
                 </div>
             </div>
         </div>
@@ -253,26 +254,28 @@
             <button @click="stopFaceScan" class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white hover:bg-white/30"><i class="fa-solid fa-times"></i></button>
         </div>
 
-        <div v-if="scanMessage" class="absolute top-24 left-0 w-full z-40 flex justify-center px-4 pointer-events-none">
-            <div class="bg-white/95 backdrop-blur-xl p-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] w-full max-w-sm border border-emerald-100">
-                <div class="flex items-center gap-4">
-                    <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-500 shadow-sm flex-shrink-0">
-                        <img :src="scannedMember && scannedMember.photo ? scannedMember.photo : ''" class="w-full h-full object-cover">
-                    </div>
-                    <div class="flex-1 min-w-0">
-                        <div class="flex items-center justify-between">
-                            <h3 class="font-bold text-xl text-slate-800 truncate">{{ scannedMember && scannedMember.name }}</h3>
-                            <span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded font-bold">已記錄</span>
+        <transition name="toast">
+            <div v-if="scanMessage" class="absolute top-24 left-0 w-full z-40 flex justify-center px-4 pointer-events-none">
+                <div class="bg-white/95 backdrop-blur-xl p-4 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.3)] w-full max-w-sm border border-emerald-100">
+                    <div class="flex items-center gap-4">
+                        <div class="w-16 h-16 rounded-full overflow-hidden border-2 border-emerald-500 shadow-sm flex-shrink-0">
+                            <img :src="scannedMember && scannedMember.photo ? scannedMember.photo : ''" class="w-full h-full object-cover">
                         </div>
-                        <p class="text-sm text-slate-500">來訪: <span class="text-indigo-600 font-black">{{ scannedMember && scannedMember.search_history && scannedMember.search_history.length }}</span> 次</p>
+                        <div class="flex-1 min-w-0">
+                            <div class="flex items-center justify-between">
+                                <h3 class="font-bold text-xl text-slate-800 truncate">{{ scannedMember && scannedMember.name }}</h3>
+                                <span class="bg-emerald-100 text-emerald-700 text-xs px-2 py-0.5 rounded font-bold">已記錄</span>
+                            </div>
+                            <p class="text-sm text-slate-500">來訪: <span class="text-indigo-600 font-black">{{ scannedMember && scannedMember.search_history && scannedMember.search_history.length }}</span> 次</p>
+                        </div>
                     </div>
-                </div>
-                <div v-if="scannedMember && scannedMember.notes" class="mt-3 bg-amber-50 border border-amber-100 p-3 rounded-xl flex gap-3">
-                    <i class="fa-solid fa-circle-exclamation text-amber-500 mt-0.5"></i>
-                    <p class="text-sm font-bold text-amber-800 leading-snug">{{ scannedMember.notes }}</p>
+                    <div v-if="scannedMember && scannedMember.notes" class="mt-3 bg-amber-50 border border-amber-100 p-3 rounded-xl flex gap-3">
+                        <i class="fa-solid fa-circle-exclamation text-amber-500 mt-0.5"></i>
+                        <p class="text-sm font-bold text-amber-800 leading-snug">{{ scannedMember.notes }}</p>
+                    </div>
                 </div>
             </div>
-        </div>
+        </transition>
 
         <div id="video-container" class="flex-1 relative flex items-center justify-center bg-black">
             <video id="video" autoplay muted playsinline></video>
@@ -334,6 +337,8 @@ const app = createApp({
         const scannedMember = ref(null);
         let supabase = null, charts = {}, videoStream = null, faceMatcher = null, isFaceModelLoaded = false;
         let lastScanTime = 0;
+        // 1. 音效解鎖狀態
+        let audioContext = null; 
         const stats = reactive({ todayVisits: 0, activeRate: 0 });
 
         onMounted(async () => {
@@ -393,16 +398,54 @@ const app = createApp({
         const saveConfig = () => { localStorage.setItem('supabase_config', JSON.stringify(config)); initSystem(); };
         const resetConfig = () => { if(confirm('確定重設系統設定？')) { localStorage.removeItem('supabase_config'); location.reload(); } };
 
+        // 1. 音效解鎖與播放邏輯
+        const unlockAudio = () => {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        };
+
+        const playSound = (type) => {
+            if (!audioContext) unlockAudio();
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            if (type === 'success') {
+                // 叮咚 (C5 -> E5)
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(523.25, audioContext.currentTime);
+                osc.frequency.setValueAtTime(659.25, audioContext.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.5);
+                osc.start();
+                osc.stop(audioContext.currentTime + 0.5);
+            } else {
+                // 失敗 (低頻)
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(150, audioContext.currentTime);
+                osc.frequency.linearRampToValueAtTime(100, audioContext.currentTime + 0.3);
+                gain.gain.setValueAtTime(0.1, audioContext.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
+                osc.start();
+                osc.stop(audioContext.currentTime + 0.3);
+            }
+        };
+
         const performVerification = () => {
             if (!selfServiceInput.value.trim()) return;
             const input = selfServiceInput.value.trim();
             const member = members.value.find(m => (searchMode.value === 'phone' && m.phone === input) || (searchMode.value === 'name' && m.name === input));
             if (member) {
-                verifyStatus.value = 'success'; verifiedMember.value = member;
+                verifyStatus.value = 'success'; verifiedMember.value = member; playSound('success');
                 const h = member.search_history||[]; h.push({timestamp:new Date().toISOString()});
                 member.search_history = h; supabase.from('members').update({search_history:h}).eq('id',member.id).then();
             } else {
-                verifyStatus.value = 'fail';
+                verifyStatus.value = 'fail'; playSound('fail');
                 setTimeout(() => { if(verifyStatus.value === 'fail') verifyStatus.value = 'idle'; }, 5000);
             }
         };
@@ -425,7 +468,6 @@ const app = createApp({
             } catch(e) { alert("儲存失敗: " + e.message); } finally { isLoading.value = false; }
         };
 
-        // --- 核心優化：JPEG 圖片壓縮與導出 ---
         const compressImage = (base64, targetWidth) => {
             return new Promise(resolve => {
                 const img = new Image();
@@ -438,24 +480,46 @@ const app = createApp({
             });
         };
 
+        // 2. Excel 圖片導出修復 (設定 Row Height 和 Column Width)
         const exportFastExcel = async () => {
             if(isExporting.value) return; isExporting.value = true;
             try {
-                const workbook = new ExcelJS.Workbook(); const sheet = workbook.addWorksheet('會員名單');
+                const workbook = new ExcelJS.Workbook(); 
+                const sheet = workbook.addWorksheet('會員名單');
+                
                 sheet.columns = [
-                    { header: 'ID', key: 'id', width: 10 }, { header: '照片', key: 'photo', width: 12 },
-                    { header: '姓名', key: 'name', width: 15 }, { header: '電話', key: 'phone', width: 15 },
-                    { header: '備註', key: 'notes', width: 25 }, { header: '次數', key: 'visits', width: 8 },
+                    { header: 'ID', key: 'id', width: 10 }, 
+                    { header: '照片', key: 'photo', width: 15 }, // 增加照片欄位寬度
+                    { header: '姓名', key: 'name', width: 15 }, 
+                    { header: '電話', key: 'phone', width: 15 },
+                    { header: '備註', key: 'notes', width: 25 }, 
+                    { header: '次數', key: 'visits', width: 8 },
                     { header: '新增日期', key: 'created', width: 15 }
                 ];
+
                 for (let i = 0; i < members.value.length; i++) {
-                    const m = members.value[i]; const rowId = i + 2; const row = sheet.getRow(rowId);
-                    row.values = { id: i + 1, name: m.name, phone: m.phone, notes: m.notes, visits: m.search_history ? m.search_history.length : 0, created: m.created_at ? m.created_at.slice(0,10) : '-' };
-                    row.height = 60;
+                    const m = members.value[i]; 
+                    const rowId = i + 2; 
+                    const row = sheet.getRow(rowId);
+                    
+                    row.values = { 
+                        id: i + 1, name: m.name, phone: m.phone, notes: m.notes, 
+                        visits: m.search_history ? m.search_history.length : 0, 
+                        created: m.created_at ? m.created_at.slice(0,10) : '-' 
+                    };
+                    
+                    // 強制設定列高 100px (確保看得到照片)
+                    row.height = 100; 
+
                     if (m.photo) {
                         const resizedBase64 = await compressImage(m.photo, 150);
                         const imageId = workbook.addImage({ base64: resizedBase64.split(',')[1], extension: 'jpeg' });
-                        sheet.addImage(imageId, { tl: { col: 1, row: rowId - 1 }, ext: { width: 80, height: 80 }, editAs: 'oneCell' });
+                        
+                        sheet.addImage(imageId, { 
+                            tl: { col: 1, row: rowId - 1 }, // 放在第 2 欄 (Index 1)
+                            ext: { width: 100, height: 100 }, // 設定顯示尺寸
+                            editAs: 'oneCell' 
+                        });
                     }
                 }
                 const buffer = await workbook.xlsx.writeBuffer();
@@ -498,6 +562,7 @@ const app = createApp({
                             const member = members.value.find(x=>x.id === m.label);
                             if(member) {
                                 lastScanTime = Date.now(); scannedMember.value = member; scanMessage.value = true;
+                                playSound('success'); // AI 掃描成功也播放音效
                                 const h = member.search_history||[]; h.push({timestamp:new Date().toISOString()});
                                 member.search_history = h; supabase.from('members').update({search_history:h}).eq('id',member.id).then();
                                 setTimeout(()=>scanMessage.value=false, 2500);
@@ -511,11 +576,11 @@ const app = createApp({
         };
 
         const startVideo = async () => {
+            if(!isFaceModelLoaded) { alert("AI 模型載入中，請稍候..."); return null; }
+            const video = document.getElementById('video');
             try {
-                const video = document.getElementById('video');
-                const constraints = { video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined } };
-                const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                videoStream = stream; video.srcObject = stream;
+                videoStream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined } });
+                video.srcObject = videoStream;
                 return new Promise(r => video.onloadedmetadata = () => { video.play(); r(video); });
             } catch(e) { alert('鏡頭啟動失敗: ' + e.message); return null; }
         };
@@ -540,42 +605,6 @@ const app = createApp({
             }; r.readAsBinaryString(f);
         };
 
-        const calcStats = () => {
-            const today = new Date().toISOString().slice(0,10);
-            stats.todayVisits = members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.startsWith(today)).length||0), 0);
-            const activeCount = members.value.filter(m => m.search_history?.some(h => new Date(h.timestamp) > new Date(Date.now() - 5184000000))).length;
-            stats.activeRate = Math.round((activeCount / (members.value.length || 1)) * 100);
-        };
-
-        const updateDashboard = () => {
-            nextTick(() => {
-                const hours = Array(24).fill(0); members.value.forEach(m => m.search_history?.forEach(h => hours[new Date(h.timestamp).getHours()]++));
-                renderChart('hourChart', 'bar', { labels: hours.map((_, i) => `${i}時`), datasets: [{ label: '來客', data: hours, backgroundColor: '#4f46e5', borderRadius: 4 }] });
-                const loyalty = { new:0, regular:0, vip:0, lost:0 }; members.value.forEach(m => loyalty[getLoyaltyType(m)]++);
-                renderChart('loyaltyChart', 'doughnut', { labels: ['新客', '常客', 'VIP', '沈睡'], datasets: [{ data: Object.values(loyalty), backgroundColor: ['#38bdf8', '#4f46e5', '#f59e0b', '#94a3b8'] }] });
-                const days = Array(7).fill(0).map((_, i) => { const d=new Date(); d.setDate(d.getDate()-i); return d.toISOString().slice(5,10); }).reverse();
-                const trends = days.map(d => members.value.reduce((acc, m) => acc + (m.search_history?.filter(h=>h.timestamp.includes(d)).length||0), 0));
-                renderChart('trendChart', 'line', { labels: days, datasets: [{ label: '流量', data: trends, borderColor: '#10b981', tension: 0.4, fill: true, backgroundColor: '#10b98120' }] });
-            });
-        };
-
-        const renderChart = (id, type, data) => {
-            const ctx = document.getElementById(id); if(!ctx) return;
-            if(charts[id]) charts[id].destroy();
-            charts[id] = new Chart(ctx, { type, data, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: type!=='bar' } } } });
-        };
-
-        const getLoyaltyType = (m) => {
-            const v = m.search_history ? m.search_history.length : 0; 
-            const last = m.search_history && m.search_history.length ? new Date(m.search_history[m.search_history.length-1].timestamp) : null;
-            if(last && (new Date()-last)/(86400000) > 60) return 'lost';
-            if(v > 20) return 'vip'; if(v > 5) return 'regular'; return 'new';
-        };
-        const getLoyaltyLabel = (m) => ({lost:'沈睡客', vip:'VIP', regular:'常客', new:'新客'}[getLoyaltyType(m)]);
-        const getLoyaltyClass = (m) => ({lost:'bg-slate-100 text-slate-500', vip:'bg-amber-100 text-amber-700', regular:'bg-indigo-100 text-indigo-700', new:'bg-sky-100 text-sky-700'}[getLoyaltyType(m)]);
-
-        const deleteMember = async () => { if(confirm('確定刪除？')) { await supabase.from('members').delete().eq('id', form.id); modals.form = false; fetchMembers(); } };
-
         watch(currentTab, v => { if(v==='dashboard') updateDashboard(); });
         const filteredMembers = computed(() => members.value.filter(m => m.name.includes(searchQuery.value) || m.phone.includes(searchQuery.value)));
 
@@ -585,7 +614,7 @@ const app = createApp({
             selfServiceInput, verifyStatus, verifiedMember, searchMode,
             saveMember, deleteMember, editMember, openModal, handleFileSelect, exportFastExcel, handleImport,
             startFaceRegistration, showFaceSearch, stopFaceScan, handleCameraSwitch, performVerification, resetSelfService, registerFaceFromSelfService, checkAdmin,
-            getLoyaltyLabel, getLoyaltyClass
+            getLoyaltyLabel, getLoyaltyClass, unlockAudio
         };
     }
 });
