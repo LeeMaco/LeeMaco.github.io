@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V5.0 (商用旗艦版)</title>
+    <title>AI 智能會員系統 V5.1 (商用穩定版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,11 +53,11 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V5.0</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V5.1</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
-                <div><label class="text-xs font-bold text-rose-500">管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
+                <div><label class="text-xs font-bold text-rose-500">設定管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
                 <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
             </div>
         </div>
@@ -65,9 +65,9 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">PRO</span></h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">V5.1</span></h1>
             <div class="flex gap-4 items-center">
-                <button @click="resetConfig" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
+                <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
                 <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
                     <span class="text-emerald-500 flex items-center"><i class="fa-solid fa-database mr-1.5"></i>{{ members.length }}</span>
@@ -145,8 +145,17 @@
                 <button @click="closeModals" class="text-white/80 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
             <div class="p-6 overflow-y-auto space-y-4 flex-1">
-                <div v-if="modals.register" class="bg-slate-50 p-3 rounded-lg border text-xs text-slate-500 mb-2">個資聲明：本系統僅用於會員識別。</div>
-                <div v-if="modals.register" class="flex items-center gap-2 mb-2"><input type="checkbox" v-model="registerForm.agree" class="w-4 h-4"><span class="text-sm font-bold">我同意條款</span></div>
+                <div v-if="modals.register" class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2">
+                    <p class="text-xs text-slate-400 font-bold mb-2">會員條款與個資聲明</p>
+                    <button @click="modals.privacy = true" class="w-full py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold shadow-sm hover:bg-indigo-50 flex items-center justify-center gap-2">
+                        <i class="fa-solid fa-file-contract"></i> 點此閱讀完整條款
+                    </button>
+                    <div class="flex items-center gap-2 mt-3 pt-2 border-t border-slate-200">
+                        <input type="checkbox" id="agree_chk" v-model="registerForm.agree" :disabled="!registerForm.hasRead" class="w-4 h-4 rounded accent-indigo-600 disabled:opacity-50">
+                        <label for="agree_chk" class="text-sm font-bold" :class="registerForm.hasRead ? 'text-slate-700' : 'text-slate-400'">我同意上述條款</label>
+                    </div>
+                    <p v-if="!registerForm.hasRead" class="text-[10px] text-rose-500 mt-1">* 請先點擊閱讀條款</p>
+                </div>
                 
                 <div class="grid gap-4" :class="{'opacity-50 pointer-events-none': modals.register && !registerForm.agree}">
                     <div v-for="field in ['name', 'phone', 'birthday']" :key="field">
@@ -164,6 +173,23 @@
             <div class="p-4 border-t bg-slate-50 flex gap-3">
                 <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="modals.register && !registerForm.agree" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-indigo-700">儲存資料</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.privacy" class="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-6">
+        <div class="bg-white w-full max-w-lg rounded-2xl flex flex-col max-h-[80vh]">
+            <div class="p-4 border-b font-bold text-lg">會員服務條款與個資聲明</div>
+            <div class="p-6 overflow-y-auto text-sm text-slate-600 leading-relaxed">
+                <h4 class="font-bold text-slate-800 mb-2">1. 個人資料蒐集目的</h4>
+                <p class="mb-4">本系統蒐集您的姓名、電話及人臉特徵值，僅用於會員身分識別、入場管理及消費紀錄查詢，絕不挪作他用。</p>
+                <h4 class="font-bold text-slate-800 mb-2">2. 人臉辨識說明</h4>
+                <p class="mb-4">系統會將您的照片轉換為不可逆的特徵碼（Face Descriptor）。我們致力於保護您的生物特徵數據安全。</p>
+                <h4 class="font-bold text-slate-800 mb-2">3. 會員權益</h4>
+                <p class="mb-4">您有權隨時要求查閱、更正或刪除您的會員資料。刪除後相關優惠將一併失效。</p>
+            </div>
+            <div class="p-4 border-t">
+                <button @click="confirmPrivacy" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700">我已閱讀並同意</button>
             </div>
         </div>
     </div>
@@ -189,8 +215,20 @@
     <div v-if="modals.io" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
             <h3 class="font-bold text-lg mb-4">資料管理</h3>
-            <button @click="exportFastExcel" class="w-full py-3 bg-green-50 text-green-700 rounded-xl font-bold border border-green-200 mb-4 hover:bg-green-100">{{ isExporting ? '處理中...' : '匯出 Excel' }}</button>
-            <button @click="modals.io=false" class="text-gray-400">關閉</button>
+            
+            <div class="space-y-3">
+                <button @click="exportFastExcel" class="w-full py-3 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center justify-center gap-2">
+                    <i class="fa-solid fa-download"></i> {{ isExporting ? '處理中...' : '匯出會員資料 (Excel)' }}
+                </button>
+
+                <div class="relative w-full py-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold border border-indigo-200 hover:bg-indigo-100 flex items-center justify-center gap-2 cursor-pointer group">
+                    <i class="fa-solid fa-upload"></i> 匯入會員 (Excel)
+                    <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
+                </div>
+                <p class="text-[10px] text-slate-400">Excel 格式: 第一欄姓名, 第二欄電話</p>
+            </div>
+
+            <button @click="modals.io=false" class="mt-6 text-gray-400 py-2">關閉</button>
         </div>
     </div>
 
@@ -211,7 +249,7 @@ const app = createApp({
         const isLoading = ref(false);
         const currentTab = ref('self_service');
         const searchQuery = ref('');
-        const modals = reactive({ form: false, faceScan: false, io: false, register: false });
+        const modals = reactive({ form: false, faceScan: false, io: false, register: false, privacy: false });
         const tabs = [
             {id:'self_service', label:'自助認證', icon:'fa-solid fa-user-check'},
             {id:'list', label:'列表管理', icon:'fa-solid fa-list-ul'},
@@ -220,7 +258,7 @@ const app = createApp({
 
         // --- 表單數據 ---
         const form = reactive({ id: null, name: '', phone: '', notes: '', birthday: '', photo: null, search_history: [], face_descriptor: null });
-        const registerForm = reactive({ name: '', phone: '', birthday: '', photo: null, face_descriptor: null, agree: false });
+        const registerForm = reactive({ name: '', phone: '', birthday: '', photo: null, face_descriptor: null, agree: false, hasRead: false });
         const activeForm = computed(() => modals.register ? registerForm : form);
         const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
 
@@ -292,7 +330,6 @@ const app = createApp({
                 await navigator.mediaDevices.getUserMedia({ video: true });
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 videoDevices.value = devices.filter(d => d.kind === 'videoinput');
-                // 優先使用後鏡頭
                 const back = videoDevices.value.find(d => d.label.toLowerCase().includes('back'));
                 if(back) currentDeviceId.value = back.deviceId;
             } catch(e) {/* ignore */}
@@ -308,7 +345,7 @@ const app = createApp({
         };
 
         // ==========================================
-        // 2. 資料庫操作 (商用級別：錯誤處理)
+        // 2. 資料庫操作
         // ==========================================
         const fetchMembers = async () => {
             if(!supabase) return;
@@ -333,16 +370,31 @@ const app = createApp({
                 const img = new Image();
                 img.onload = () => {
                     const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 600; // 降低解析度以節省流量
+                    const MAX_WIDTH = 600; 
                     const scale = MAX_WIDTH / img.width;
                     canvas.width = MAX_WIDTH;
                     canvas.height = img.height * scale;
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6)); // 高壓縮率
+                    resolve(canvas.toDataURL('image/jpeg', 0.6));
                 };
                 img.src = base64;
             });
+        };
+
+        // --- 修正: 定義在 Setup 內部的 closeModals ---
+        const stopFaceScan = () => {
+            isScanning = false;
+            modals.faceScan = false;
+            if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
+        };
+
+        const closeModals = () => {
+            modals.form = false;
+            modals.register = false;
+            modals.faceScan = false;
+            modals.io = false;
+            stopFaceScan();
         };
 
         const submitForm = async () => {
@@ -352,9 +404,9 @@ const app = createApp({
             isLoading.value = true;
             try {
                 const payload = { ...target };
-                delete payload.agree; // 移除 UI 僅用欄位
+                delete payload.agree; 
+                delete payload.hasRead; 
                 
-                // 若有新照片，確保已壓縮
                 if(payload.photo && payload.photo.length > 100000) {
                    payload.photo = await compressImage(payload.photo);
                 }
@@ -376,7 +428,7 @@ const app = createApp({
                         performVerification();
                     }
                 }
-                closeModals();
+                closeModals(); // 這裡現在可以正確呼叫了
                 fetchMembers();
             } catch(e) { showToast(e.message, 'error', '儲存失敗'); }
             finally { isLoading.value = false; }
@@ -389,8 +441,14 @@ const app = createApp({
             else { showToast('已刪除'); closeModals(); fetchMembers(); }
         };
 
+        const confirmPrivacy = () => {
+            registerForm.hasRead = true;
+            registerForm.agree = true;
+            modals.privacy = false;
+        };
+
         // ==========================================
-        // 3. AI 掃描核心 (優化：requestAnimationFrame)
+        // 3. AI 掃描核心
         // ==========================================
         const startVideo = async () => {
             if(!isFaceModelLoaded.value) { showToast('AI 初始化中...', 'warning'); return null; }
@@ -405,26 +463,21 @@ const app = createApp({
             } catch(e) { showToast('無法啟動相機', 'error'); return null; }
         };
 
-        // 使用遞迴 Loop 代替 setInterval，提升效能
         const scanningLoop = async (video) => {
             if(!isScanning || !modals.faceScan) return;
 
             const now = Date.now();
-            // FPS 計算
             if(now - lastFpsTime >= 1000) { fps.value = frameCount; frameCount = 0; lastFpsTime = now; }
             frameCount++;
 
             try {
-                // 使用 TinyFaceDetector，速度最快
                 const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 }))
                     .withFaceLandmarks().withFaceDescriptor();
 
                 if(detection) {
-                    // 1. 註冊模式：拍照
                     if(app.scanMode === 'register') {
                         isScanning = false;
                         const canvas = document.createElement('canvas');
-                        // 裁切人臉
                         const box = detection.detection.box;
                         const pad = 50;
                         canvas.width = 300; canvas.height = 300;
@@ -439,10 +492,9 @@ const app = createApp({
                         
                         playSound('success');
                         stopFaceScan();
-                        return; // 結束 Loop
+                        return;
                     }
                     
-                    // 2. 搜尋模式：比對
                     if(faceMatcher && (now - lastScanTime > 2000)) {
                         const match = faceMatcher.findBestMatch(detection.descriptor);
                         if(match.label !== 'unknown') {
@@ -450,7 +502,6 @@ const app = createApp({
                             if(member) {
                                 lastScanTime = now;
                                 playSound('success');
-                                // 寫入歷史紀錄 (非同步，不阻擋 UI)
                                 const history = member.search_history || [];
                                 history.push({ timestamp: new Date().toISOString() });
                                 supabase.from('members').update({ search_history: history }).eq('id', member.id).then();
@@ -470,26 +521,19 @@ const app = createApp({
                 }
             } catch(e) { console.error(e); }
 
-            // 請求下一幀
             if(isScanning) requestAnimationFrame(() => scanningLoop(video));
         };
 
         const startScan = async (mode) => {
-            app.scanMode = mode; // register, self, search
+            app.scanMode = mode; 
             modals.faceScan = true;
             isScanning = true;
             const video = await startVideo();
             if(video) scanningLoop(video);
         };
 
-        const stopFaceScan = () => {
-            isScanning = false;
-            modals.faceScan = false;
-            if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
-        };
-
         // ==========================================
-        // 4. 其他邏輯
+        // 4. 其他邏輯 (匯入、匯出、重置)
         // ==========================================
         const performVerification = () => {
             const val = selfServiceInput.value.trim();
@@ -513,7 +557,6 @@ const app = createApp({
 
         const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; };
         
-        // Excel 匯出 (優化：批次處理)
         const isExporting = ref(false);
         const exportFastExcel = async () => {
             isExporting.value = true;
@@ -529,14 +572,68 @@ const app = createApp({
             finally { isExporting.value = false; }
         };
 
-        // 儲存設定
+        // --- 新增: Excel 匯入邏輯 ---
+        const isImporting = ref(false);
+        const handleImport = async (e) => {
+            const file = e.target.files[0];
+            if (!file) return;
+            isImporting.value = true;
+            try {
+                const buffer = await file.arrayBuffer();
+                const wb = new ExcelJS.Workbook();
+                await wb.xlsx.load(buffer);
+                const ws = wb.getWorksheet(1);
+                
+                const newMembers = [];
+                // 從第二行開始讀取 (假設第一行為標題)
+                ws.eachRow((row, rowNumber) => {
+                    if(rowNumber > 1) {
+                        const name = row.getCell(1).text;
+                        const phone = row.getCell(2).text;
+                        if(name && phone) {
+                            newMembers.push({
+                                id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
+                                name: name,
+                                phone: phone,
+                                created_at: new Date(),
+                                updated_at: new Date()
+                            });
+                        }
+                    }
+                });
+
+                if(newMembers.length > 0) {
+                    const { error } = await supabase.from('members').insert(newMembers);
+                    if(error) throw error;
+                    showToast(`成功匯入 ${newMembers.length} 筆資料`);
+                    fetchMembers();
+                    modals.io = false;
+                } else {
+                    showToast('檔案內容為空或格式錯誤', 'warning');
+                }
+            } catch(e) {
+                console.error(e);
+                showToast('匯入失敗: ' + e.message, 'error');
+            } finally {
+                isImporting.value = false;
+                e.target.value = ''; // 重置 input
+            }
+        };
+
         const saveConfig = () => {
             localStorage.setItem('supabase_config_v5', JSON.stringify(config));
             initSupabase();
         };
         
-        const resetConfig = () => {
-            if(confirm('清除所有設定？')) { localStorage.removeItem('supabase_config_v5'); location.reload(); }
+        // --- 優化: 密碼保護的重置 ---
+        const resetConfigSecure = () => {
+            const pwd = prompt("請輸入管理員密碼以確認重置：");
+            if(pwd === (config.adminPwd || '0000')) {
+                 localStorage.removeItem('supabase_config_v5'); 
+                 location.reload(); 
+            } else {
+                showToast('密碼錯誤，操作取消', 'error');
+            }
         };
 
         const filteredMembers = computed(() => {
@@ -545,31 +642,26 @@ const app = createApp({
             return members.value.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q));
         });
 
-        // 統計資料
         const stats = computed(() => {
             const today = new Date().toISOString().slice(0,10);
             const visits = members.value.reduce((acc, m) => acc + (m.search_history?.filter(h => h.timestamp.startsWith(today)).length || 0), 0);
             return { todayVisits: visits };
         });
 
-        // 暴露給模板
-        app.scanMode = ''; // 掛載到 app 實例以便 Loop 存取
+        app.scanMode = ''; 
         return {
-            config, isConfigured, saveConfig, resetConfig, checkAdmin: (cb) => config.adminPwd === prompt('Pwd?') ? cb() : alert('Err'),
-            members, filteredMembers, isLoading, isExporting, exportFastExcel,
-            currentTab, tabs, modals, closeModals: () => { modals.form=false; modals.register=false; stopFaceScan(); },
+            config, isConfigured, saveConfig, resetConfigSecure, checkAdmin: (cb) => { const p=prompt('Pwd?'); if(p===(config.adminPwd||'0000'))cb(); else alert('Err'); },
+            members, filteredMembers, isLoading, isExporting, isImporting, exportFastExcel, handleImport,
+            currentTab, tabs, modals, closeModals, confirmPrivacy,
             form, registerForm, activeForm, activePhoto, submitForm, deleteMember,
-            // Actions
             openAdminAdd: () => { Object.assign(form, {id:null,name:'',phone:'',birthday:'',photo:null,face_descriptor:null}); modals.form=true; modals.register=false; },
             editMember: (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form=true; modals.register=false; },
-            openSelfRegister: () => { Object.assign(registerForm, {name:'',phone:'',birthday:'',photo:null,face_descriptor:null, agree:false}); modals.register=true; modals.form=false; },
+            openSelfRegister: () => { Object.assign(registerForm, {name:'',phone:'',birthday:'',photo:null,face_descriptor:null, agree:false, hasRead:false}); modals.register=true; modals.form=false; },
             startScanForForm: () => startScan('register'),
             startSelfServiceFaceScan: () => startScan('self'),
             showFaceSearch: () => { modals.io=false; currentTab.value='list'; startScan('search'); },
             stopFaceScan, handleCameraSwitch: async () => { if(videoStream) { stopFaceScan(); await startScan(app.scanMode); } },
-            // Verify
             selfServiceInput, searchMode, verifyStatus, verifiedMember, performVerification, resetSelfService, registerFaceFromSelfService: () => { app.editMember(verifiedMember.value); app.startScanForForm(); },
-            // UI
             stats, isFaceModelLoaded, videoDevices, currentDeviceId, scanMessage, fps,
             unlockAudio, toasts
         };
