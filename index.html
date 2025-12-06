@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V5.1 (商用穩定版)</title>
+    <title>AI 智能會員系統 V5.2 (客製版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V5.1</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V5.2</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -65,7 +65,7 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">V5.1</span></h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">V5.2</span></h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
@@ -88,19 +88,37 @@
     <main class="flex-grow p-4 overflow-y-auto bg-slate-50">
         <div v-show="currentTab === 'self_service'" class="max-w-md mx-auto mt-4 pb-20">
             <div class="bg-white rounded-3xl shadow-lg overflow-hidden border border-slate-100 p-8 min-h-[60vh] flex flex-col items-center justify-center text-center relative animate-fade-in-up">
+                
                 <div v-if="verifyStatus === 'idle'" class="w-full space-y-6">
                     <div class="space-y-2">
-                        <i class="fa-solid fa-mobile-screen-button text-5xl text-indigo-500 mb-2"></i>
-                        <h2 class="text-2xl font-black text-slate-800">會員自助認證</h2>
-                        <p class="text-slate-400 text-sm">請選擇驗證方式</p>
+                        <i class="fa-solid fa-robot text-5xl text-indigo-500 mb-2"></i>
+                        <h2 class="text-2xl font-black text-slate-800">智能接待中心</h2>
+                        <p class="text-slate-400 text-sm">請選擇服務</p>
                     </div>
-                    <div class="flex justify-center items-center gap-3 mb-4">
-                         <button v-for="m in ['phone', 'name']" :key="m" class="text-xs font-bold px-3 py-1.5 rounded-full transition border uppercase" :class="searchMode === m ? 'bg-indigo-600 text-white border-indigo-600' : 'text-slate-400 border-slate-200'" @click="searchMode=m">{{ m === 'phone' ? '手機' : '姓名' }}</button>
-                         <button @click="startSelfServiceFaceScan" class="text-xs font-bold px-4 py-1.5 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 text-white shadow-md flex items-center gap-1 hover:scale-105 active:scale-95"><i class="fa-solid fa-face-smile"></i> 刷臉</button>
+
+                    <div class="grid gap-4 mt-6">
+                        <button @click="startHomepageScan" class="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl shadow-xl hover:scale-[1.02] transition active:scale-95 flex items-center justify-center gap-3">
+                            <i class="fa-solid fa-expand text-xl"></i>
+                            <div class="text-left">
+                                <div class="text-lg font-bold">啟動 AI 迎賓掃描</div>
+                                <div class="text-xs text-indigo-100">連續辨識會員 / 新客偵測</div>
+                            </div>
+                        </button>
+
+                        <div class="grid grid-cols-2 gap-3">
+                            <button @click="searchMode='phone'" class="py-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-600 hover:border-indigo-200 transition">
+                                <i class="fa-solid fa-mobile-screen mb-1 block text-xl text-indigo-400"></i> 電話查詢
+                            </button>
+                            <button @click="openSelfRegister" class="py-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-600 hover:border-indigo-200 transition">
+                                <i class="fa-solid fa-user-plus mb-1 block text-xl text-emerald-400"></i> 會員註冊
+                            </button>
+                        </div>
                     </div>
-                    <input v-model="selfServiceInput" :type="searchMode === 'phone' ? 'tel' : 'text'" :placeholder="searchMode === 'phone' ? '輸入電話號碼...' : '輸入姓名...'" class="w-full text-center text-2xl font-bold py-4 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent" @keyup.enter="performVerification">
-                    <button @click="performVerification" class="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-2xl text-lg font-bold shadow-lg shadow-indigo-200 active:scale-95 transition mt-4">確認送出</button>
-                    <div class="pt-8 mt-4 border-t border-slate-100"><button @click="openSelfRegister" class="w-full border-2 border-indigo-600 text-indigo-600 py-3 rounded-2xl font-bold hover:bg-indigo-50 transition">立即加入會員</button></div>
+
+                    <div v-if="searchMode === 'phone'" class="mt-4 pt-4 border-t animate-fade-in-up">
+                         <input v-model="selfServiceInput" type="tel" placeholder="輸入電話號碼..." class="w-full text-center text-xl font-bold py-3 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent" @keyup.enter="performVerification">
+                         <button @click="performVerification" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-3 shadow-md">查詢</button>
+                    </div>
                 </div>
 
                 <div v-else class="w-full space-y-6 animate-fade-in-up">
@@ -108,31 +126,35 @@
                         <i class="fa-solid text-5xl" :class="verifyStatus === 'success' ? 'fa-check text-emerald-500' : 'fa-xmark text-rose-500'"></i>
                     </div>
                     <div>
-                        <h2 class="text-3xl font-black text-slate-800">{{ verifyStatus === 'success' ? '認證成功' : '驗證失敗' }}</h2>
-                        <p class="text-lg text-slate-600 mt-2" v-if="verifyStatus === 'success'">歡迎，<span class="font-bold text-indigo-600">{{ verifiedMember?.name }}</span></p>
-                        <p class="text-slate-500 mt-2" v-else>找不到資料，請重試</p>
+                        <h2 class="text-3xl font-black text-slate-800">{{ verifyStatus === 'success' ? '查詢成功' : '查無資料' }}</h2>
+                        <div v-if="verifyStatus === 'success'" class="mt-3">
+                            <p class="text-2xl font-bold text-indigo-600">{{ verifiedMember?.name }}</p>
+                            <p v-if="verifiedMember?.notes" class="text-sm text-slate-500 bg-slate-100 inline-block px-3 py-1 rounded-full mt-2">{{ verifiedMember.notes }}</p>
+                        </div>
                     </div>
-                    <div v-if="verifyStatus === 'success' && !verifiedMember.face_descriptor" class="bg-indigo-50 p-4 rounded-xl"><button @click="registerFaceFromSelfService" class="text-indigo-600 font-bold w-full">👉 立即註冊人臉</button></div>
                     <button @click="resetSelfService" class="w-full bg-slate-500 text-white py-3 rounded-xl font-bold mt-6">返回</button>
                 </div>
             </div>
         </div>
 
         <div v-show="currentTab === 'list'" class="space-y-4 max-w-4xl mx-auto animate-fade-in-up">
-             <div class="relative group"><i class="fa-solid fa-magnifying-glass absolute left-4 top-4 text-slate-400"></i><input v-model="searchQuery" type="text" placeholder="搜尋會員..." class="w-full pl-11 pr-4 py-3.5 border-0 rounded-2xl shadow-sm bg-white focus:ring-2 focus:ring-indigo-100 outline-none"></div>
-             <div class="flex justify-between px-1"><span class="text-sm text-slate-500">共 {{ members.length }} 人</span><button @click="openAdminAdd" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow">+ 新增</button></div>
+             <div class="relative group"><i class="fa-solid fa-magnifying-glass absolute left-4 top-4 text-slate-400"></i><input v-model="searchQuery" type="text" placeholder="搜尋會員姓名或備註..." class="w-full pl-11 pr-4 py-3.5 border-0 rounded-2xl shadow-sm bg-white focus:ring-2 focus:ring-indigo-100 outline-none"></div>
+             <div class="flex justify-between px-1"><span class="text-sm text-slate-500">共 {{ members.length }} 人</span><button @click="openAdminAdd" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-indigo-700 transition">+ 新增</button></div>
              <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                 <div v-for="m in filteredMembers" :key="m.id" @click="editMember(m)" class="bg-white p-4 rounded-2xl shadow-sm flex items-center gap-4 cursor-pointer border border-slate-100 hover:border-indigo-200 transition">
-                     <img :src="m.photo||'https://via.placeholder.com/150'" class="w-12 h-12 rounded-full object-cover bg-gray-100 border">
-                     <div class="flex-1 overflow-hidden"><b class="truncate block">{{m.name}}</b><p class="text-xs text-gray-500 truncate">{{m.phone}}</p></div>
-                     <i class="fa-solid fa-chevron-right text-slate-300 text-xs"></i>
+                 <div v-for="m in filteredMembers" :key="m.id" @click="editMember(m)" class="bg-white p-4 rounded-2xl shadow-sm flex items-start gap-4 cursor-pointer border border-slate-100 hover:border-indigo-200 transition relative overflow-hidden">
+                     <img :src="m.photo||'https://via.placeholder.com/150'" class="w-12 h-12 rounded-full object-cover bg-gray-100 border flex-shrink-0">
+                     <div class="flex-1 overflow-hidden">
+                         <b class="truncate block text-lg">{{m.name}}</b>
+                         <p class="text-xs text-gray-400 truncate">{{m.phone}}</p>
+                         <p v-if="m.notes" class="text-xs text-indigo-600 mt-1 truncate bg-indigo-50 px-2 py-0.5 rounded inline-block"><i class="fa-solid fa-tag mr-1"></i>{{m.notes}}</p>
+                     </div>
                  </div>
              </div>
         </div>
 
         <div v-show="currentTab === 'dashboard'" class="max-w-4xl mx-auto animate-fade-in-up">
             <div class="grid grid-cols-2 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-indigo-500"><h3 class="text-sm text-slate-500 mb-1">今日來客</h3><span class="text-3xl font-bold text-indigo-600">{{stats.todayVisits}}</span></div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-indigo-500"><h3 class="text-sm text-slate-500 mb-1">今日來客 (AI)</h3><span class="text-3xl font-bold text-indigo-600">{{stats.todayVisits}}</span></div>
                 <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500"><h3 class="text-sm text-slate-500 mb-1">會員總數</h3><span class="text-3xl font-bold text-emerald-600">{{members.length}}</span></div>
             </div>
         </div>
@@ -146,22 +168,30 @@
             </div>
             <div class="p-6 overflow-y-auto space-y-4 flex-1">
                 <div v-if="modals.register" class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2">
-                    <p class="text-xs text-slate-400 font-bold mb-2">會員條款與個資聲明</p>
+                    <p class="text-xs text-slate-400 font-bold mb-2">會員條款</p>
                     <button @click="modals.privacy = true" class="w-full py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold shadow-sm hover:bg-indigo-50 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-file-contract"></i> 點此閱讀完整條款
+                        <i class="fa-solid fa-file-contract"></i> 閱讀條款
                     </button>
                     <div class="flex items-center gap-2 mt-3 pt-2 border-t border-slate-200">
                         <input type="checkbox" id="agree_chk" v-model="registerForm.agree" :disabled="!registerForm.hasRead" class="w-4 h-4 rounded accent-indigo-600 disabled:opacity-50">
-                        <label for="agree_chk" class="text-sm font-bold" :class="registerForm.hasRead ? 'text-slate-700' : 'text-slate-400'">我同意上述條款</label>
+                        <label for="agree_chk" class="text-sm font-bold" :class="registerForm.hasRead ? 'text-slate-700' : 'text-slate-400'">我同意條款</label>
                     </div>
-                    <p v-if="!registerForm.hasRead" class="text-[10px] text-rose-500 mt-1">* 請先點擊閱讀條款</p>
                 </div>
                 
                 <div class="grid gap-4" :class="{'opacity-50 pointer-events-none': modals.register && !registerForm.agree}">
-                    <div v-for="field in ['name', 'phone', 'birthday']" :key="field">
-                        <label class="text-xs font-bold text-slate-500 uppercase">{{ field==='name'?'姓名':field==='phone'?'電話':'生日' }}</label>
-                        <input v-model="activeForm[field]" :type="field==='birthday'?'date':field==='phone'?'tel':'text'" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none">
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase">姓名</label>
+                        <input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none">
                     </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase">電話</label>
+                        <input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none">
+                    </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase">備註 (Notes)</label>
+                        <textarea v-model="activeForm.notes" rows="2" placeholder="例如：VIP, 喜歡靠窗..." class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none resize-none"></textarea>
+                    </div>
+                    
                     <div class="flex gap-4 items-center mt-2">
                         <img v-if="activePhoto" :src="activePhoto" class="w-16 h-16 rounded object-cover border bg-gray-50">
                         <button @click="startScanForForm" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-slate-600 text-sm flex items-center justify-center gap-2 transition">
@@ -179,17 +209,14 @@
 
     <div v-if="modals.privacy" class="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-6">
         <div class="bg-white w-full max-w-lg rounded-2xl flex flex-col max-h-[80vh]">
-            <div class="p-4 border-b font-bold text-lg">會員服務條款與個資聲明</div>
+            <div class="p-4 border-b font-bold text-lg">會員服務條款</div>
             <div class="p-6 overflow-y-auto text-sm text-slate-600 leading-relaxed">
-                <h4 class="font-bold text-slate-800 mb-2">1. 個人資料蒐集目的</h4>
-                <p class="mb-4">本系統蒐集您的姓名、電話及人臉特徵值，僅用於會員身分識別、入場管理及消費紀錄查詢，絕不挪作他用。</p>
-                <h4 class="font-bold text-slate-800 mb-2">2. 人臉辨識說明</h4>
-                <p class="mb-4">系統會將您的照片轉換為不可逆的特徵碼（Face Descriptor）。我們致力於保護您的生物特徵數據安全。</p>
-                <h4 class="font-bold text-slate-800 mb-2">3. 會員權益</h4>
-                <p class="mb-4">您有權隨時要求查閱、更正或刪除您的會員資料。刪除後相關優惠將一併失效。</p>
+                <p>1. 本系統蒐集您的姓名、電話及人臉特徵，用於身分識別。</p>
+                <p>2. 您有權隨時要求刪除資料。</p>
+                <p>3. 系統將自動記錄您的到訪時間。</p>
             </div>
             <div class="p-4 border-t">
-                <button @click="confirmPrivacy" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700">我已閱讀並同意</button>
+                <button @click="confirmPrivacy" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700">同意並繼續</button>
             </div>
         </div>
     </div>
@@ -198,36 +225,45 @@
         <div class="absolute top-0 w-full z-30 p-4 flex justify-between bg-gradient-to-b from-black/60 to-transparent">
             <select v-model="currentDeviceId" @change="handleCameraSwitch" class="bg-black/40 text-white border border-white/20 py-2 pl-4 pr-10 rounded-full text-sm backdrop-blur-md outline-none appearance-none">
                 <option value="">自動選擇鏡頭</option>
-                <option v-for="cam in videoDevices" :key="cam.deviceId" :value="cam.deviceId">{{ cam.label || 'Camera '+cam.deviceId.slice(0,4) }}</option>
+                <option v-for="cam in videoDevices" :key="cam.deviceId" :value="cam.deviceId">{{ cam.label || 'Camera' }}</option>
             </select>
             <button @click="stopFaceScan" class="w-10 h-10 rounded-full bg-white/20 backdrop-blur-md text-white"><i class="fa-solid fa-times"></i></button>
         </div>
+        
         <div id="video-container" class="flex-1 relative flex items-center justify-center bg-black">
             <video id="video" autoplay muted playsinline></video>
             <div class="absolute w-64 h-64 border-2 border-white/30 rounded-3xl overflow-hidden"><div class="scan-line"></div></div>
-            <div v-if="scanMessage" class="absolute bottom-24 bg-emerald-500 text-white px-6 py-2 rounded-full font-bold shadow-lg animate-bounce">
-                <i class="fa-solid fa-check-circle mr-1"></i> {{ scanMessage }}
+            
+            <div v-if="scanMessage.show" class="absolute bottom-24 left-4 right-4 text-center animate-bounce">
+                <div class="inline-block px-6 py-4 rounded-2xl shadow-2xl backdrop-blur-md border border-white/20"
+                     :class="scanMessage.type === 'member' ? 'bg-emerald-500/90 text-white' : 'bg-slate-500/90 text-white'">
+                    <div class="text-2xl font-black flex items-center justify-center gap-2">
+                        <i class="fa-solid" :class="scanMessage.type === 'member' ? 'fa-circle-check' : 'fa-user-clock'"></i>
+                        {{ scanMessage.title }}
+                    </div>
+                    <div v-if="scanMessage.subtitle" class="text-sm font-bold mt-1 opacity-90 bg-black/10 px-2 py-0.5 rounded inline-block">
+                        {{ scanMessage.subtitle }}
+                    </div>
+                </div>
             </div>
-            <div class="absolute bottom-8 text-white/50 text-xs">AI Running @ {{ fps }} FPS</div>
+            
+            <div class="absolute bottom-8 text-white/50 text-xs w-full text-center">AI Running @ {{ fps }} FPS</div>
         </div>
     </div>
     
     <div v-if="modals.io" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
             <h3 class="font-bold text-lg mb-4">資料管理</h3>
-            
             <div class="space-y-3">
                 <button @click="exportFastExcel" class="w-full py-3 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-download"></i> {{ isExporting ? '處理中...' : '匯出會員資料 (Excel)' }}
+                    <i class="fa-solid fa-download"></i> 匯出 (含備註)
                 </button>
-
                 <div class="relative w-full py-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold border border-indigo-200 hover:bg-indigo-100 flex items-center justify-center gap-2 cursor-pointer group">
-                    <i class="fa-solid fa-upload"></i> 匯入會員 (Excel)
+                    <i class="fa-solid fa-upload"></i> 匯入 (含備註)
                     <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
                 </div>
-                <p class="text-[10px] text-slate-400">Excel 格式: 第一欄姓名, 第二欄電話</p>
+                <p class="text-[10px] text-slate-400">Excel 格式: 姓名, 電話, 備註</p>
             </div>
-
             <button @click="modals.io=false" class="mt-6 text-gray-400 py-2">關閉</button>
         </div>
     </div>
@@ -239,43 +275,46 @@ const { createApp, ref, computed, onMounted, reactive, watch } = Vue;
 
 const app = createApp({
     setup() {
-        // --- 核心狀態 ---
         const config = reactive({ url: '', key: '', adminPwd: '' });
         const isConfigured = ref(false);
         const members = ref([]);
         const toasts = ref([]);
         
-        // --- UI 控制 ---
         const isLoading = ref(false);
         const currentTab = ref('self_service');
         const searchQuery = ref('');
         const modals = reactive({ form: false, faceScan: false, io: false, register: false, privacy: false });
         const tabs = [
-            {id:'self_service', label:'自助認證', icon:'fa-solid fa-user-check'},
-            {id:'list', label:'列表管理', icon:'fa-solid fa-list-ul'},
-            {id:'dashboard', label:'數據分析', icon:'fa-solid fa-chart-line'},
+            {id:'self_service', label:'首頁', icon:'fa-solid fa-home'},
+            {id:'list', label:'會員列表', icon:'fa-solid fa-list-ul'},
+            {id:'dashboard', label:'分析', icon:'fa-solid fa-chart-line'},
         ];
 
-        // --- 表單數據 ---
-        const form = reactive({ id: null, name: '', phone: '', notes: '', birthday: '', photo: null, search_history: [], face_descriptor: null });
-        const registerForm = reactive({ name: '', phone: '', birthday: '', photo: null, face_descriptor: null, agree: false, hasRead: false });
+        // 📌 更新表單結構：移除 birthday，保留 notes
+        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, search_history: [], face_descriptor: null });
+        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, face_descriptor: null, agree: false, hasRead: false });
         const activeForm = computed(() => modals.register ? registerForm : form);
         const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
 
-        // --- AI & 掃描狀態 ---
+        // AI 狀態
         const isFaceModelLoaded = ref(false);
         const verifyStatus = ref('idle');
         const verifiedMember = ref(null);
-        const searchMode = ref('phone');
+        const searchMode = ref(''); // 空字串為預設首頁
         const selfServiceInput = ref('');
-        const scanMessage = ref('');
+        
+        // 📌 掃描訊息物件 (控制顯示姓名+備註)
+        const scanMessage = reactive({ show: false, title: '', subtitle: '', type: 'member' });
         const fps = ref(0);
         
-        // --- 硬體參考 ---
+        // 📌 記錄會員上次掃描時間 (Map<MemberId, Timestamp>)
+        const memberCooldowns = reactive({});
+        // 記錄上次未知訪客掃描時間，避免刷屏
+        const lastUnknownScan = ref(0);
+
         const videoDevices = ref([]);
         const currentDeviceId = ref('');
         
-        // --- 內部變數 (非響應式) ---
         let supabase = null;
         let faceMatcher = null;
         let videoStream = null;
@@ -285,9 +324,7 @@ const app = createApp({
         let lastFpsTime = 0;
         let audioContext = null;
 
-        // ==========================================
-        // 1. 系統初始化與工具函數
-        // ==========================================
+        // --- 工具 ---
         const showToast = (msg, type='success', title='提示') => {
             const id = Date.now();
             toasts.value.push({ id, msg, type, title });
@@ -300,7 +337,7 @@ const app = createApp({
             const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
             osc.connect(gain); gain.connect(audioContext.destination);
             osc.type = type === 'success' ? 'sine' : 'square';
-            osc.frequency.setValueAtTime(type==='success'?523:150, audioContext.currentTime);
+            osc.frequency.setValueAtTime(type==='success'?880:150, audioContext.currentTime);
             gain.gain.setValueAtTime(0.1, audioContext.currentTime);
             gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
             osc.start(); osc.stop(audioContext.currentTime + 0.3);
@@ -314,7 +351,6 @@ const app = createApp({
                 try { Object.assign(config, JSON.parse(saved)); if(config.url) initSupabase(); } 
                 catch(e) { console.error(e); }
             }
-            // 預載 AI 模型
             const URL = 'https://justadudewhohacks.github.io/face-api.js/models';
             try {
                 await Promise.all([
@@ -323,16 +359,15 @@ const app = createApp({
                     faceapi.nets.faceRecognitionNet.loadFromUri(URL)
                 ]);
                 isFaceModelLoaded.value = true;
-            } catch(e) { showToast('AI 模型載入失敗，請檢查網路', 'error'); }
+            } catch(e) { showToast('AI 模型載入失敗', 'error'); }
             
-            // 取得相機列表
             try {
                 await navigator.mediaDevices.getUserMedia({ video: true });
                 const devices = await navigator.mediaDevices.enumerateDevices();
                 videoDevices.value = devices.filter(d => d.kind === 'videoinput');
                 const back = videoDevices.value.find(d => d.label.toLowerCase().includes('back'));
                 if(back) currentDeviceId.value = back.deviceId;
-            } catch(e) {/* ignore */}
+            } catch(e) {}
         });
 
         const initSupabase = () => {
@@ -341,20 +376,16 @@ const app = createApp({
                 supabase = window.supabase.createClient(config.url, config.key);
                 isConfigured.value = true;
                 fetchMembers();
-            } catch(e) { showToast('Supabase 連線失敗', 'error'); }
+            } catch(e) { showToast('連線失敗', 'error'); }
         };
 
-        // ==========================================
-        // 2. 資料庫操作
-        // ==========================================
         const fetchMembers = async () => {
             if(!supabase) return;
             isLoading.value = true;
             const { data, error } = await supabase.from('members').select('*').order('updated_at', {ascending:false});
-            if(error) { showToast(error.message, 'error', '讀取失敗'); }
+            if(error) { showToast(error.message, 'error'); }
             else {
                 members.value = data || [];
-                // 重建 AI 索引
                 if(members.value.length > 0) {
                     const labeled = members.value
                         .filter(m => m.face_descriptor)
@@ -365,35 +396,15 @@ const app = createApp({
             isLoading.value = false;
         };
 
-        const compressImage = (base64) => {
-            return new Promise(resolve => {
-                const img = new Image();
-                img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    const MAX_WIDTH = 600; 
-                    const scale = MAX_WIDTH / img.width;
-                    canvas.width = MAX_WIDTH;
-                    canvas.height = img.height * scale;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                    resolve(canvas.toDataURL('image/jpeg', 0.6));
-                };
-                img.src = base64;
-            });
-        };
-
-        // --- 修正: 定義在 Setup 內部的 closeModals ---
         const stopFaceScan = () => {
             isScanning = false;
             modals.faceScan = false;
+            scanMessage.show = false; // 關閉訊息
             if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; }
         };
 
         const closeModals = () => {
-            modals.form = false;
-            modals.register = false;
-            modals.faceScan = false;
-            modals.io = false;
+            modals.form = false; modals.register = false; modals.faceScan = false; modals.io = false;
             stopFaceScan();
         };
 
@@ -404,13 +415,8 @@ const app = createApp({
             isLoading.value = true;
             try {
                 const payload = { ...target };
-                delete payload.agree; 
-                delete payload.hasRead; 
+                delete payload.agree; delete payload.hasRead; 
                 
-                if(payload.photo && payload.photo.length > 100000) {
-                   payload.photo = await compressImage(payload.photo);
-                }
-
                 if(!modals.register && payload.id) {
                     const { error } = await supabase.from('members').update({...payload, updated_at: new Date()}).eq('id', payload.id);
                     if(error) throw error;
@@ -422,15 +428,10 @@ const app = createApp({
                     const { error } = await supabase.from('members').insert(payload);
                     if(error) throw error;
                     showToast('註冊成功');
-                    if(modals.register) {
-                        selfServiceInput.value = payload.phone;
-                        searchMode.value = 'phone';
-                        performVerification();
-                    }
                 }
-                closeModals(); // 這裡現在可以正確呼叫了
+                closeModals();
                 fetchMembers();
-            } catch(e) { showToast(e.message, 'error', '儲存失敗'); }
+            } catch(e) { showToast(e.message, 'error'); }
             finally { isLoading.value = false; }
         };
 
@@ -441,15 +442,9 @@ const app = createApp({
             else { showToast('已刪除'); closeModals(); fetchMembers(); }
         };
 
-        const confirmPrivacy = () => {
-            registerForm.hasRead = true;
-            registerForm.agree = true;
-            modals.privacy = false;
-        };
+        const confirmPrivacy = () => { registerForm.hasRead = true; registerForm.agree = true; modals.privacy = false; };
 
-        // ==========================================
-        // 3. AI 掃描核心
-        // ==========================================
+        // --- AI 掃描核心 (V5.2 核心更新) ---
         const startVideo = async () => {
             if(!isFaceModelLoaded.value) { showToast('AI 初始化中...', 'warning'); return null; }
             const v = document.getElementById('video');
@@ -475,6 +470,7 @@ const app = createApp({
                     .withFaceLandmarks().withFaceDescriptor();
 
                 if(detection) {
+                    // --- 註冊模式 ---
                     if(app.scanMode === 'register') {
                         isScanning = false;
                         const canvas = document.createElement('canvas');
@@ -495,25 +491,53 @@ const app = createApp({
                         return;
                     }
                     
-                    if(faceMatcher && (now - lastScanTime > 2000)) {
-                        const match = faceMatcher.findBestMatch(detection.descriptor);
-                        if(match.label !== 'unknown') {
-                            const member = members.value.find(m => m.id === match.label);
-                            if(member) {
-                                lastScanTime = now;
-                                playSound('success');
-                                const history = member.search_history || [];
-                                history.push({ timestamp: new Date().toISOString() });
-                                supabase.from('members').update({ search_history: history }).eq('id', member.id).then();
+                    // --- 首頁連續掃描模式 (核心更新) ---
+                    if(app.scanMode === 'homepage_scan') {
+                        // 1. 辨識會員
+                        if(faceMatcher) {
+                            const match = faceMatcher.findBestMatch(detection.descriptor);
+                            
+                            // A. 辨識到會員
+                            if(match.label !== 'unknown') {
+                                const member = members.value.find(m => m.id === match.label);
+                                if(member) {
+                                    const lastTime = memberCooldowns[member.id] || 0;
+                                    // ⏱️ 3分鐘冷卻檢查 (3 * 60 * 1000 = 180000 ms)
+                                    if (now - lastTime > 180000) {
+                                        // 更新冷卻時間
+                                        memberCooldowns[member.id] = now;
+                                        
+                                        playSound('success');
+                                        
+                                        // 顯示 UI：姓名 + 備註
+                                        scanMessage.type = 'member';
+                                        scanMessage.title = member.name;
+                                        scanMessage.subtitle = member.notes || '';
+                                        scanMessage.show = true;
+                                        
+                                        // 3秒後隱藏訊息
+                                        setTimeout(() => { if(scanMessage.title === member.name) scanMessage.show = false; }, 3000);
 
-                                if(app.scanMode === 'self') {
-                                    verifyStatus.value = 'success';
-                                    verifiedMember.value = member;
-                                    stopFaceScan();
-                                    return;
-                                } else {
-                                    scanMessage.value = `識別成功: ${member.name}`;
-                                    setTimeout(() => scanMessage.value='', 2000);
+                                        // 寫入資料庫記錄
+                                        const history = member.search_history || [];
+                                        history.push({ timestamp: new Date().toISOString() });
+                                        supabase.from('members').update({ search_history: history }).eq('id', member.id).then();
+                                    }
+                                }
+                            } 
+                            // B. 辨識為陌生人 (新客人)
+                            else {
+                                // 陌生人防刷屏 (每 5 秒提示一次)
+                                if(now - lastUnknownScan.value > 5000) {
+                                    lastUnknownScan.value = now;
+                                    // playSound('square'); // 可選擇是否開啟陌生人音效
+                                    
+                                    scanMessage.type = 'guest';
+                                    scanMessage.title = '👋 歡迎 新客人';
+                                    scanMessage.subtitle = '請洽櫃台註冊';
+                                    scanMessage.show = true;
+                                    
+                                    setTimeout(() => { if(scanMessage.type === 'guest') scanMessage.show = false; }, 2500);
                                 }
                             }
                         }
@@ -528,13 +552,11 @@ const app = createApp({
             app.scanMode = mode; 
             modals.faceScan = true;
             isScanning = true;
+            scanMessage.show = false; // 重置訊息
             const video = await startVideo();
             if(video) scanningLoop(video);
         };
 
-        // ==========================================
-        // 4. 其他邏輯 (匯入、匯出、重置)
-        // ==========================================
         const performVerification = () => {
             const val = selfServiceInput.value.trim();
             if(!val) return showToast('請輸入內容', 'warning');
@@ -563,16 +585,16 @@ const app = createApp({
             try {
                 const wb = new ExcelJS.Workbook();
                 const ws = wb.addWorksheet('Members');
-                ws.columns = [{header:'ID',key:'id'}, {header:'Name',key:'name'}, {header:'Phone',key:'phone'}, {header:'Created',key:'created_at'}];
+                // 📌 Excel 更新：Notes
+                ws.columns = [{header:'ID',key:'id'}, {header:'Name',key:'name'}, {header:'Phone',key:'phone'}, {header:'Notes',key:'notes'}, {header:'Created',key:'created_at'}];
                 members.value.forEach(m => ws.addRow(m));
                 const buffer = await wb.xlsx.writeBuffer();
-                saveAs(new Blob([buffer]), `members_${Date.now()}.xlsx`);
+                saveAs(new Blob([buffer]), `members_v5.2.xlsx`);
                 showToast('匯出完成');
             } catch(e) { showToast('匯出失敗', 'error'); }
             finally { isExporting.value = false; }
         };
 
-        // --- 新增: Excel 匯入邏輯 ---
         const isImporting = ref(false);
         const handleImport = async (e) => {
             const file = e.target.files[0];
@@ -585,16 +607,17 @@ const app = createApp({
                 const ws = wb.getWorksheet(1);
                 
                 const newMembers = [];
-                // 從第二行開始讀取 (假設第一行為標題)
                 ws.eachRow((row, rowNumber) => {
                     if(rowNumber > 1) {
                         const name = row.getCell(1).text;
                         const phone = row.getCell(2).text;
+                        const notes = row.getCell(3).text; // 📌 讀取第三欄作為備註
                         if(name && phone) {
                             newMembers.push({
                                 id: Date.now().toString() + Math.random().toString(36).substr(2, 5),
                                 name: name,
                                 phone: phone,
+                                notes: notes || '',
                                 created_at: new Date(),
                                 updated_at: new Date()
                             });
@@ -605,41 +628,21 @@ const app = createApp({
                 if(newMembers.length > 0) {
                     const { error } = await supabase.from('members').insert(newMembers);
                     if(error) throw error;
-                    showToast(`成功匯入 ${newMembers.length} 筆資料`);
+                    showToast(`成功匯入 ${newMembers.length} 筆`);
                     fetchMembers();
                     modals.io = false;
-                } else {
-                    showToast('檔案內容為空或格式錯誤', 'warning');
-                }
-            } catch(e) {
-                console.error(e);
-                showToast('匯入失敗: ' + e.message, 'error');
-            } finally {
-                isImporting.value = false;
-                e.target.value = ''; // 重置 input
-            }
+                } else { showToast('無有效資料', 'warning'); }
+            } catch(e) { showToast('匯入失敗: ' + e.message, 'error'); } 
+            finally { isImporting.value = false; e.target.value = ''; }
         };
 
-        const saveConfig = () => {
-            localStorage.setItem('supabase_config_v5', JSON.stringify(config));
-            initSupabase();
-        };
-        
-        // --- 優化: 密碼保護的重置 ---
-        const resetConfigSecure = () => {
-            const pwd = prompt("請輸入管理員密碼以確認重置：");
-            if(pwd === (config.adminPwd || '0000')) {
-                 localStorage.removeItem('supabase_config_v5'); 
-                 location.reload(); 
-            } else {
-                showToast('密碼錯誤，操作取消', 'error');
-            }
-        };
+        const saveConfig = () => { localStorage.setItem('supabase_config_v5', JSON.stringify(config)); initSupabase(); };
+        const resetConfigSecure = () => { if(prompt("密碼")===(config.adminPwd||'0000')) { localStorage.removeItem('supabase_config_v5'); location.reload(); } };
 
         const filteredMembers = computed(() => {
             if(!searchQuery.value) return members.value;
             const q = searchQuery.value.toLowerCase();
-            return members.value.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q));
+            return members.value.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q) || (m.notes && m.notes.toLowerCase().includes(q)));
         });
 
         const stats = computed(() => {
@@ -654,14 +657,14 @@ const app = createApp({
             members, filteredMembers, isLoading, isExporting, isImporting, exportFastExcel, handleImport,
             currentTab, tabs, modals, closeModals, confirmPrivacy,
             form, registerForm, activeForm, activePhoto, submitForm, deleteMember,
-            openAdminAdd: () => { Object.assign(form, {id:null,name:'',phone:'',birthday:'',photo:null,face_descriptor:null}); modals.form=true; modals.register=false; },
+            openAdminAdd: () => { Object.assign(form, {id:null,name:'',phone:'',notes:'',photo:null,face_descriptor:null}); modals.form=true; modals.register=false; },
             editMember: (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form=true; modals.register=false; },
-            openSelfRegister: () => { Object.assign(registerForm, {name:'',phone:'',birthday:'',photo:null,face_descriptor:null, agree:false, hasRead:false}); modals.register=true; modals.form=false; },
+            openSelfRegister: () => { Object.assign(registerForm, {name:'',phone:'',notes:'',photo:null,face_descriptor:null, agree:false, hasRead:false}); modals.register=true; modals.form=false; },
             startScanForForm: () => startScan('register'),
-            startSelfServiceFaceScan: () => startScan('self'),
-            showFaceSearch: () => { modals.io=false; currentTab.value='list'; startScan('search'); },
+            // 📌 啟動首頁連續掃描
+            startHomepageScan: () => startScan('homepage_scan'),
             stopFaceScan, handleCameraSwitch: async () => { if(videoStream) { stopFaceScan(); await startScan(app.scanMode); } },
-            selfServiceInput, searchMode, verifyStatus, verifiedMember, performVerification, resetSelfService, registerFaceFromSelfService: () => { app.editMember(verifiedMember.value); app.startScanForForm(); },
+            selfServiceInput, searchMode, verifyStatus, verifiedMember, performVerification, resetSelfService,
             stats, isFaceModelLoaded, videoDevices, currentDeviceId, scanMessage, fps,
             unlockAudio, toasts
         };
