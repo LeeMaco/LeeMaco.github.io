@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V6.7 (iPad POS 優化版)</title>
+    <title>AI 智能會員系統 V6.7 (Fixed)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -53,7 +53,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V6.7</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V6.7 (Fix)</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -83,7 +83,7 @@
             <div class="flex gap-4 items-center">
                 <button @click="checkAdmin(() => modals.io = true)" class="w-10 h-10 rounded-full hover:bg-slate-100 text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-cloud-arrow-up text-lg"></i></button>
                 <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full border border-slate-200">
-                    <span class="text-indigo-500 flex items-center"><i class="fa-solid fa-wifi mr-1.5"></i>Online</span>
+                    <span :class="isConfigured ? 'text-emerald-500' : 'text-rose-500'" class="flex items-center"><i class="fa-solid mr-1.5" :class="isConfigured ? 'fa-wifi' : 'fa-wifi-slash'"></i>{{ isConfigured ? 'Online' : 'Offline' }}</span>
                     <span class="w-[1px] h-3 bg-slate-300 mx-1"></span>
                     <span :class="isFaceModelLoaded ? 'text-emerald-500' : 'text-slate-400'" class="flex items-center">
                         <i class="fa-solid" :class="isFaceModelLoaded ? 'fa-brain' : 'fa-circle-notch fa-spin'"></i>
@@ -400,7 +400,7 @@ const app = createApp({
         const currentTab = ref('self_service');
         const searchQuery = ref('');
         const modals = reactive({ form: false, faceScan: false, io: false, register: false, privacy: false });
-        // Tab Definition
+        
         const tabs = [
             {id:'self_service', label:'POS 櫃台', icon:'fa-solid fa-store'},
             {id:'list', label:'會員列表', icon:'fa-solid fa-list'},
@@ -435,7 +435,21 @@ const app = createApp({
         let frameCount = 0;
         let audioContext = null;
 
-        // --- Numpad Logic (V6.7) ---
+        // --- Core: Init Supabase (Fixed: Added Missing Function) ---
+        const initSupabase = () => {
+            if(config.url && config.key) {
+                try {
+                    supabase = supabase.createClient(config.url, config.key);
+                    isConfigured.value = true;
+                    initSystemData();
+                    showToast('系統已連線', 'success');
+                } catch(e) {
+                    showToast('連線失敗: ' + e.message, 'error');
+                }
+            }
+        };
+
+        // --- Numpad Logic ---
         const numpadInput = (num) => {
             if(selfServiceInput.value.length < 10) {
                 selfServiceInput.value += num;
@@ -448,7 +462,7 @@ const app = createApp({
             if(action === 'clr') selfServiceInput.value = '';
         };
 
-        // --- Core Functions (Same as V6.6 but optimized) ---
+        // --- Core Functions ---
         const stopFaceScan = () => { isScanning = false; modals.faceScan = false; if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } };
         const closeModals = () => { modals.form = false; modals.register = false; modals.faceScan = false; modals.io = false; stopFaceScan(); };
         const showToast = (msg, type='success', title='提示') => {
@@ -480,12 +494,14 @@ const app = createApp({
         const fetchTotalCount = async () => { if(supabase) { const {count} = await supabase.from('members').select('*', {count: 'exact', head: true}); totalMemberCount.value = count || 0; }};
         const initSystemData = async () => {
             if(!supabase) return;
-            const { data } = await supabase.from('members').select('id, name, face_descriptor, notes').not('face_descriptor', 'is', null);
-            if(data) {
-                aiMembers.value = data;
-                if(data.length) faceMatcher = new faceapi.FaceMatcher(data.map(m=>new faceapi.LabeledFaceDescriptors(m.id,[new Float32Array(m.face_descriptor)])), 0.45);
-            }
-            searchMembers(''); fetchTotalCount();
+            try {
+                const { data } = await supabase.from('members').select('id, name, face_descriptor, notes').not('face_descriptor', 'is', null);
+                if(data) {
+                    aiMembers.value = data;
+                    if(data.length) faceMatcher = new faceapi.FaceMatcher(data.map(m=>new faceapi.LabeledFaceDescriptors(m.id,[new Float32Array(m.face_descriptor)])), 0.45);
+                }
+                searchMembers(''); fetchTotalCount();
+            } catch(e) { console.error(e); }
         };
         const searchMembers = async () => {
             if(!supabase) return; isLoadingList.value = true;
@@ -506,10 +522,11 @@ const app = createApp({
         const performVerification = async () => {
             if(!selfServiceInput.value) return showToast('請輸入電話', 'warning');
             isLoading.value = true;
-            const { data } = await supabase.from('members').select('*').eq('phone', selfServiceInput.value).single();
-            isLoading.value = false;
-            if(data) handleCheckIn(data, 'phone');
-            else { verifyStatus.value = 'fail'; playSound('fail'); setTimeout(()=>verifyStatus.value='idle', 2000); }
+            try {
+                const { data } = await supabase.from('members').select('*').eq('phone', selfServiceInput.value).single();
+                if(data) handleCheckIn(data, 'phone');
+                else { verifyStatus.value = 'fail'; playSound('fail'); setTimeout(()=>verifyStatus.value='idle', 2000); }
+            } catch(e) { showToast('查詢錯誤', 'error'); } finally { isLoading.value = false; }
         };
         const fetchMemberPhoto = async (id) => { const {data} = await supabase.from('members').select('photo').eq('id',id).single(); return data?.photo; };
         const editMember = async (m) => {
@@ -526,7 +543,7 @@ const app = createApp({
                 showToast('儲存成功'); closeModals(); initSystemData();
             } catch(e) { showToast(e.message, 'error'); } finally { isLoading.value = false; }
         };
-        const deleteMember = async () => { if(confirm('Del?')) { await supabase.from('members').delete().eq('id',form.id); showToast('Deleted'); closeModals(); initSystemData(); }};
+        const deleteMember = async () => { if(confirm('確定刪除?')) { await supabase.from('members').delete().eq('id',form.id); showToast('已刪除'); closeModals(); initSystemData(); }};
         
         // Export / Import
         const exportAllMembers = async () => {
@@ -557,7 +574,7 @@ const app = createApp({
                     importProgress.value = Math.round((i/rows.length)*100);
                 }
                 showToast(`匯入 ${rows.length} 筆`); modals.io=false; initSystemData();
-            } catch(e) { showToast('Err','error'); } finally { isImporting.value = false; e.target.value=''; }
+            } catch(e) { showToast('匯入失敗','error'); } finally { isImporting.value = false; e.target.value=''; }
         };
 
         // Camera Logic
@@ -610,7 +627,6 @@ const app = createApp({
             isFaceModelLoaded.value = true;
         });
         const saveConfig = () => { localStorage.setItem('supabase_config_v6', JSON.stringify(config)); initSupabase(); };
-        const resetConfigSecure = () => { if(prompt("密碼")===(config.adminPwd||'0000')) { localStorage.removeItem('supabase_config_v6'); location.reload(); } };
         const checkAdmin = (cb) => { if(prompt("Pwd?")===(config.adminPwd||'0000')) cb(); };
         const confirmPrivacy = () => { registerForm.hasRead=true; registerForm.agree=true; modals.privacy=false; };
         const resetSelfService = () => { verifyStatus.value='idle'; selfServiceInput.value=''; verifiedMember.value=null; };
@@ -618,14 +634,14 @@ const app = createApp({
         const openAdminAdd = () => { Object.assign(form, {id:null,name:'',phone:'',notes:'',photo:null,face_descriptor:null}); modals.form=true; modals.register=false; };
 
         return {
-            config, isConfigured, saveConfig, resetConfigSecure, checkAdmin,
+            config, isConfigured, saveConfig, checkAdmin,
             displayMembers, aiMembers, totalMemberCount, searchMembers, searchQuery, isLoading, isLoadingList, isLoadingPhoto, isImporting, isExporting, importProgress, exportProgress, handleImport, exportAllMembers,
             currentTab, tabs, modals, closeModals, confirmPrivacy,
             form, registerForm, activeForm, activePhoto, submitForm, deleteMember, editMember, deletePhoto,
-            openAdminAdd, openSelfRegister, startScanForForm:()=>startScan('register'), startHomepageScan:()=>startScan('homepage_scan'), stopFaceScan, handleCameraSwitch:()=>{},
+            openAdminAdd, openSelfRegister, startScanForForm:()=>startScan('register'), startHomepageScan:()=>startScan('homepage_scan'), stopFaceScan,
             selfServiceInput, searchMode, verifyStatus, verifiedMember, verifiedMemberPhoto, performVerification, resetSelfService,
             stats: computed(()=>({todayVisits: scanHistory.value.filter(x=>x.type!=='guest').length})), isFaceModelLoaded, videoDevices, currentDeviceId, scanHistory, fps, app, unlockAudio, toasts, formatDate, formatDateSimple,
-            isFaceDetected, manualCapture, numpadInput, numpadAction // V6.7
+            isFaceDetected, manualCapture, numpadInput, numpadAction
         };
     }
 });
