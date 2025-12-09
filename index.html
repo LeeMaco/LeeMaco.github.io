@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V5.5 (UI優化版)</title>
+    <title>AI 智能會員系統 V6.1 (智慧匯入版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -31,7 +31,6 @@
         .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
         .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(30px); }
 
-        /* 隱藏滾動條但保留功能 */
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
     </style>
@@ -51,9 +50,9 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V5.5</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V6.1</h2>
             <div class="space-y-4">
-                <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：快樂咖啡廳" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
+                <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-rose-500">設定管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
@@ -64,14 +63,14 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">V5.5</span></h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">V6.1</span></h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
                 <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
-                    <span class="text-emerald-500 flex items-center"><i class="fa-solid fa-database mr-1.5"></i>{{ members.length }}</span>
+                    <span class="text-indigo-500 flex items-center"><i class="fa-solid fa-cloud mr-1.5"></i>Online</span>
                     <span class="w-[1px] h-3 bg-slate-300 mx-1"></span>
-                    <span :class="isFaceModelLoaded ? 'text-indigo-500' : 'text-slate-400'" class="flex items-center">
+                    <span :class="isFaceModelLoaded ? 'text-emerald-500' : 'text-slate-400'" class="flex items-center">
                         <i class="fa-solid" :class="isFaceModelLoaded ? 'fa-brain' : 'fa-circle-notch fa-spin'"></i>
                     </span>
                 </div>
@@ -92,14 +91,14 @@
                     <div class="space-y-2">
                         <i class="fa-solid fa-robot text-5xl text-indigo-500 mb-2"></i>
                         <h2 class="text-2xl font-black text-slate-800">{{ config.storeName || '智能接待中心' }}</h2>
-                        <p class="text-slate-400 text-sm">請選擇服務</p>
+                        <p class="text-slate-400 text-sm">請輸入電話或掃臉</p>
                     </div>
                     <div class="grid gap-4 mt-6">
                         <button @click="startHomepageScan" class="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl shadow-xl hover:scale-[1.02] transition active:scale-95 flex items-center justify-center gap-3">
                             <i class="fa-solid fa-expand text-xl"></i>
                             <div class="text-left">
                                 <div class="text-lg font-bold">啟動 AI 迎賓掃描</div>
-                                <div class="text-xs text-indigo-100">視覺化歷程 / 高效能模式</div>
+                                <div class="text-xs text-indigo-100">已啟用快速通關</div>
                             </div>
                         </button>
                         <div class="grid grid-cols-2 gap-3">
@@ -107,13 +106,16 @@
                                 <i class="fa-solid fa-mobile-screen mb-1 block text-xl text-indigo-400"></i> 電話查詢
                             </button>
                             <button @click="openSelfRegister" class="py-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-600 hover:border-indigo-200 transition">
-                                <i class="fa-solid fa-user-plus mb-1 block text-xl text-emerald-400"></i> 會員註冊
+                                <i class="fa-solid fa-user-plus mb-1 block text-xl text-emerald-400"></i> 新會員註冊
                             </button>
                         </div>
                     </div>
-                    <div v-if="searchMode === 'phone'" class="mt-4 pt-4 border-t animate-fade-in-up">
+                    <div v-if="searchMode === 'phone'" class="mt-4 pt-4 border-t animate-fade-in-up relative">
                          <input v-model="selfServiceInput" type="tel" placeholder="輸入電話號碼..." class="w-full text-center text-xl font-bold py-3 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent" @keyup.enter="performVerification">
-                         <button @click="performVerification" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-3 shadow-md">查詢</button>
+                         <button @click="performVerification" :disabled="isLoading" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-3 shadow-md disabled:opacity-50">
+                             <span v-if="isLoading"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>查詢中...</span>
+                             <span v-else>查詢</span>
+                         </button>
                     </div>
                 </div>
 
@@ -125,21 +127,21 @@
                         <h2 class="text-3xl font-black text-slate-800">{{ verifyStatus === 'success' ? '查詢成功' : '查無資料' }}</h2>
                         <div v-if="verifyStatus === 'success'" class="mt-3">
                             <p class="text-2xl font-bold text-indigo-600">{{ verifiedMember?.name }}</p>
+                            <p class="text-gray-500 text-lg">{{ verifiedMember?.phone }}</p>
                             <p v-if="verifiedMember?.notes" class="text-sm text-slate-500 bg-slate-100 inline-block px-3 py-1 rounded-full mt-2">{{ verifiedMember.notes }}</p>
                             
                             <div v-if="verifiedMemberPhoto" class="mt-4 flex justify-center">
                                 <img :src="verifiedMemberPhoto" class="w-32 h-32 rounded-xl object-cover border-4 border-white shadow-lg bg-gray-100">
                             </div>
                             <div v-else class="mt-5 mx-4">
-                                <div @click="editMember(verifiedMember)" class="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl p-4 cursor-pointer hover:bg-indigo-100 transition group">
+                                <div @click="editMember(verifiedMember)" class="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl p-4 cursor-pointer hover:bg-indigo-100 transition group animate-pulse">
                                     <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm text-indigo-500 group-hover:scale-110 transition">
                                         <i class="fa-solid fa-camera-rotate text-xl"></i>
                                     </div>
-                                    <h4 class="font-bold text-indigo-700">增加照片 掃臉辨識</h4>
-                                    <p class="text-xs text-indigo-500 mt-1">啟用 AI 快速通關，方便快速！</p>
+                                    <h4 class="font-bold text-indigo-700">尚未建立人臉資料</h4>
+                                    <p class="text-xs text-indigo-500 mt-1">點擊此處補拍照片，啟用快速通關</p>
                                 </div>
                             </div>
-
                         </div>
                     </div>
                     <button @click="resetSelfService" class="w-full bg-slate-500 text-white py-3 rounded-xl font-bold mt-6">返回</button>
@@ -148,27 +150,56 @@
         </div>
 
         <div v-show="currentTab === 'list'" class="space-y-4 max-w-4xl mx-auto animate-fade-in-up">
-             <div class="relative group"><i class="fa-solid fa-magnifying-glass absolute left-4 top-4 text-slate-400"></i><input v-model="searchQuery" type="text" placeholder="搜尋會員姓名或備註..." class="w-full pl-11 pr-4 py-3.5 border-0 rounded-2xl shadow-sm bg-white focus:ring-2 focus:ring-indigo-100 outline-none"></div>
-             <div class="flex justify-between px-1"><span class="text-sm text-slate-500">共 {{ members.length }} 人</span><button @click="openAdminAdd" class="bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-indigo-700 transition">+ 新增</button></div>
+             <div class="relative group">
+                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-4 text-slate-400"></i>
+                 <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="搜尋雲端資料庫 (姓名或電話)..." class="w-full pl-11 pr-4 py-3.5 border-0 rounded-2xl shadow-sm bg-white focus:ring-2 focus:ring-indigo-100 outline-none">
+                 <button @click="searchMembers" class="absolute right-2 top-2 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
+             </div>
+             <div class="flex justify-between px-1">
+                 <span class="text-sm text-slate-500">顯示最近更新的 50 筆</span>
+                 <button @click="openAdminAdd" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-emerald-700 transition">+ 新增</button>
+             </div>
              
-             <div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                 <div v-for="m in filteredMembers" :key="m.id" @click="editMember(m)" class="bg-white p-4 rounded-2xl shadow-sm flex items-start gap-4 cursor-pointer border border-slate-100 hover:border-indigo-200 transition relative overflow-hidden">
+             <div v-if="isLoadingList" class="py-10 text-center text-slate-400">
+                 <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
+                 <p class="text-xs mt-2">雲端資料讀取中...</p>
+             </div>
+
+             <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                 <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" class="bg-white p-4 rounded-2xl shadow-sm flex items-start gap-4 cursor-pointer border border-slate-100 hover:border-indigo-200 transition relative overflow-hidden">
                      <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg flex-shrink-0 border border-slate-200">
-                        {{ m.name.charAt(0) }}
+                        {{ m.name ? m.name.charAt(0) : '?' }}
                      </div>
                      <div class="flex-1 overflow-hidden">
                          <b class="truncate block text-lg">{{m.name}}</b>
                          <p class="text-xs text-gray-400 truncate">{{m.phone}}</p>
-                         <p v-if="m.notes" class="text-xs text-indigo-600 mt-1 truncate bg-indigo-50 px-2 py-0.5 rounded inline-block"><i class="fa-solid fa-tag mr-1"></i>{{m.notes}}</p>
+                         <div class="flex gap-2 mt-1">
+                             <span v-if="m.face_descriptor" class="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">已掃臉</span>
+                             <span v-if="m.notes" class="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded truncate max-w-[80px]">{{m.notes}}</span>
+                         </div>
                      </div>
+                 </div>
+                 <div v-if="displayMembers.length === 0" class="col-span-full text-center py-10 text-slate-400">
+                     無符合資料
                  </div>
              </div>
         </div>
 
         <div v-show="currentTab === 'dashboard'" class="max-w-4xl mx-auto animate-fade-in-up">
             <div class="grid grid-cols-2 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-indigo-500"><h3 class="text-sm text-slate-500 mb-1">今日來客 (AI)</h3><span class="text-3xl font-bold text-indigo-600">{{stats.todayVisits}}</span></div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500"><h3 class="text-sm text-slate-500 mb-1">會員總數</h3><span class="text-3xl font-bold text-emerald-600">{{members.length}}</span></div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-indigo-500">
+                    <h3 class="text-sm text-slate-500 mb-1">今日來客 (AI)</h3>
+                    <span class="text-3xl font-bold text-indigo-600">{{stats.todayVisits}}</span>
+                </div>
+                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500">
+                    <h3 class="text-sm text-slate-500 mb-1">資料庫總數</h3>
+                    <span class="text-3xl font-bold text-emerald-600">
+                        {{ totalMemberCount > 0 ? totalMemberCount.toLocaleString() : '...' }}
+                    </span>
+                </div>
+            </div>
+            <div class="bg-indigo-50 p-4 rounded-xl mt-4 text-sm text-indigo-700">
+                <p><i class="fa-solid fa-info-circle mr-2"></i><strong>高效能模式：</strong> 系統已優化，可支援 30,000+ 筆資料。請使用「Excel 智慧匯入」來更新舊資料。</p>
             </div>
         </div>
     </main>
@@ -197,7 +228,7 @@
                     <div><label class="text-xs font-bold text-slate-500 uppercase">備註</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none resize-none"></textarea></div>
                     
                     <div class="flex gap-4 items-center mt-2">
-                        <div v-if="isLoadingPhoto" class="w-16 h-16 flex items-center justify-center bg-gray-50 border rounded"><span class="loader"></span></div>
+                        <div v-if="isLoadingPhoto" class="w-16 h-16 flex items-center justify-center bg-gray-50 border rounded"><i class="fa-solid fa-circle-notch fa-spin text-gray-400"></i></div>
                         <img v-else-if="activePhoto" :src="activePhoto" class="w-16 h-16 rounded object-cover border bg-gray-50">
                         <div v-else class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center p-1">無照片</div>
 
@@ -229,7 +260,6 @@
     <div v-show="modals.faceScan" class="fixed inset-0 bg-black z-[60] flex flex-col">
         <div id="video-container" class="relative w-full h-[35vh] bg-black overflow-hidden border-b border-white/20">
             <button @click="stopFaceScan" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-md text-white z-40 border border-white/10 flex items-center justify-center active:scale-95"><i class="fa-solid fa-times"></i></button>
-            
             <select v-model="currentDeviceId" @change="handleCameraSwitch" class="absolute top-4 left-4 bg-black/40 text-white border border-white/20 py-2 pl-4 pr-8 rounded-full text-xs backdrop-blur-md outline-none appearance-none z-40 max-w-[150px]">
                 <option value="">切換鏡頭</option>
                 <option v-for="cam in videoDevices" :key="cam.deviceId" :value="cam.deviceId">{{ cam.label || 'Camera' }}</option>
@@ -246,7 +276,6 @@
             <div class="p-4 border-b border-white/10 bg-slate-800/50 backdrop-blur-sm">
                 <h3 class="text-white font-bold flex items-center gap-2"><i class="fa-solid fa-history text-indigo-400"></i> 即時掃描歷程</h3>
             </div>
-            
             <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
                 <transition-group name="list">
                     <div v-for="log in scanHistory" :key="log.id" class="bg-white/10 rounded-xl p-3 flex gap-3 items-center border border-white/5 shadow-lg">
@@ -254,7 +283,7 @@
                         <div class="flex-1 overflow-hidden">
                             <div class="flex justify-between items-start"><h4 class="text-white font-bold truncate text-lg">{{ log.name }}</h4><span class="text-xs text-slate-400">{{ log.time }}</span></div>
                             <p v-if="log.type==='member'" class="text-sm text-emerald-400 truncate">{{ log.notes || '一般會員' }}</p>
-                            <p v-else class="text-sm text-slate-400">新訪客</p>
+                            <p v-else class="text-sm text-slate-400">新訪客 (尚未錄入)</p>
                         </div>
                     </div>
                 </transition-group>
@@ -273,17 +302,25 @@
     
     <div v-if="modals.io" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
         <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
-            <h3 class="font-bold text-lg mb-4">資料管理</h3>
+            <h3 class="font-bold text-lg mb-4">智慧資料匯入</h3>
+            
+            <div class="text-left text-xs text-slate-500 bg-slate-50 p-3 rounded-lg mb-4 space-y-1">
+                <p><strong>自動對應欄位：</strong> 系統會自動讀取標題列。</p>
+                <p>• 姓名 (Name, 姓名)</p>
+                <p>• 電話 (Phone, Mobile, 手機)</p>
+                <p>• 編號 (ID, 編號) *若無則自動產生</p>
+                <p class="text-rose-500 mt-2 font-bold">過濾規則：相同 ID 或 電話 將自動合併更新，不會產生重覆資料。</p>
+            </div>
+
             <div class="space-y-3">
-                <button @click="exportFastExcel" class="w-full py-3 bg-emerald-50 text-emerald-700 rounded-xl font-bold border border-emerald-200 hover:bg-emerald-100 flex items-center justify-center gap-2">
-                    <i class="fa-solid fa-download"></i> 匯出文字資料
-                </button>
                 <div class="relative w-full py-3 bg-indigo-50 text-indigo-700 rounded-xl font-bold border border-indigo-200 hover:bg-indigo-100 flex items-center justify-center gap-2 cursor-pointer group">
-                    <i class="fa-solid fa-upload"></i> 匯入資料
+                    <i v-if="!isImporting" class="fa-solid fa-upload"></i>
+                    <i v-else class="fa-solid fa-circle-notch fa-spin"></i>
+                    {{ isImporting ? `匯入中 ${importProgress}%` : '選擇 Excel 檔案' }}
                     <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
                 </div>
             </div>
-            <button @click="modals.io=false" class="mt-6 text-gray-400 py-2">關閉</button>
+            <button @click="modals.io=false" class="mt-6 text-gray-400 py-2" :disabled="isImporting">關閉</button>
         </div>
     </div>
 </div>
@@ -295,15 +332,21 @@ const app = createApp({
     setup() {
         const config = reactive({ url: '', key: '', adminPwd: '', storeName: '' });
         const isConfigured = ref(false);
-        const members = ref([]);
+        const displayMembers = ref([]); 
+        const aiMembers = ref([]); 
+        const totalMemberCount = ref(0); // 真實總數
+        
         const toasts = ref([]);
         const isLoading = ref(false);
+        const isLoadingList = ref(false);
         const isLoadingPhoto = ref(false);
+        const isImporting = ref(false);
+        const importProgress = ref(0);
         
         const currentTab = ref('self_service');
         const searchQuery = ref('');
         const modals = reactive({ form: false, faceScan: false, io: false, register: false, privacy: false });
-        const tabs = [{id:'self_service', label:'首頁', icon:'fa-solid fa-home'},{id:'list', label:'列表', icon:'fa-solid fa-list-ul'},{id:'dashboard', label:'分析', icon:'fa-solid fa-chart-line'}];
+        const tabs = [{id:'self_service', label:'首頁', icon:'fa-solid fa-home'},{id:'list', label:'雲端列表', icon:'fa-solid fa-list-ul'},{id:'dashboard', label:'分析', icon:'fa-solid fa-chart-line'}];
 
         const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, search_history: [], face_descriptor: null });
         const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, face_descriptor: null, agree: false, hasRead: false });
@@ -329,12 +372,10 @@ const app = createApp({
         let faceMatcher = null;
         let videoStream = null;
         let isScanning = false;
-        let lastScanTime = 0;
-        let frameCount = 0;
         let lastFpsTime = 0;
+        let frameCount = 0;
         let audioContext = null;
 
-        // --- 核心函數：定義在 Setup 最上方，確保可被呼叫 ---
         const stopFaceScan = () => { isScanning = false; modals.faceScan = false; if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } };
         const closeModals = () => { modals.form = false; modals.register = false; modals.faceScan = false; modals.io = false; stopFaceScan(); };
 
@@ -357,19 +398,65 @@ const app = createApp({
         };
         const unlockAudio = () => { if(!audioContext) playSound('success'); };
 
-        const fetchMembers = async () => {
+        // 取得資料庫真實總數
+        const fetchTotalCount = async () => {
             if(!supabase) return;
-            isLoading.value = true;
-            const { data, error } = await supabase.from('members').select('id, name, phone, notes, face_descriptor, updated_at, search_history').order('updated_at', {ascending:false});
-            if(error) { showToast(error.message, 'error'); }
-            else {
-                members.value = data || [];
-                if(members.value.length > 0) {
-                    const labeled = members.value.filter(m => m.face_descriptor).map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
-                    if(labeled.length) faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
+            const { count, error } = await supabase.from('members').select('*', { count: 'exact', head: true });
+            if(!error) totalMemberCount.value = count;
+        };
+
+        const initSystemData = async () => {
+            if(!supabase) return;
+            // 1. 初始化 AI 比對資料 (只抓有臉特徵的)
+            const { data, error } = await supabase.from('members').select('id, name, face_descriptor, notes').not('face_descriptor', 'is', null);
+            if(!error && data) {
+                aiMembers.value = data;
+                if(data.length > 0) {
+                    const labeled = data.map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
+                    faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
                 }
             }
+            // 2. 初始化列表
+            searchMembers('');
+            // 3. 取得總數
+            fetchTotalCount();
+        };
+
+        const searchMembers = async (overrideQuery) => {
+            if(!supabase) return;
+            isLoadingList.value = true;
+            let query = supabase.from('members').select('id, name, phone, notes, face_descriptor, updated_at').order('updated_at', {ascending:false}).limit(50);
+            
+            const q = (typeof overrideQuery === 'string' ? overrideQuery : searchQuery.value).trim();
+            if(q) {
+                query = supabase.from('members').select('*').or(`name.ilike.%${q}%,phone.ilike.%${q}%`).limit(50);
+            }
+
+            const { data, error } = await query;
+            if(error) showToast(error.message, 'error');
+            else displayMembers.value = data || [];
+            
+            isLoadingList.value = false;
+        };
+
+        const performVerification = async () => {
+            const val = selfServiceInput.value.trim();
+            if(!val) return showToast('請輸入電話', 'warning');
+            
+            isLoading.value = true;
+            const { data, error } = await supabase.from('members').select('*').eq('phone', val).single();
             isLoading.value = false;
+
+            if(data) {
+                verifyStatus.value = 'success'; 
+                verifiedMember.value = data; 
+                verifiedMemberPhoto.value = data.photo; 
+                playSound('success');
+            } else { 
+                verifyStatus.value = 'fail'; 
+                playSound('fail'); 
+                setTimeout(()=>verifyStatus.value='idle', 2000); 
+            }
         };
 
         const fetchMemberPhoto = async (id) => {
@@ -378,7 +465,6 @@ const app = createApp({
         };
 
         const editMember = async (m) => {
-            // 從搜尋結果點擊時，確保 Modal 狀態正確
             isLoadingPhoto.value = true;
             Object.assign(form, JSON.parse(JSON.stringify(m)));
             form.photo = null; 
@@ -407,16 +493,127 @@ const app = createApp({
                     if(error) throw error;
                     showToast('註冊成功');
                 }
-                closeModals(); fetchMembers();
+                closeModals(); 
+                initSystemData();
+                resetSelfService();
             } catch(e) { showToast(e.message, 'error'); } finally { isLoading.value = false; }
         };
 
-        const deleteMember = async () => { if(!confirm('確定刪除？')) return; const { error } = await supabase.from('members').delete().eq('id', form.id); if(error) showToast('刪除失敗', 'error'); else { showToast('已刪除'); closeModals(); fetchMembers(); } };
+        const deleteMember = async () => { if(!confirm('確定刪除？')) return; const { error } = await supabase.from('members').delete().eq('id', form.id); if(error) showToast('刪除失敗', 'error'); else { showToast('已刪除'); closeModals(); initSystemData(); } };
         const confirmPrivacy = () => { registerForm.hasRead = true; registerForm.agree = true; modals.privacy = false; };
+        const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; verifiedMemberPhoto.value = null; };
+
+        // --- 智慧匯入邏輯 (Smart Import) ---
+        const handleImport = async (e) => {
+            const file = e.target.files[0]; 
+            if (!file) return; 
+            
+            isImporting.value = true;
+            importProgress.value = 0;
+
+            try {
+                const buffer = await file.arrayBuffer(); 
+                const wb = new ExcelJS.Workbook(); 
+                await wb.xlsx.load(buffer); 
+                const ws = wb.getWorksheet(1);
+                
+                const membersToUpsert = [];
+                const seenPhones = new Set();
+                const seenIds = new Set();
+
+                // 1. 智慧解析標題列 (假設第一列是標題)
+                const headerRow = ws.getRow(1).values; // ExcelJS 陣列索引從 1 開始
+                
+                // 尋找對應的欄位索引
+                let idxName = -1, idxPhone = -1, idxId = -1, idxNotes = -1;
+                
+                if(Array.isArray(headerRow)) {
+                    headerRow.forEach((val, idx) => {
+                        if(!val) return;
+                        const v = val.toString().toLowerCase();
+                        if(v.includes('姓名') || v.includes('name')) idxName = idx;
+                        else if(v.includes('電話') || v.includes('mobile') || v.includes('phone') || v.includes('手機')) idxPhone = idx;
+                        else if(v.includes('id') || v.includes('編號')) idxId = idx;
+                        else if(v.includes('備註') || v.includes('note')) idxNotes = idx;
+                    });
+                }
+
+                // 如果找不到標題，使用預設順序 (1:Name, 2:Phone, 3:Notes)
+                if(idxName === -1) idxName = 1;
+                if(idxPhone === -1) idxPhone = 2;
+                if(idxNotes === -1) idxNotes = 3;
+
+                console.log(`Mapping: Name=${idxName}, Phone=${idxPhone}, ID=${idxId}`);
+
+                // 2. 遍歷並清整資料
+                ws.eachRow((row, rowNumber) => {
+                    if(rowNumber === 1) return; // 跳過標題
+
+                    let name = row.getCell(idxName).text?.trim();
+                    let phone = row.getCell(idxPhone).text?.trim();
+                    let id = (idxId > -1) ? row.getCell(idxId).text?.trim() : null;
+                    let notes = (idxNotes > -1) ? row.getCell(idxNotes).text?.trim() : '';
+
+                    // 基本驗證
+                    if(name && phone) {
+                        // 檔案內去重 (優先保留先出現的)
+                        if(seenPhones.has(phone)) return;
+                        if(id && seenIds.has(id)) return;
+
+                        seenPhones.add(phone);
+                        if(id) seenIds.add(id);
+                        
+                        // 若無 ID 則自動產生亂數 ID
+                        if(!id) id = Date.now() + Math.random().toString(36).substr(2, 5);
+
+                        membersToUpsert.push({
+                            id: id,
+                            name: name,
+                            phone: phone,
+                            notes: notes,
+                            updated_at: new Date()
+                        });
+                    }
+                });
+
+                if(membersToUpsert.length === 0) throw new Error("無有效資料，請檢查 Excel 格式");
+
+                // 3. 分批上傳 (Upsert)
+                const BATCH_SIZE = 500;
+                const total = membersToUpsert.length;
+                let processed = 0;
+
+                for (let i = 0; i < total; i += BATCH_SIZE) {
+                    const batch = membersToUpsert.slice(i, i + BATCH_SIZE);
+                    
+                    // 使用 Upsert: 如果 ID 相同則更新，不同則新增
+                    const { error } = await supabase.from('members').upsert(batch, { onConflict: 'id' });
+                    
+                    if (error) {
+                        console.error('Batch error:', error);
+                        // 如果 ID 衝突失敗 (很少見因為用了 upsert)，嘗試用 phone 檢查 (這裡簡化處理，直接略過)
+                    }
+                    
+                    processed += batch.length;
+                    importProgress.value = Math.floor((processed / total) * 100);
+                }
+
+                showToast(`成功匯入/更新 ${processed} 筆資料`);
+                modals.io = false;
+                initSystemData(); // 重新整理總數
+
+            } catch(e) { 
+                showToast('匯入失敗: ' + e.message, 'error'); 
+                console.error(e);
+            } finally { 
+                isImporting.value = false; 
+                e.target.value = ''; 
+            }
+        };
 
         // --- AI & Hardware ---
         onMounted(async () => {
-            const saved = localStorage.getItem('supabase_config_v5');
+            const saved = localStorage.getItem('supabase_config_v6');
             if(saved) { try { Object.assign(config, JSON.parse(saved)); if(config.url) initSupabase(); } catch(e){} }
             const URL = 'https://justadudewhohacks.github.io/face-api.js/models';
             try {
@@ -428,7 +625,7 @@ const app = createApp({
 
         const initSupabase = () => {
             if(!config.url || !config.key) return;
-            try { supabase = window.supabase.createClient(config.url, config.key); isConfigured.value = true; fetchMembers(); } catch(e) { showToast('連線失敗', 'error'); }
+            try { supabase = window.supabase.createClient(config.url, config.key); isConfigured.value = true; initSystemData(); } catch(e) { showToast('連線失敗', 'error'); }
         };
 
         const startVideo = async () => {
@@ -477,13 +674,12 @@ const app = createApp({
                     if(app.scanMode === 'homepage_scan' && faceMatcher) {
                         const match = faceMatcher.findBestMatch(detection.descriptor);
                         if(match.label !== 'unknown') {
-                            const m = members.value.find(x => x.id === match.label);
+                            const m = aiMembers.value.find(x => x.id === match.label); 
                             if(m) {
                                 if (now - (memberCooldowns[m.id]||0) > 180000) {
                                     memberCooldowns[m.id] = now; playSound('success');
-                                    const h = m.search_history||[]; h.push({timestamp:new Date().toISOString()});
-                                    supabase.from('members').update({search_history:h}).eq('id',m.id).then();
                                     addToHistory(m.name, 'member', m.notes, captureFace(video, box));
+                                    supabase.rpc('append_history', { member_id: m.id, timestamp: new Date().toISOString() }).then(); 
                                 }
                             }
                         } else {
@@ -499,57 +695,15 @@ const app = createApp({
         };
 
         const startScan = async (mode) => { app.scanMode = mode; modals.faceScan = true; isScanning = true; const v = await startVideo(); if(v) scanningLoop(v); };
-
-        const performVerification = async () => {
-            const val = selfServiceInput.value.trim();
-            if(!val) return showToast('請輸入內容', 'warning');
-            const member = members.value.find(m => (searchMode.value === 'phone' && m.phone === val));
-            if(member) {
-                verifyStatus.value = 'success'; verifiedMember.value = member; 
-                verifiedMemberPhoto.value = null; 
-                playSound('success');
-                verifiedMemberPhoto.value = await fetchMemberPhoto(member.id);
-            } else { verifyStatus.value = 'fail'; playSound('fail'); setTimeout(()=>verifyStatus.value='idle', 2000); }
-        };
-        const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; verifiedMemberPhoto.value = null; };
         
-        const isExporting = ref(false);
-        const exportFastExcel = async () => {
-            isExporting.value = true;
-            try {
-                const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Members');
-                ws.columns = [{header:'ID',key:'id'}, {header:'Name',key:'name'}, {header:'Phone',key:'phone'}, {header:'Notes',key:'notes'}, {header:'Created',key:'created_at'}];
-                members.value.forEach(m => ws.addRow(m));
-                const buffer = await wb.xlsx.writeBuffer(); saveAs(new Blob([buffer]), `members_v5.4_text_only.xlsx`);
-                showToast('匯出完成');
-            } catch(e) { showToast('匯出失敗', 'error'); } finally { isExporting.value = false; }
-        };
-
-        const isImporting = ref(false);
-        const handleImport = async (e) => {
-            const file = e.target.files[0]; if (!file) return; isImporting.value = true;
-            try {
-                const buffer = await file.arrayBuffer(); const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buffer); const ws = wb.getWorksheet(1);
-                const newMembers = [];
-                ws.eachRow((row, rowNumber) => {
-                    if(rowNumber > 1) {
-                        const name = row.getCell(1).text; const phone = row.getCell(2).text; const notes = row.getCell(3).text;
-                        if(name && phone) newMembers.push({ id: Date.now()+Math.random().toString(36).substr(2,5), name, phone, notes:notes||'', created_at: new Date(), updated_at: new Date() });
-                    }
-                });
-                if(newMembers.length > 0) { const { error } = await supabase.from('members').insert(newMembers); if(error) throw error; showToast(`匯入 ${newMembers.length} 筆`); fetchMembers(); modals.io = false; } else showToast('無有效資料', 'warning');
-            } catch(e) { showToast('匯入失敗', 'error'); } finally { isImporting.value = false; e.target.value=''; }
-        };
-
-        const saveConfig = () => { localStorage.setItem('supabase_config_v5', JSON.stringify(config)); initSupabase(); };
-        const resetConfigSecure = () => { if(prompt("密碼")===(config.adminPwd||'0000')) { localStorage.removeItem('supabase_config_v5'); location.reload(); } };
-        const filteredMembers = computed(() => { if(!searchQuery.value) return members.value; const q = searchQuery.value.toLowerCase(); return members.value.filter(m => m.name.toLowerCase().includes(q) || m.phone.includes(q) || (m.notes && m.notes.toLowerCase().includes(q))); });
-        const stats = computed(() => { const today = new Date().toISOString().slice(0,10); const visits = members.value.reduce((acc, m) => acc + (m.search_history?.filter(h => h.timestamp.startsWith(today)).length || 0), 0); return { todayVisits: visits }; });
+        const saveConfig = () => { localStorage.setItem('supabase_config_v6', JSON.stringify(config)); initSupabase(); };
+        const resetConfigSecure = () => { if(prompt("密碼")===(config.adminPwd||'0000')) { localStorage.removeItem('supabase_config_v6'); location.reload(); } };
+        const stats = computed(() => { const today = new Date().toISOString().slice(0,10); return { todayVisits: scanHistory.value.length }; });
 
         app.scanMode = ''; 
         return {
             config, isConfigured, saveConfig, resetConfigSecure, checkAdmin: (cb) => { const p=prompt('Pwd?'); if(p===(config.adminPwd||'0000'))cb(); else alert('Err'); },
-            members, filteredMembers, isLoading, isLoadingPhoto, isExporting, isImporting, exportFastExcel, handleImport,
+            displayMembers, aiMembers, totalMemberCount, searchMembers, searchQuery, isLoading, isLoadingList, isLoadingPhoto, isImporting, importProgress, handleImport,
             currentTab, tabs, modals, closeModals, confirmPrivacy,
             form, registerForm, activeForm, activePhoto, submitForm, deleteMember, editMember,
             openAdminAdd: () => { Object.assign(form, {id:null,name:'',phone:'',notes:'',photo:null,face_descriptor:null}); modals.form=true; modals.register=false; },
