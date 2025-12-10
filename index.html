@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V7.1 (POS 優化版)</title>
+    <title>AI 智能會員系統 V7.2 (V6.6 引擎版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -54,7 +54,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.1</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.2</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -67,7 +67,7 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded ml-2 shadow-sm">POS V7.1</span></h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded ml-2 shadow-sm">POS V7.2</span></h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
@@ -537,7 +537,6 @@ const app = createApp({
         let videoStream = null;
         let isScanning = false;
         let lastFpsTime = 0;
-        let lastScanTime = 0;
         let frameCount = 0;
         let audioContext = null;
 
@@ -621,7 +620,6 @@ const app = createApp({
             fetchTotalCount();
         };
 
-        // 需求 5: 列表查詢改為依 註冊日 created_at 倒序
         const searchMembers = async (overrideQuery) => {
             if(!supabase) return;
             isLoadingList.value = true;
@@ -683,7 +681,6 @@ const app = createApp({
             form.face_descriptor = null;
         };
 
-        // 需求 3: 新增/註冊 檢查重複電話
         const checkDuplicate = async (phone) => {
             if(!phone) return false;
             const { data } = await supabase.from('members').select('id').eq('phone', phone).single();
@@ -696,7 +693,6 @@ const app = createApp({
             
             isLoading.value = true;
             try {
-                // 如果是新增(或註冊)，先檢查電話
                 const isNew = modals.register || !target.id;
                 if(isNew) {
                     const exists = await checkDuplicate(target.phone);
@@ -726,13 +722,12 @@ const app = createApp({
         const deleteMember = async () => { if(!confirm('確定刪除會員？此操作無法復原。')) return; const { error } = await supabase.from('members').delete().eq('id', form.id); if(error) showToast('刪除失敗', 'error'); else { showToast('已刪除'); closeModals(); initSystemData(); } };
         const confirmPrivacy = () => { registerForm.hasRead = true; registerForm.agree = true; modals.privacy = false; };
         
-        // 需求 1: 返回首頁時，直接重置為電話模式
         const resetSelfService = () => { 
             verifyStatus.value = 'idle'; 
             selfServiceInput.value = ''; 
             verifiedMember.value = null; 
             verifiedMemberPhoto.value = null; 
-            searchMode.value = 'phone'; // 改為 'phone'
+            searchMode.value = 'phone'; 
         };
 
         const exportAllMembers = async () => {
@@ -780,7 +775,6 @@ const app = createApp({
                 const BATCH_SIZE = 500; const total = membersToUpsert.length; let processed = 0;
                 for (let i = 0; i < total; i += BATCH_SIZE) { 
                     const batch = membersToUpsert.slice(i, i + BATCH_SIZE); 
-                    // 匯入時維持 upsert 邏輯，避免因單一重複導致整批失敗，但會以電話為唯一鍵覆蓋
                     const { error } = await supabase.from('members').upsert(batch, { onConflict: 'phone' }); 
                     if (error) console.error(error); processed += batch.length; importProgress.value = Math.floor((processed / total) * 100); 
                 }
@@ -830,22 +824,13 @@ const app = createApp({
 
         const scanningLoop = async (video) => {
             if(!isScanning || !modals.faceScan) return;
-            
-            // 需求 4: 優化 AI 速度與準確率
             const now = Date.now(); 
             if(now - lastFpsTime >= 1000) { fps.value = frameCount; frameCount = 0; lastFpsTime = now; } 
-            
-            // 加入 Throttle: 限制每 100ms 偵測一次，減輕 CPU 負擔
-            if (now - lastScanTime < 100) {
-                 requestAnimationFrame(() => scanningLoop(video));
-                 return;
-            }
-            lastScanTime = now;
             frameCount++;
 
+            // 回退 V6.6 設定: 移除 Throttle，並使用 224 解析度
             try {
-                // 將 inputSize 提高到 320 (原224)，提升遠距離與小臉的準確率
-                const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 320, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
+                const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
                 isFaceDetected.value = !!detection; if (detection) lastDetectedFace.value = detection;
                 if(detection) {
                     const box = detection.detection.box;
