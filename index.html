@@ -3,41 +3,33 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員人臉辨識系統 V7.0 (Optimized)</title>
-    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js" defer></script>
+    <title>AI 會員人臉辨識系統 V6.7</title>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js"></script>
     <style>
-        :root {
-            --primary-color: #3498db;
-            --success-color: #2ecc71;
-            --danger-color: #e74c3c;
-            --bg-color: #f4f7f6;
-            --card-bg: #ffffff;
-        }
-
         body {
-            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-            background-color: var(--bg-color);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: #f0f2f5;
             display: flex;
             flex-direction: column;
             align-items: center;
             padding: 20px;
             margin: 0;
-            overscroll-behavior: none;
+            overscroll-behavior: none; /* 防止手機下拉重新整理 */
         }
 
-        h2 { color: #2c3e50; margin-bottom: 15px; }
+        h2 { margin-bottom: 10px; font-size: 1.5rem; text-align: center; }
 
-        /* 視訊容器：核心優化 */
-        .camera-wrapper {
+        /* 相機容器 */
+        .camera-container {
             position: relative;
             width: 100%;
             max-width: 640px;
-            aspect-ratio: 4/3; /* 鎖定比例避免跳動 */
+            aspect-ratio: 4/3;
             background: #000;
-            border-radius: 16px;
+            border-radius: 12px;
             overflow: hidden;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
-            margin-bottom: 20px;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+            margin-bottom: 15px;
         }
 
         video {
@@ -47,167 +39,156 @@
             display: block;
         }
 
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-        }
-
-        /* 鏡像翻轉類：同時應用於 video 和 canvas 以解決座標錯位 */
-        .mirrored {
+        /* 只有這個 class 存在時才鏡像翻轉 (用於前鏡頭) */
+        video.mirrored {
             transform: scaleX(-1);
             -webkit-transform: scaleX(-1);
         }
 
-        /* 儀表板設計 */
-        .dashboard {
+        /* 畫布覆蓋層 */
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            pointer-events: none; /* 讓點擊事件穿透到 video */
+        }
+
+        /* 狀態顯示區 */
+        #status-panel {
             width: 90%;
             max-width: 600px;
-            background: var(--card-bg);
-            padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            background: white;
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
             text-align: center;
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
+            margin-bottom: 15px;
         }
 
-        .status-badge {
-            display: inline-block;
-            padding: 6px 12px;
-            border-radius: 20px;
+        .status-text {
+            font-size: 1.1rem;
             font-weight: bold;
+            display: block;
+            margin-bottom: 5px;
+        }
+        
+        .status-loading { color: #e67e22; }
+        .status-member { color: #27ae60; }
+        .status-unknown { color: #c0392b; }
+        
+        #recognitionResult {
             font-size: 0.9rem;
-            margin-bottom: 10px;
+            color: #666;
+            line-height: 1.4;
         }
 
-        .status-loading { background: #fff3cd; color: #856404; }
-        .status-ok { background: #d4edda; color: #155724; }
-        .status-unknown { background: #f8d7da; color: #721c24; }
-
-        .info-text { font-size: 1rem; color: #555; margin: 5px 0; }
-
-        /* 按鈕群組 */
+        /* 按鈕區 */
         .controls {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 15px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
             width: 100%;
-            max-width: 600px;
         }
 
         button {
-            padding: 14px;
+            padding: 12px 24px;
             font-size: 16px;
             border: none;
-            border-radius: 10px;
+            border-radius: 8px;
             cursor: pointer;
             color: white;
             font-weight: 600;
-            transition: transform 0.1s, opacity 0.2s;
+            touch-action: manipulation; /* 優化觸控反應 */
         }
 
-        button:active { transform: scale(0.98); }
-        button:disabled { background-color: #bdc3c7 !important; cursor: not-allowed; opacity: 0.7; }
+        .btn-switch { background-color: #3498db; }
+        .btn-register { background-color: #2ecc71; }
         
-        .btn-switch { background-color: var(--primary-color); }
-        .btn-register { background-color: var(--success-color); }
-
-        /* Loading 動畫 */
-        .loader {
-            border: 3px solid #f3f3f3;
-            border-top: 3px solid var(--primary-color);
-            border-radius: 50%;
-            width: 20px;
-            height: 20px;
-            animation: spin 1s linear infinite;
-            display: inline-block;
-            vertical-align: middle;
-            margin-right: 8px;
+        button:disabled {
+            background-color: #bdc3c7;
+            cursor: not-allowed;
         }
 
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        /* 手機版面優化 */
+        @media (max-width: 480px) {
+            .camera-container { border-radius: 8px; }
+            button { flex: 1; min-width: 120px; }
+        }
     </style>
 </head>
 <body>
 
-    <h2>AI 會員辨識系統 V7.0</h2>
+    <h2>AI 會員人臉辨識系統</h2>
 
-    <div class="camera-wrapper" id="cameraWrapper">
+    <div class="camera-container">
         <video id="video" autoplay playsinline muted></video>
-        </div>
+    </div>
 
-    <div class="dashboard">
-        <div id="statusBadge" class="status-badge status-loading">
-            <div class="loader"></div>系統初始化中...
-        </div>
-        <div id="resultText" class="info-text">正在連接神經網路模型...</div>
+    <div id="status-panel">
+        <span id="systemStatus" class="status-text status-loading">系統初始化中...</span>
+        <div id="recognitionResult">正在連接模型伺服器...</div>
     </div>
 
     <div class="controls">
-        <button id="switchBtn" class="btn-switch" onclick="toggleCamera()">切換鏡頭</button>
-        <button id="regBtn" class="btn-register" onclick="handleRegistration()" disabled>註冊會員</button>
+        <button id="switchCameraBtn" class="btn-switch" onclick="switchCamera()">切換前後鏡頭</button>
+        <button id="registerBtn" class="btn-register" onclick="registerCurrentFace()" disabled>註冊會員</button>
     </div>
 
     <script>
-        // --- 設定與狀態變數 ---
-        const CONFIG = {
-            modelUrl: 'https://justadudewhohacks.github.io/face-api.js/models',
-            matchThreshold: 0.45,  // 嚴格度 (越低越嚴格)
-            minConfidence: 0.5,    // 偵測信心門檻
-            inputSize: 320         // 降低輸入尺寸以提升 FPS (原本預設通常較大)
-        };
+        const video = document.getElementById('video');
+        const systemStatus = document.getElementById('systemStatus');
+        const recognitionResult = document.getElementById('recognitionResult');
+        const registerBtn = document.getElementById('registerBtn');
+        let canvas;
 
-        const STATE = {
-            isModelLoaded: false,
-            isDetecting: false,    // 防止堆疊偵測迴圈
-            currentFacingMode: 'user',
-            labeledDescriptors: [],
-            faceMatcher: null,
-            videoEl: document.getElementById('video'),
-            canvasEl: null
-        };
+        // 狀態變數
+        let currentFacingMode = 'user'; // 預設前鏡頭
+        let isModelLoaded = false;
+        let labeledFaceDescriptors = []; 
+        let faceMatcher = null; 
 
-        // 預先實例化 Options，避免在迴圈中重複建立 (記憶體優化)
-        let detectOptions;
+        // 嚴格模式：0.45 (數值越小越嚴格，解決誤判問題)
+        const MATCH_THRESHOLD = 0.45; 
 
-        // --- 核心功能 1: 初始化 ---
-        async function initSystem() {
+        // 1. 初始化：載入模型 (改用 CDN 解決 TypeError)
+        async function loadModels() {
             try {
-                updateStatus('loading', '正在下載 AI 模型 (約 5MB)...');
+                systemStatus.innerText = "正在下載 AI 模型...";
                 
-                // 並行下載模型
+                // --- 關鍵修正：使用穩定的線上 CDN 路徑 ---
+                // 這解決了手機找不到 './models' 資料夾導致的 TypeError
+                const modelPath = 'https://justadudewhohacks.github.io/face-api.js/models';
+
                 await Promise.all([
-                    faceapi.nets.ssdMobilenetv1.loadFromUri(CONFIG.modelUrl),
-                    faceapi.nets.faceLandmark68Net.loadFromUri(CONFIG.modelUrl),
-                    faceapi.nets.faceRecognitionNet.loadFromUri(CONFIG.modelUrl)
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(modelPath),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(modelPath),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(modelPath)
                 ]);
 
-                // 初始化偵測選項
-                detectOptions = new faceapi.SsdMobilenetv1Options({ 
-                    minConfidence: CONFIG.minConfidence 
-                });
+                isModelLoaded = true;
+                systemStatus.innerText = "模型載入完成，啟動相機...";
+                systemStatus.className = "status-text";
+                startCamera();
 
-                STATE.isModelLoaded = true;
-                updateStatus('ok', '模型就緒，啟動相機...');
-                await startCamera();
-
-            } catch (err) {
-                console.error(err);
-                updateStatus('unknown', '錯誤：模型載入失敗，請檢查網路');
+            } catch (error) {
+                console.error("模型載入失敗:", error);
+                systemStatus.innerText = "錯誤：無法載入模型";
+                recognitionResult.innerText = "請檢查網路連線 (TypeError: Failed to fetch)";
+                systemStatus.className = "status-text status-unknown";
             }
         }
 
-        // --- 核心功能 2: 相機管理 ---
+        // 2. 啟動相機 (修正畫面翻轉邏輯)
         async function startCamera() {
-            // 停止舊串流
-            if (STATE.videoEl.srcObject) {
-                STATE.videoEl.srcObject.getTracks().forEach(track => track.stop());
+            // 停止舊串流 (防止切換時黑屏)
+            if (video.srcObject) {
+                video.srcObject.getTracks().forEach(track => track.stop());
             }
 
             const constraints = {
                 video: {
-                    facingMode: STATE.currentFacingMode,
+                    facingMode: currentFacingMode,
                     width: { ideal: 1280 },
                     height: { ideal: 720 }
                 }
@@ -215,194 +196,156 @@
 
             try {
                 const stream = await navigator.mediaDevices.getUserMedia(constraints);
-                STATE.videoEl.srcObject = stream;
+                video.srcObject = stream;
                 
-                // 等待影片 Metadata 載入完畢才開始偵測
-                STATE.videoEl.onloadedmetadata = () => {
-                    STATE.videoEl.play();
-                    handleMirroring();
-                    startDetectionLoop();
+                // 等待影片載入 metadata 確保尺寸正確
+                video.onloadedmetadata = () => {
+                    video.play();
+                    // --- 修正畫面翻轉 ---
+                    if (currentFacingMode === 'user') {
+                        video.classList.add('mirrored'); // 前鏡頭：翻轉
+                    } else {
+                        video.classList.remove('mirrored'); // 後鏡頭：正常
+                    }
                 };
+
             } catch (err) {
-                updateStatus('unknown', '無法存取相機 (HTTPS Required)');
+                console.error("相機錯誤:", err);
+                systemStatus.innerText = "無法存取相機";
+                recognitionResult.innerText = "請確認瀏覽器已授權相機權限 (HTTPS Required)";
+                systemStatus.className = "status-text status-unknown";
             }
         }
 
-        function handleMirroring() {
-            const wrapper = document.getElementById('cameraWrapper');
-            // 如果是前鏡頭，將整個容器 (Video + Canvas) 一起翻轉
-            if (STATE.currentFacingMode === 'user') {
-                wrapper.classList.add('mirrored');
-            } else {
-                wrapper.classList.remove('mirrored');
+        // 3. 核心偵測邏輯
+        video.addEventListener('play', () => {
+            // 避免重複建立 canvas
+            const container = document.querySelector('.camera-container');
+            if (document.querySelector('canvas')) {
+                document.querySelector('canvas').remove();
             }
-        }
-
-        function toggleCamera() {
-            STATE.currentFacingMode = STATE.currentFacingMode === 'user' ? 'environment' : 'user';
-            startCamera();
-        }
-
-        // --- 核心功能 3: 高效偵測迴圈 ---
-        async function startDetectionLoop() {
-            // 清理舊 Canvas
-            const wrapper = document.getElementById('cameraWrapper');
-            const oldCanvas = wrapper.querySelector('canvas');
-            if (oldCanvas) oldCanvas.remove();
-
-            // 建立新 Canvas
-            STATE.canvasEl = faceapi.createCanvasFromMedia(STATE.videoEl);
-            wrapper.append(STATE.canvasEl);
+            canvas = faceapi.createCanvasFromMedia(video);
+            container.append(canvas);
             
-            const displaySize = { width: STATE.videoEl.videoWidth, height: STATE.videoEl.videoHeight };
-            faceapi.matchDimensions(STATE.canvasEl, displaySize);
+            const displaySize = { width: video.videoWidth, height: video.videoHeight };
+            faceapi.matchDimensions(canvas, displaySize);
 
             // 啟動迴圈
-            detectFrame();
-        }
+            setInterval(async () => {
+                if (!isModelLoaded || video.paused || video.ended) return;
 
-        async function detectFrame() {
-            // 如果視訊暫停或結束，停止迴圈
-            if (STATE.videoEl.paused || STATE.videoEl.ended || !STATE.isModelLoaded) {
-                return requestAnimationFrame(detectFrame);
-            }
+                // 更新畫布尺寸 (應對手機旋轉)
+                const currentDisplaySize = { width: video.videoWidth, height: video.videoHeight };
+                if (canvas.width !== currentDisplaySize.width) {
+                    faceapi.matchDimensions(canvas, currentDisplaySize);
+                }
 
-            // 鎖定機制：如果上一幀還沒算完，這幀先跳過 (避免卡頓)
-            if (STATE.isDetecting) {
-                return requestAnimationFrame(detectFrame);
-            }
-
-            STATE.isDetecting = true;
-
-            try {
-                // 1. 偵測人臉
-                const detections = await faceapi.detectAllFaces(STATE.videoEl, detectOptions)
+                // 偵測
+                const detections = await faceapi.detectAllFaces(video, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.5 }))
                     .withFaceLandmarks()
                     .withFaceDescriptors();
 
-                // 2. 調整尺寸
-                const displaySize = { width: STATE.videoEl.videoWidth, height: STATE.videoEl.videoHeight };
-                const resizedDetections = faceapi.resizeResults(detections, displaySize);
-
-                // 3. 清空畫布
-                const ctx = STATE.canvasEl.getContext('2d');
-                ctx.clearRect(0, 0, STATE.canvasEl.width, STATE.canvasEl.height);
-
-                // 4. 比對與繪製
-                if (resizedDetections.length > 0) {
-                    processDetections(resizedDetections);
-                } else {
-                    updateStatus('ok', '監控中...');
-                    document.getElementById('regBtn').disabled = true;
-                }
-
-            } catch (error) {
-                console.error("Detection Error:", error);
-            } finally {
-                STATE.isDetecting = false;
-                requestAnimationFrame(detectFrame); // 請求下一幀
-            }
-        }
-
-        // --- 核心功能 4: 辨識邏輯與 UI ---
-        function processDetections(detections) {
-            // 如果沒有註冊資料，全部視為陌生人
-            if (STATE.labeledDescriptors.length === 0) {
-                faceapi.draw.drawDetections(STATE.canvasEl, detections);
-                updateStatus('unknown', '偵測到陌生訪客 (未建立資料庫)');
-                document.getElementById('regBtn').disabled = false;
-                return;
-            }
-
-            // 建立 Matcher (建議：若人數多，Matcher 應緩存，不要每幀重建)
-            if (!STATE.faceMatcher) {
-                STATE.faceMatcher = new faceapi.FaceMatcher(STATE.labeledDescriptors, CONFIG.matchThreshold);
-            }
-
-            detections.forEach(d => {
-                const bestMatch = STATE.faceMatcher.findBestMatch(d.descriptor);
-                const { label, distance } = bestMatch;
+                const resizedDetections = faceapi.resizeResults(detections, currentDisplaySize);
                 
-                // 繪製框框
-                const box = d.detection.box;
-                const drawBox = new faceapi.draw.DrawBox(box, { 
-                    label: label === 'unknown' ? "陌生人" : `${label} (${Math.round((1-distance)*100)}%)`,
-                    boxColor: label === 'unknown' ? '#e74c3c' : '#2ecc71'
-                });
-                drawBox.draw(STATE.canvasEl);
+                // 清空畫布
+                const ctx = canvas.getContext('2d');
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-                // 更新 UI
-                if (label === 'unknown') {
-                    updateStatus('unknown', '陌生訪客 - 請註冊');
-                    document.getElementById('regBtn').disabled = false;
-                } else {
-                    updateStatus('ok', `歡迎會員：${label}`);
-                    document.getElementById('regBtn').disabled = true;
+                // 如果資料庫是空的 -> 全部視為陌生人
+                if (labeledFaceDescriptors.length === 0) {
+                    if (detections.length > 0) {
+                        // 畫預設框
+                        faceapi.draw.drawDetections(canvas, resizedDetections);
+                        updateUI("unknown", 0);
+                    } else {
+                        recognitionResult.innerText = "偵測中...請注視鏡頭";
+                        registerBtn.disabled = true;
+                        systemStatus.innerText = "監控中";
+                        systemStatus.className = "status-text";
+                    }
+                    return;
                 }
-            });
+
+                // 建立比對器
+                if (!faceMatcher) {
+                    faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, MATCH_THRESHOLD);
+                }
+
+                const results = resizedDetections.map(d => faceMatcher.findBestMatch(d.descriptor));
+
+                results.forEach((result, i) => {
+                    const box = resizedDetections[i].detection.box;
+                    const { label, distance } = result;
+
+                    // 繪製結果框
+                    // 注意：若前鏡頭翻轉，Canvas 的繪製不需要手動翻轉，因為它對應的是 video 座標
+                    const drawBox = new faceapi.draw.DrawBox(box, { 
+                        label: label === 'unknown' ? "陌生人" : `${label} (${Math.round((1-distance)*100)}%)` 
+                    });
+                    drawBox.draw(canvas);
+
+                    updateUI(label, distance);
+                });
+
+            }, 200); // 稍微放寬到 200ms 節省手機效能
+        });
+
+        // 4. UI 更新邏輯
+        function updateUI(label, distance) {
+            if (label === 'unknown') {
+                systemStatus.innerText = "偵測到陌生訪客";
+                systemStatus.className = "status-text status-unknown";
+                recognitionResult.innerHTML = `身份未確認 <br> 請點擊下方按鈕註冊`;
+                registerBtn.disabled = false; // 允許註冊
+            } else {
+                systemStatus.innerText = `歡迎會員：${label}`;
+                systemStatus.className = "status-text status-member";
+                const score = Math.round((1 - distance) * 100);
+                recognitionResult.innerHTML = `識別成功 (信心度: ${score}%)`;
+                registerBtn.disabled = true; // 禁止重複註冊
+            }
         }
 
-        // --- 核心功能 5: 註冊流程 ---
-        async function handleRegistration() {
-            document.getElementById('regBtn').disabled = true;
-            
-            // 暫停偵測迴圈以獲得準確的單張快照
-            const wasDetecting = STATE.isDetecting;
-            STATE.isDetecting = true; 
+        // 5. 註冊功能
+        async function registerCurrentFace() {
+            if (!video.srcObject) return;
+            registerBtn.disabled = true; // 防止連點
 
-            const name = prompt("請輸入會員姓名：");
+            const name = prompt("請輸入會員姓名以完成註冊：");
             if (!name) {
-                STATE.isDetecting = false; // 恢復迴圈
+                registerBtn.disabled = false;
                 return;
             }
 
-            updateStatus('loading', `正在分析 ${name} 的臉部特徵...`);
-
-            try {
-                // 使用最精確的單一人臉偵測進行註冊
-                const detection = await faceapi.detectSingleFace(STATE.videoEl, detectOptions)
-                    .withFaceLandmarks()
-                    .withFaceDescriptor();
-
-                if (detection) {
-                    // 加入資料庫
-                    const newDescriptor = new faceapi.LabeledFaceDescriptors(name, [detection.descriptor]);
-                    STATE.labeledDescriptors.push(newDescriptor);
-                    
-                    // 強制更新 Matcher
-                    STATE.faceMatcher = new faceapi.FaceMatcher(STATE.labeledDescriptors, CONFIG.matchThreshold);
-                    
-                    alert(`註冊成功！系統已記錄 ${name}`);
-                } else {
-                    alert("註冊失敗：影像模糊或未偵測到人臉，請再試一次。");
-                }
-            } catch (e) {
-                console.error(e);
-                alert("系統錯誤");
-            } finally {
-                STATE.isDetecting = false; // 恢復迴圈
-            }
-        }
-
-        // --- 輔助：更新狀態 UI ---
-        function updateStatus(type, text) {
-            const badge = document.getElementById('statusBadge');
-            const result = document.getElementById('resultText');
+            systemStatus.innerText = "正在分析特徵...";
             
-            result.innerText = text;
-            badge.className = `status-badge status-${type}`;
+            // 擷取單一人臉
+            const detection = await faceapi.detectSingleFace(video, new faceapi.SsdMobilenetv1Options())
+                .withFaceLandmarks()
+                .withFaceDescriptor();
             
-            if (type === 'loading') {
-                badge.innerHTML = '<div class="loader"></div>處理中';
-            } else if (type === 'ok') {
-                badge.innerText = '系統正常';
+            if (detection) {
+                const newDescriptor = new faceapi.LabeledFaceDescriptors(name, [detection.descriptor]);
+                labeledFaceDescriptors.push(newDescriptor);
+                
+                // 重建比對器
+                faceMatcher = new faceapi.FaceMatcher(labeledFaceDescriptors, MATCH_THRESHOLD);
+                
+                alert(`註冊成功！歡迎 ${name}`);
             } else {
-                badge.innerText = '待命/警示';
+                alert("註冊失敗：未偵測到清晰人臉，請靠近鏡頭重試。");
+                registerBtn.disabled = false;
             }
         }
 
-        // 啟動點
-        window.addEventListener('load', initSystem);
+        // 6. 切換鏡頭
+        function switchCamera() {
+            currentFacingMode = (currentFacingMode === 'user') ? 'environment' : 'user';
+            startCamera();
+        }
+
+        // 啟動
+        window.onload = loadModels;
 
     </script>
 </body>
