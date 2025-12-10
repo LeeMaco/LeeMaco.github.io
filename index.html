@@ -3,792 +3,407 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V6.4 (完美營運版)</title>
-    
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
-
+    <title>AI 會員人臉辨識系統 V7.0 (Optimized)</title>
+    <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.min.js" defer></script>
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
-        .tab-btn { position: relative; color: #64748b; transition: all 0.3s; }
-        .tab-active { color: #4f46e5; font-weight: bold; }
-        .tab-active::after { content: ''; position: absolute; bottom: -12px; left: 0; width: 100%; height: 3px; background: #4f46e5; border-radius: 3px 3px 0 0; }
-        
-        @keyframes fadeInUp { from { opacity: 0; transform: translate3d(0, 20px, 0); } to { opacity: 1; transform: none; } }
-        .animate-fade-in-up { animation: fadeInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1); }
-        
-        #video-container video { width: 100%; height: 100%; object-fit: cover; }
-        .scan-line { position: absolute; width: 100%; height: 2px; background: #4f46e5; box-shadow: 0 0 15px #4f46e5; animation: scanning 2s infinite ease-in-out; }
-        @keyframes scanning { 0% {top:0; opacity: 0;} 10% {opacity: 1;} 90% {opacity: 1;} 100% {top:100%; opacity: 0;} }
-        
-        .list-enter-active, .list-leave-active { transition: all 0.5s ease; }
-        .list-enter-from, .list-leave-to { opacity: 0; transform: translateX(30px); }
-        .toast-enter-active, .toast-leave-active { transition: all 0.3s ease; }
-        .toast-enter-from, .toast-leave-to { opacity: 0; transform: translateX(30px); }
+        :root {
+            --primary-color: #3498db;
+            --success-color: #2ecc71;
+            --danger-color: #e74c3c;
+            --bg-color: #f4f7f6;
+            --card-bg: #ffffff;
+        }
 
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        body {
+            font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            margin: 0;
+            overscroll-behavior: none;
+        }
+
+        h2 { color: #2c3e50; margin-bottom: 15px; }
+
+        /* 視訊容器：核心優化 */
+        .camera-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 640px;
+            aspect-ratio: 4/3; /* 鎖定比例避免跳動 */
+            background: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.15);
+            margin-bottom: 20px;
+        }
+
+        video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* 鏡像翻轉類：同時應用於 video 和 canvas 以解決座標錯位 */
+        .mirrored {
+            transform: scaleX(-1);
+            -webkit-transform: scaleX(-1);
+        }
+
+        /* 儀表板設計 */
+        .dashboard {
+            width: 90%;
+            max-width: 600px;
+            background: var(--card-bg);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+            text-align: center;
+            margin-bottom: 20px;
+            transition: all 0.3s ease;
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 20px;
+            font-weight: bold;
+            font-size: 0.9rem;
+            margin-bottom: 10px;
+        }
+
+        .status-loading { background: #fff3cd; color: #856404; }
+        .status-ok { background: #d4edda; color: #155724; }
+        .status-unknown { background: #f8d7da; color: #721c24; }
+
+        .info-text { font-size: 1rem; color: #555; margin: 5px 0; }
+
+        /* 按鈕群組 */
+        .controls {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            width: 100%;
+            max-width: 600px;
+        }
+
+        button {
+            padding: 14px;
+            font-size: 16px;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            color: white;
+            font-weight: 600;
+            transition: transform 0.1s, opacity 0.2s;
+        }
+
+        button:active { transform: scale(0.98); }
+        button:disabled { background-color: #bdc3c7 !important; cursor: not-allowed; opacity: 0.7; }
+        
+        .btn-switch { background-color: var(--primary-color); }
+        .btn-register { background-color: var(--success-color); }
+
+        /* Loading 動畫 */
+        .loader {
+            border: 3px solid #f3f3f3;
+            border-top: 3px solid var(--primary-color);
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            display: inline-block;
+            vertical-align: middle;
+            margin-right: 8px;
+        }
+
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
 
-<div id="app" class="min-h-screen flex flex-col pb-safe" @click="unlockAudio">
-    
-    <div class="fixed top-4 right-4 z-[100] flex flex-col gap-2 pointer-events-none">
-        <transition-group name="toast">
-            <div v-for="toast in toasts" :key="toast.id" class="pointer-events-auto min-w-[300px] max-w-sm bg-white rounded-xl shadow-xl border-l-4 p-4 flex items-center gap-3" :class="{'border-emerald-500': toast.type==='success', 'border-rose-500': toast.type==='error', 'border-amber-500': toast.type==='warning'}">
-                <i class="fa-solid text-xl" :class="{'fa-check-circle text-emerald-500': toast.type==='success', 'fa-times-circle text-rose-500': toast.type==='error', 'fa-exclamation-circle text-amber-500': toast.type==='warning'}"></i>
-                <div><h4 class="font-bold text-slate-800 text-sm">{{ toast.title }}</h4><p class="text-xs text-slate-500">{{ toast.msg }}</p></div>
-            </div>
-        </transition-group>
+    <h2>AI 會員辨識系統 V7.0</h2>
+
+    <div class="camera-wrapper" id="cameraWrapper">
+        <video id="video" autoplay playsinline muted></video>
+        </div>
+
+    <div class="dashboard">
+        <div id="statusBadge" class="status-badge status-loading">
+            <div class="loader"></div>系統初始化中...
+        </div>
+        <div id="resultText" class="info-text">正在連接神經網路模型...</div>
     </div>
 
-    <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
-        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V6.4</h2>
-            <div class="space-y-4">
-                <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
-                <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
-                <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
-                <div><label class="text-xs font-bold text-rose-500">設定管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
-                <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
-            </div>
-        </div>
+    <div class="controls">
+        <button id="switchBtn" class="btn-switch" onclick="toggleCamera()">切換鏡頭</button>
+        <button id="regBtn" class="btn-register" onclick="handleRegistration()" disabled>註冊會員</button>
     </div>
 
-    <header class="bg-white shadow-sm sticky top-0 z-40">
-        <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-100 text-indigo-700 px-2 py-0.5 rounded ml-2">V6.4</span></h1>
-            <div class="flex gap-4 items-center">
-                <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
-                <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
-                <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
-                    <span class="text-indigo-500 flex items-center"><i class="fa-solid fa-cloud mr-1.5"></i>Online</span>
-                    <span class="w-[1px] h-3 bg-slate-300 mx-1"></span>
-                    <span :class="isFaceModelLoaded ? 'text-emerald-500' : 'text-slate-400'" class="flex items-center">
-                        <i class="fa-solid" :class="isFaceModelLoaded ? 'fa-brain' : 'fa-circle-notch fa-spin'"></i>
-                    </span>
-                </div>
-            </div>
-        </div>
-        <div class="flex border-t border-slate-100 bg-white px-2">
-            <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="{'tab-active': currentTab === tab.id}" class="tab-btn flex-1 py-3 text-sm flex justify-center items-center">
-                <i :class="tab.icon" class="mr-1.5"></i>{{ tab.label }}
-            </button>
-        </div>
-    </header>
-
-    <main class="flex-grow p-4 overflow-y-auto bg-slate-50">
-        <div v-show="currentTab === 'self_service'" class="max-w-md mx-auto mt-4 pb-20">
-            <div class="bg-white rounded-3xl shadow-lg overflow-hidden border border-slate-100 p-8 min-h-[60vh] flex flex-col items-center justify-center text-center relative animate-fade-in-up">
-                
-                <div v-if="verifyStatus === 'idle'" class="w-full space-y-6">
-                    <div class="space-y-2">
-                        <i class="fa-solid fa-robot text-5xl text-indigo-500 mb-2"></i>
-                        <h2 class="text-2xl font-black text-slate-800">{{ config.storeName || '智能接待中心' }}</h2>
-                        <p class="text-slate-400 text-sm">請輸入電話或掃臉</p>
-                    </div>
-                    <div class="grid gap-4 mt-6">
-                        <button @click="startHomepageScan" class="w-full py-5 bg-gradient-to-r from-indigo-600 to-blue-600 text-white rounded-2xl shadow-xl hover:scale-[1.02] transition active:scale-95 flex items-center justify-center gap-3">
-                            <i class="fa-solid fa-expand text-xl"></i>
-                            <div class="text-left">
-                                <div class="text-lg font-bold">啟動 AI 迎賓掃描</div>
-                                <div class="text-xs text-indigo-100">已啟用快速通關</div>
-                            </div>
-                        </button>
-                        <div class="grid grid-cols-2 gap-3">
-                            <button @click="searchMode='phone'" class="py-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-600 hover:border-indigo-200 transition">
-                                <i class="fa-solid fa-mobile-screen mb-1 block text-xl text-indigo-400"></i> 電話查詢
-                            </button>
-                            <button @click="openSelfRegister" class="py-4 bg-white border-2 border-slate-100 rounded-xl font-bold text-slate-600 hover:border-indigo-200 transition">
-                                <i class="fa-solid fa-user-plus mb-1 block text-xl text-emerald-400"></i> 新會員註冊
-                            </button>
-                        </div>
-                    </div>
-                    <div v-if="searchMode === 'phone'" class="mt-4 pt-4 border-t animate-fade-in-up relative">
-                         <input v-model="selfServiceInput" type="tel" placeholder="輸入電話號碼..." class="w-full text-center text-xl font-bold py-3 border-b-2 border-slate-200 focus:border-indigo-500 outline-none bg-transparent" @keyup.enter="performVerification">
-                         <button @click="performVerification" :disabled="isLoading" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold mt-3 shadow-md disabled:opacity-50">
-                             <span v-if="isLoading"><i class="fa-solid fa-circle-notch fa-spin mr-2"></i>查詢中...</span>
-                             <span v-else>查詢</span>
-                         </button>
-                    </div>
-                </div>
-
-                <div v-else class="w-full space-y-6 animate-fade-in-up">
-                    <div class="w-24 h-24 rounded-full flex items-center justify-center mx-auto mb-4" :class="verifyStatus === 'success' ? 'bg-emerald-100' : 'bg-rose-100'">
-                        <i class="fa-solid text-5xl" :class="verifyStatus === 'success' ? 'fa-check text-emerald-500' : 'fa-xmark text-rose-500'"></i>
-                    </div>
-                    <div>
-                        <h2 class="text-3xl font-black text-slate-800">{{ verifyStatus === 'success' ? '查詢成功' : '查無資料' }}</h2>
-                        <div v-if="verifyStatus === 'success'" class="mt-3">
-                            <p class="text-2xl font-bold text-indigo-600">{{ verifiedMember?.name }}</p>
-                            <p class="text-gray-500 text-lg">{{ verifiedMember?.phone }}</p>
-                            <p v-if="verifiedMember?.notes" class="text-sm text-slate-500 bg-slate-100 inline-block px-3 py-1 rounded-full mt-2">{{ verifiedMember.notes }}</p>
-                            
-                            <div v-if="verifiedMemberPhoto" class="mt-4 flex justify-center">
-                                <img :src="verifiedMemberPhoto" class="w-32 h-32 rounded-xl object-cover border-4 border-white shadow-lg bg-gray-100">
-                            </div>
-                            <div v-else class="mt-5 mx-4">
-                                <div @click="editMember(verifiedMember)" class="bg-indigo-50 border-2 border-dashed border-indigo-200 rounded-2xl p-4 cursor-pointer hover:bg-indigo-100 transition group animate-pulse">
-                                    <div class="w-12 h-12 bg-white rounded-full flex items-center justify-center mx-auto mb-2 shadow-sm text-indigo-500 group-hover:scale-110 transition">
-                                        <i class="fa-solid fa-camera-rotate text-xl"></i>
-                                    </div>
-                                    <h4 class="font-bold text-indigo-700">尚未建立人臉資料</h4>
-                                    <p class="text-xs text-indigo-500 mt-1">點擊此處補拍照片，啟用快速通關</p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                    <button @click="resetSelfService" class="w-full bg-slate-500 text-white py-3 rounded-xl font-bold mt-6">返回</button>
-                </div>
-            </div>
-        </div>
-
-        <div v-show="currentTab === 'list'" class="space-y-4 max-w-4xl mx-auto animate-fade-in-up">
-             <div class="relative group">
-                 <i class="fa-solid fa-magnifying-glass absolute left-4 top-4 text-slate-400"></i>
-                 <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="搜尋雲端資料庫 (姓名或電話)..." class="w-full pl-11 pr-4 py-3.5 border-0 rounded-2xl shadow-sm bg-white focus:ring-2 focus:ring-indigo-100 outline-none">
-                 <button @click="searchMembers" class="absolute right-2 top-2 bg-indigo-600 text-white px-4 py-1.5 rounded-lg text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
-             </div>
-             <div class="flex justify-between px-1">
-                 <span class="text-sm text-slate-500">顯示最近更新的 50 筆</span>
-                 <button @click="openAdminAdd" class="bg-emerald-600 text-white px-4 py-2 rounded-lg text-sm font-bold shadow hover:bg-emerald-700 transition">+ 新增</button>
-             </div>
-             
-             <div v-if="isLoadingList" class="py-10 text-center text-slate-400">
-                 <i class="fa-solid fa-circle-notch fa-spin text-2xl"></i>
-                 <p class="text-xs mt-2">雲端資料讀取中...</p>
-             </div>
-
-             <div v-else class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                 <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" class="bg-white p-4 rounded-2xl shadow-sm flex items-start gap-4 cursor-pointer border border-slate-100 hover:border-indigo-200 transition relative overflow-hidden">
-                     <div class="w-12 h-12 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 font-bold text-lg flex-shrink-0 border border-slate-200">
-                        {{ m.name ? m.name.charAt(0) : '?' }}
-                     </div>
-                     <div class="flex-1 overflow-hidden">
-                         <div class="flex justify-between items-start">
-                             <b class="truncate block text-lg">{{m.name}}</b>
-                             <span class="text-[10px] text-slate-400 bg-slate-50 px-1 rounded">{{ formatDateSimple(m.updated_at) }}</span>
-                         </div>
-                         <p class="text-xs text-gray-400 truncate">{{m.phone}}</p>
-                         <div class="flex gap-2 mt-1">
-                             <span v-if="m.face_descriptor" class="text-[10px] bg-emerald-50 text-emerald-600 px-1.5 py-0.5 rounded border border-emerald-100">已掃臉</span>
-                             <span v-if="m.notes" class="text-[10px] bg-indigo-50 text-indigo-600 px-1.5 py-0.5 rounded truncate max-w-[80px]">{{m.notes}}</span>
-                         </div>
-                     </div>
-                 </div>
-                 <div v-if="displayMembers.length === 0" class="col-span-full text-center py-10 text-slate-400">
-                     無符合資料
-                 </div>
-             </div>
-        </div>
-
-        <div v-show="currentTab === 'dashboard'" class="max-w-4xl mx-auto animate-fade-in-up pb-20">
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-indigo-500">
-                    <h3 class="text-sm text-slate-500 mb-1">今日來客 (含電話)</h3>
-                    <span class="text-3xl font-bold text-indigo-600">{{stats.todayVisits}}</span>
-                </div>
-                <div class="bg-white p-5 rounded-2xl shadow-sm border-l-4 border-emerald-500">
-                    <h3 class="text-sm text-slate-500 mb-1">資料庫總數</h3>
-                    <span class="text-3xl font-bold text-emerald-600">
-                        {{ totalMemberCount > 0 ? totalMemberCount.toLocaleString() : '...' }}
-                    </span>
-                </div>
-            </div>
-            
-            <div class="mt-6">
-                <h3 class="font-bold text-slate-800 mb-3 flex items-center">
-                    <i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>即時來客紀錄 (最近 50 筆)
-                </h3>
-                <div class="bg-white rounded-2xl shadow-sm border border-slate-100 overflow-hidden">
-                    <div v-if="scanHistory.length === 0" class="p-8 text-center text-slate-400">
-                        <i class="fa-solid fa-mug-hot text-3xl mb-2"></i>
-                        <p class="text-sm">尚無來客資料</p>
-                    </div>
-                    <ul v-else class="divide-y divide-slate-50">
-                        <transition-group name="list">
-                            <li v-for="log in scanHistory" :key="log.id" class="p-4 flex items-center justify-between hover:bg-slate-50 transition">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-bold" :class="log.type === 'phone' ? 'bg-indigo-400' : 'bg-emerald-400'">
-                                        <i class="fa-solid" :class="log.type === 'phone' ? 'fa-phone' : 'fa-camera'"></i>
-                                    </div>
-                                    <div>
-                                        <div class="font-bold text-slate-800">{{ log.name }}</div>
-                                        <div class="text-xs text-slate-400">{{ log.phone || '無電話' }}</div>
-                                    </div>
-                                </div>
-                                <div class="text-right">
-                                    <div class="text-sm font-bold text-slate-600">{{ log.time }}</div>
-                                    <div class="text-[10px] text-slate-400">{{ log.type === 'phone' ? '電話報到' : '刷臉報到' }}</div>
-                                </div>
-                            </li>
-                        </transition-group>
-                    </ul>
-                </div>
-            </div>
-
-            <div class="bg-indigo-50 p-4 rounded-xl mt-4 text-sm text-indigo-700">
-                <p><i class="fa-solid fa-info-circle mr-2"></i><strong>說明：</strong> 「今日來客」統計包含刷臉成功與電話查詢成功的會員。資料庫總數為目前系統內所有會員數量。</p>
-            </div>
-        </div>
-    </main>
-
-    <div v-if="modals.register || modals.form" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-md rounded-3xl max-h-[90vh] flex flex-col shadow-2xl">
-            <div class="px-6 py-4 bg-indigo-600 text-white flex justify-between items-center">
-                <h3 class="font-bold text-lg">{{ modals.register ? '申請加入會員' : '編輯資料' }}</h3>
-                <button @click="closeModals" class="text-white/80 hover:text-white"><i class="fa-solid fa-times text-xl"></i></button>
-            </div>
-            <div class="p-6 overflow-y-auto space-y-4 flex-1">
-                <div v-if="modals.register" class="bg-slate-50 p-4 rounded-xl border border-slate-200 mb-2">
-                    <p class="text-xs text-slate-400 font-bold mb-2">個資保護聲明</p>
-                    <button @click="modals.privacy = true" class="w-full py-2 bg-white border border-indigo-200 text-indigo-600 rounded-lg text-xs font-bold shadow-sm hover:bg-indigo-50 flex items-center justify-center gap-2">
-                        <i class="fa-solid fa-file-contract"></i> 審閱同意書
-                    </button>
-                    <div class="flex items-center gap-2 mt-3 pt-2 border-t border-slate-200">
-                        <input type="checkbox" id="agree_chk" v-model="registerForm.agree" :disabled="!registerForm.hasRead" class="w-4 h-4 rounded accent-indigo-600 disabled:opacity-50">
-                        <label for="agree_chk" class="text-sm font-bold" :class="registerForm.hasRead ? 'text-slate-700' : 'text-slate-400'">我已詳閱並同意</label>
-                    </div>
-                </div>
-                
-                <div class="grid gap-4" :class="{'opacity-50 pointer-events-none': modals.register && !registerForm.agree}">
-                    <div><label class="text-xs font-bold text-slate-500 uppercase">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none"></div>
-                    <div><label class="text-xs font-bold text-slate-500 uppercase">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none"></div>
-                    <div><label class="text-xs font-bold text-slate-500 uppercase">備註 (或 ID)</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-2.5 rounded-xl mt-1 focus:border-indigo-500 outline-none resize-none"></textarea></div>
-                    
-                    <div class="flex gap-4 items-center mt-2">
-                        <div v-if="isLoadingPhoto" class="w-16 h-16 flex items-center justify-center bg-gray-50 border rounded"><i class="fa-solid fa-circle-notch fa-spin text-gray-400"></i></div>
-                        <img v-else-if="activePhoto" :src="activePhoto" class="w-16 h-16 rounded object-cover border bg-gray-50">
-                        <div v-else class="w-16 h-16 bg-gray-100 rounded flex items-center justify-center text-gray-400 text-xs text-center p-1">無照片</div>
-
-                        <button @click="startScanForForm" class="flex-1 py-3 bg-slate-100 hover:bg-slate-200 rounded-xl font-bold text-slate-600 text-sm flex items-center justify-center gap-2 transition">
-                            <i class="fa-solid fa-camera"></i> {{ activeForm.face_descriptor ? '重拍照片' : '拍攝人臉' }}
-                        </button>
-                    </div>
-
-                    <div v-if="modals.form && activeForm.created_at" class="mt-4 pt-4 border-t border-slate-100 text-[10px] text-slate-400 grid grid-cols-2 gap-2">
-                        <div>
-                            <span class="block font-bold text-slate-500">註冊時間</span>
-                            {{ formatDate(activeForm.created_at) }}
-                        </div>
-                        <div class="text-right">
-                            <span class="block font-bold text-slate-500">最後修訂</span>
-                            {{ formatDate(activeForm.updated_at) }}
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="p-4 border-t bg-slate-50 flex gap-3">
-                <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
-                <button @click="submitForm" :disabled="(modals.register && !registerForm.agree) || isLoadingPhoto" class="flex-1 py-3 bg-indigo-600 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-indigo-700">儲存資料</button>
-            </div>
-        </div>
-    </div>
-
-    <div v-if="modals.privacy" class="fixed inset-0 bg-black/80 z-[70] flex items-center justify-center p-6">
-        <div class="bg-white w-full max-w-lg rounded-2xl flex flex-col max-h-[85vh]">
-            <div class="p-4 border-b font-bold text-lg bg-indigo-50 rounded-t-2xl">會員個人資料蒐集告知聲明</div>
-            <div class="p-6 overflow-y-auto text-sm text-slate-700 leading-relaxed space-y-4">
-                <p><strong>{{ config.storeName || '本公司' }}</strong> 依據個資法，蒐集您的資料（姓名、電話、人臉影像等）用於會員管理與身分識別。您可隨時請求刪除。若拒絕提供人臉資料，將無法使用 AI 快速通關。</p>
-            </div>
-            <div class="p-4 border-t bg-slate-50 rounded-b-2xl">
-                <button @click="confirmPrivacy" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 shadow-lg">本人已詳閱並同意</button>
-            </div>
-        </div>
-    </div>
-
-    <div v-show="modals.faceScan" class="fixed inset-0 bg-black z-[60] flex flex-col">
-        <div id="video-container" class="relative w-full h-[35vh] bg-black overflow-hidden border-b border-white/20">
-            <button @click="stopFaceScan" class="absolute top-4 right-4 w-10 h-10 rounded-full bg-black/40 backdrop-blur-md text-white z-40 border border-white/10 flex items-center justify-center active:scale-95"><i class="fa-solid fa-times"></i></button>
-            <select v-model="currentDeviceId" @change="handleCameraSwitch" class="absolute top-4 left-4 bg-black/40 text-white border border-white/20 py-2 pl-4 pr-8 rounded-full text-xs backdrop-blur-md outline-none appearance-none z-40 max-w-[150px]">
-                <option value="">切換鏡頭</option>
-                <option v-for="cam in videoDevices" :key="cam.deviceId" :value="cam.deviceId">{{ cam.label || 'Camera' }}</option>
-            </select>
-
-            <video id="video" autoplay muted playsinline class="w-full h-full object-cover"></video>
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                 <div class="w-48 h-48 border-2 border-white/30 rounded-full relative overflow-hidden"><div class="scan-line"></div></div>
-            </div>
-            <div class="absolute bottom-2 left-4 text-white/50 text-[10px]">AI Running @ {{ fps }} FPS</div>
-        </div>
-
-        <div v-if="app.scanMode === 'homepage_scan'" class="flex-1 bg-slate-900 overflow-hidden flex flex-col">
-            <div class="p-4 border-b border-white/10 bg-slate-800/50 backdrop-blur-sm">
-                <h3 class="text-white font-bold flex items-center gap-2"><i class="fa-solid fa-history text-indigo-400"></i> 即時掃描歷程</h3>
-            </div>
-            <div class="flex-1 overflow-y-auto p-4 space-y-3 no-scrollbar">
-                <transition-group name="list">
-                    <div v-for="log in scanHistory" :key="log.id" class="bg-white/10 rounded-xl p-3 flex gap-3 items-center border border-white/5 shadow-lg">
-                        <img :src="log.photo" class="w-14 h-14 rounded-full object-cover border-2" :class="log.type==='phone'?'border-indigo-500':(log.type==='member'?'border-emerald-500':'border-slate-500')">
-                        <div class="flex-1 overflow-hidden">
-                            <div class="flex justify-between items-start"><h4 class="text-white font-bold truncate text-lg">{{ log.name }}</h4><span class="text-xs text-slate-400">{{ log.time }}</span></div>
-                            <p v-if="log.type==='member' || log.type==='phone'" class="text-sm text-emerald-400 truncate">{{ log.type==='phone' ? '電話報到' : '一般會員' }}</p>
-                            <p v-else class="text-sm text-slate-400">新訪客</p>
-                        </div>
-                    </div>
-                </transition-group>
-                <div v-if="scanHistory.length === 0" class="text-center text-slate-600 mt-10">
-                    <p class="text-sm">等待會員經過...</p>
-                </div>
-            </div>
-        </div>
-        
-        <div v-if="app.scanMode === 'register'" class="flex-1 bg-black flex flex-col items-center justify-center text-white/70 p-8 text-center">
-            <i class="fa-solid fa-camera text-4xl mb-4"></i>
-            <p>請將臉部對準上方圓框</p>
-            <p class="text-sm mt-2">偵測成功將自動拍照</p>
-        </div>
-    </div>
-    
-    <div v-if="modals.io" class="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
-        <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl text-center">
-            <h3 class="font-bold text-lg mb-4">智慧資料匯入/匯出</h3>
-            
-            <div class="text-left text-xs text-slate-500 bg-slate-50 p-3 rounded-lg mb-4 space-y-1">
-                <p><strong>自動對應：</strong></p>
-                <p>• A欄 -> ID</p>
-                <p>• B欄 -> 姓名</p>
-                <p>• C欄 -> 電話</p>
-                <p class="text-rose-500 mt-2 font-bold">相同 ID 或 電話 將自動合併，不產生重覆。</p>
-            </div>
-
-            <div class="space-y-3">
-                <button @click="exportFastExcel" class="w-full py-3 bg-white text-slate-700 rounded-xl font-bold border-2 border-slate-200 hover:bg-slate-50 flex items-center justify-center gap-2">
-                     <i v-if="!isExporting" class="fa-solid fa-download"></i>
-                     <i v-else class="fa-solid fa-circle-notch fa-spin"></i>
-                     匯出會員資料 (Excel)
-                </button>
-
-                <div class="relative w-full py-3 bg-indigo-600 text-white rounded-xl font-bold border border-indigo-600 hover:bg-indigo-700 flex items-center justify-center gap-2 cursor-pointer group shadow-lg">
-                    <i v-if="!isImporting" class="fa-solid fa-upload"></i>
-                    <i v-else class="fa-solid fa-circle-notch fa-spin"></i>
-                    {{ isImporting ? `匯入中 ${importProgress}%` : '選擇 Excel 檔案匯入' }}
-                    <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
-                </div>
-            </div>
-            <button @click="modals.io=false" class="mt-6 text-gray-400 py-2" :disabled="isImporting">關閉</button>
-        </div>
-    </div>
-</div>
-
-<script>
-const { createApp, ref, computed, onMounted, reactive } = Vue;
-
-const app = createApp({
-    setup() {
-        const config = reactive({ url: '', key: '', adminPwd: '', storeName: '' });
-        const isConfigured = ref(false);
-        const displayMembers = ref([]); 
-        const aiMembers = ref([]); 
-        const totalMemberCount = ref(0); 
-        
-        const toasts = ref([]);
-        const isLoading = ref(false);
-        const isLoadingList = ref(false);
-        const isLoadingPhoto = ref(false);
-        const isImporting = ref(false);
-        const isExporting = ref(false);
-        const importProgress = ref(0);
-        
-        const currentTab = ref('self_service');
-        const searchQuery = ref('');
-        const modals = reactive({ form: false, faceScan: false, io: false, register: false, privacy: false });
-        const tabs = [{id:'self_service', label:'首頁', icon:'fa-solid fa-home'},{id:'list', label:'雲端列表', icon:'fa-solid fa-list-ul'},{id:'dashboard', label:'分析', icon:'fa-solid fa-chart-line'}];
-
-        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, search_history: [], face_descriptor: null, created_at: null, updated_at: null });
-        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, face_descriptor: null, agree: false, hasRead: false });
-        const activeForm = computed(() => modals.register ? registerForm : form);
-        const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
-
-        const isFaceModelLoaded = ref(false);
-        const verifyStatus = ref('idle');
-        const verifiedMember = ref(null);
-        const verifiedMemberPhoto = ref(null);
-        const searchMode = ref(''); 
-        const selfServiceInput = ref('');
-        
-        const scanHistory = ref([]); // 這是儀表板和掃描頁共用的歷史紀錄
-        const fps = ref(0);
-        const memberCooldowns = reactive({});
-        const lastUnknownScan = ref(0);
-
-        const videoDevices = ref([]);
-        const currentDeviceId = ref('');
-        
-        let supabase = null;
-        let faceMatcher = null;
-        let videoStream = null;
-        let isScanning = false;
-        let lastFpsTime = 0;
-        let frameCount = 0;
-        let audioContext = null;
-
-        const stopFaceScan = () => { isScanning = false; modals.faceScan = false; if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } };
-        const closeModals = () => { modals.form = false; modals.register = false; modals.faceScan = false; modals.io = false; stopFaceScan(); };
-
-        const showToast = (msg, type='success', title='提示') => {
-            const id = Date.now();
-            toasts.value.push({ id, msg, type, title });
-            setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 3000);
+    <script>
+        // --- 設定與狀態變數 ---
+        const CONFIG = {
+            modelUrl: 'https://justadudewhohacks.github.io/face-api.js/models',
+            matchThreshold: 0.45,  // 嚴格度 (越低越嚴格)
+            minConfidence: 0.5,    // 偵測信心門檻
+            inputSize: 320         // 降低輸入尺寸以提升 FPS (原本預設通常較大)
         };
 
-        const playSound = (type) => {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') audioContext.resume();
-            const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
-            osc.connect(gain); gain.connect(audioContext.destination);
-            osc.type = type === 'success' ? 'sine' : 'square';
-            osc.frequency.setValueAtTime(type==='success'?880:150, audioContext.currentTime);
-            gain.gain.setValueAtTime(0.1, audioContext.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
-            osc.start(); osc.stop(audioContext.currentTime + 0.3);
-        };
-        const unlockAudio = () => { if(!audioContext) playSound('success'); };
-
-        const formatDate = (isoString) => {
-            if (!isoString) return '--';
-            return new Date(isoString).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' });
+        const STATE = {
+            isModelLoaded: false,
+            isDetecting: false,    // 防止堆疊偵測迴圈
+            currentFacingMode: 'user',
+            labeledDescriptors: [],
+            faceMatcher: null,
+            videoEl: document.getElementById('video'),
+            canvasEl: null
         };
 
-        const formatDateSimple = (isoString) => {
-            if (!isoString) return '';
-            const d = new Date(isoString);
-            return `${d.getMonth()+1}/${d.getDate()} ${d.getHours()}:${d.getMinutes().toString().padStart(2,'0')}`;
-        };
+        // 預先實例化 Options，避免在迴圈中重複建立 (記憶體優化)
+        let detectOptions;
 
-        const fetchTotalCount = async () => {
-            if(!supabase) return;
-            const { count, error } = await supabase.from('members').select('*', { count: 'exact', head: true });
-            if(!error) totalMemberCount.value = count;
-        };
-
-        const initSystemData = async () => {
-            if(!supabase) return;
-            const { data, error } = await supabase.from('members').select('id, name, face_descriptor, notes').not('face_descriptor', 'is', null);
-            if(!error && data) {
-                aiMembers.value = data;
-                if(data.length > 0) {
-                    const labeled = data.map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
-                    faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
-                }
-            }
-            searchMembers('');
-            fetchTotalCount();
-        };
-
-        const searchMembers = async (overrideQuery) => {
-            if(!supabase) return;
-            isLoadingList.value = true;
-            let query = supabase.from('members').select('id, name, phone, notes, face_descriptor, updated_at, created_at').order('updated_at', {ascending:false}).limit(50);
-            const q = (typeof overrideQuery === 'string' ? overrideQuery : searchQuery.value).trim();
-            if(q) {
-                query = supabase.from('members').select('*').or(`name.ilike.%${q}%,phone.ilike.%${q}%`).limit(50);
-            }
-            const { data, error } = await query;
-            if(error) showToast(error.message, 'error');
-            else displayMembers.value = data || [];
-            isLoadingList.value = false;
-        };
-
-        // --- 核心報到邏輯 (統一處理 Face 與 Phone) ---
-        const handleCheckIn = async (member, type) => {
-            // 防抖動 (僅針對刷臉)
-            const now = Date.now();
-            if (type === 'face' && now - (memberCooldowns[member.id]||0) < 180000) return;
-            memberCooldowns[member.id] = now;
-
-            // 1. 介面回饋
-            verifyStatus.value = 'success';
-            verifiedMember.value = member;
-            verifiedMemberPhoto.value = member.photo; // 從 DB 拉到的照片字串
-            playSound('success');
-
-            // 2. 加入即時歷史紀錄 (儀表板與掃描頁都會用到)
-            const timeStr = new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            scanHistory.value.unshift({ 
-                id: now, 
-                name: member.name, 
-                phone: member.phone,
-                type: type === 'face' ? 'member' : 'phone', // 區分來源
-                notes: member.notes, 
-                photo: member.photo, 
-                time: timeStr 
-            });
-            // 保持最新 50 筆
-            if (scanHistory.value.length > 50) scanHistory.value.pop();
-
-            // 3. 背景更新資料庫 (紀錄最後來店時間)
-            if(supabase) {
-                await supabase.from('members').update({ updated_at: new Date() }).eq('id', member.id);
-            }
-        };
-
-        const performVerification = async () => {
-            const val = selfServiceInput.value.trim();
-            if(!val) return showToast('請輸入電話', 'warning');
-            
-            isLoading.value = true;
-            const { data, error } = await supabase.from('members').select('*').eq('phone', val).single();
-            isLoading.value = false;
-
-            if(data) {
-                // 呼叫統一報到函式
-                await handleCheckIn(data, 'phone');
-            } else { 
-                verifyStatus.value = 'fail'; 
-                playSound('fail'); 
-                setTimeout(()=>verifyStatus.value='idle', 2000); 
-            }
-        };
-
-        const fetchMemberPhoto = async (id) => {
-            const { data } = await supabase.from('members').select('photo').eq('id', id).single();
-            return data?.photo || null;
-        };
-
-        const editMember = async (m) => {
-            isLoadingPhoto.value = true;
-            Object.assign(form, JSON.parse(JSON.stringify(m)));
-            form.photo = null; 
-            modals.form = true; 
-            modals.register = false;
-            const photo = await fetchMemberPhoto(m.id);
-            form.photo = photo;
-            isLoadingPhoto.value = false;
-        };
-
-        const submitForm = async () => {
-            const target = modals.register ? registerForm : form;
-            if(!target.name || !target.phone) return showToast('資料不完整', 'warning');
-            isLoading.value = true;
+        // --- 核心功能 1: 初始化 ---
+        async function initSystem() {
             try {
-                const payload = { ...target };
-                delete payload.agree; delete payload.hasRead; 
+                updateStatus('loading', '正在下載 AI 模型 (約 5MB)...');
                 
-                if(!modals.register && payload.id) {
-                    const { error } = await supabase.from('members').update({...payload, updated_at: new Date()}).eq('id', payload.id);
-                    if(error) throw error;
-                    showToast('更新成功');
-                } else {
-                    payload.id = Date.now().toString(); payload.created_at = new Date(); payload.updated_at = new Date();
-                    const { error } = await supabase.from('members').insert(payload);
-                    if(error) throw error;
-                    showToast('註冊成功');
-                }
-                closeModals(); initSystemData(); resetSelfService();
-            } catch(e) { showToast(e.message, 'error'); } finally { isLoading.value = false; }
-        };
+                // 並行下載模型
+                await Promise.all([
+                    faceapi.nets.ssdMobilenetv1.loadFromUri(CONFIG.modelUrl),
+                    faceapi.nets.faceLandmark68Net.loadFromUri(CONFIG.modelUrl),
+                    faceapi.nets.faceRecognitionNet.loadFromUri(CONFIG.modelUrl)
+                ]);
 
-        const deleteMember = async () => { if(!confirm('確定刪除？')) return; const { error } = await supabase.from('members').delete().eq('id', form.id); if(error) showToast('刪除失敗', 'error'); else { showToast('已刪除'); closeModals(); initSystemData(); } };
-        const confirmPrivacy = () => { registerForm.hasRead = true; registerForm.agree = true; modals.privacy = false; };
-        const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; verifiedMemberPhoto.value = null; };
-
-        const exportFastExcel = async () => {
-            if(!confirm('由於資料量大，將只匯出前 1000 筆最新資料。\n確定匯出？')) return;
-            isExporting.value = true;
-            try {
-                const { data, error } = await supabase.from('members').select('id, name, phone, notes, created_at, updated_at').order('updated_at', {ascending: false}).limit(1000);
-                if(error) throw error;
-                const wb = new ExcelJS.Workbook(); 
-                const ws = wb.addWorksheet('Members');
-                ws.columns = [
-                    {header:'ID',key:'id'}, {header:'Name',key:'name'}, {header:'Phone',key:'phone'}, 
-                    {header:'Notes',key:'notes'}, {header:'Created',key:'created_at'}, {header:'Updated',key:'updated_at'}
-                ];
-                if(data && data.length > 0) {
-                    data.forEach(m => ws.addRow(m));
-                    const buffer = await wb.xlsx.writeBuffer(); 
-                    saveAs(new Blob([buffer]), `members_export_v6.4.xlsx`);
-                    showToast('匯出完成');
-                } else {
-                    showToast('無資料可匯出', 'warning');
-                }
-            } catch(e) { showToast('匯出失敗: '+e.message, 'error'); } finally { isExporting.value = false; }
-        };
-
-        const handleImport = async (e) => {
-            const file = e.target.files[0]; 
-            if (!file) return; 
-            isImporting.value = true;
-            importProgress.value = 0;
-            try {
-                const buffer = await file.arrayBuffer(); 
-                const wb = new ExcelJS.Workbook(); 
-                await wb.xlsx.load(buffer); 
-                const ws = wb.getWorksheet(1);
-                
-                const membersToUpsert = [];
-                const seenPhones = new Set();
-                const seenIds = new Set();
-                let idxId = 1; let idxName = 2; let idxPhone = 3; let idxNotes = 4;
-                const headerRow = ws.getRow(1).values; 
-                let hasHeader = false;
-                
-                if(Array.isArray(headerRow)) {
-                    headerRow.forEach((val, idx) => {
-                        if(!val) return;
-                        const v = val.toString().toLowerCase();
-                        if(v.includes('姓名') || v.includes('name')) { idxName = idx; hasHeader = true; }
-                        else if(v.includes('電話') || v.includes('mobile') || v.includes('phone')) { idxPhone = idx; hasHeader = true; }
-                        else if(v.includes('id') || v.includes('編號')) { idxId = idx; hasHeader = true; }
-                    });
-                }
-                
-                ws.eachRow((row, rowNumber) => {
-                    if(hasHeader && rowNumber === 1) return;
-                    let id = row.getCell(idxId).text?.trim(); 
-                    let name = row.getCell(idxName).text?.trim();
-                    let phone = row.getCell(idxPhone).text?.trim();
-                    let notes = (idxNotes > 0) ? row.getCell(idxNotes).text?.trim() : '';
-                    if(name && phone) {
-                        if(seenPhones.has(phone)) return;
-                        if(id && seenIds.has(id)) return;
-                        seenPhones.add(phone);
-                        if(id) seenIds.add(id);
-                        if(!id) id = Date.now() + Math.random().toString(36).substr(2, 5);
-                        membersToUpsert.push({
-                            id: id,
-                            name: name,
-                            phone: phone,
-                            notes: notes,
-                            updated_at: new Date()
-                        });
-                    }
+                // 初始化偵測選項
+                detectOptions = new faceapi.SsdMobilenetv1Options({ 
+                    minConfidence: CONFIG.minConfidence 
                 });
 
-                if(membersToUpsert.length === 0) throw new Error("無有效資料");
+                STATE.isModelLoaded = true;
+                updateStatus('ok', '模型就緒，啟動相機...');
+                await startCamera();
 
-                const BATCH_SIZE = 500;
-                const total = membersToUpsert.length;
-                let processed = 0;
+            } catch (err) {
+                console.error(err);
+                updateStatus('unknown', '錯誤：模型載入失敗，請檢查網路');
+            }
+        }
 
-                for (let i = 0; i < total; i += BATCH_SIZE) {
-                    const batch = membersToUpsert.slice(i, i + BATCH_SIZE);
-                    const { error } = await supabase.from('members').upsert(batch, { onConflict: 'id' });
-                    if (error) console.error('Batch error:', error);
-                    processed += batch.length;
-                    importProgress.value = Math.floor((processed / total) * 100);
+        // --- 核心功能 2: 相機管理 ---
+        async function startCamera() {
+            // 停止舊串流
+            if (STATE.videoEl.srcObject) {
+                STATE.videoEl.srcObject.getTracks().forEach(track => track.stop());
+            }
+
+            const constraints = {
+                video: {
+                    facingMode: STATE.currentFacingMode,
+                    width: { ideal: 1280 },
+                    height: { ideal: 720 }
                 }
-                showToast(`成功匯入 ${processed} 筆`);
-                modals.io = false;
-                initSystemData();
-            } catch(e) { showToast('匯入失敗: ' + e.message, 'error'); } finally { isImporting.value = false; e.target.value = ''; }
-        };
+            };
 
-        onMounted(async () => {
-            const saved = localStorage.getItem('supabase_config_v6');
-            if(saved) { try { Object.assign(config, JSON.parse(saved)); if(config.url) initSupabase(); } catch(e){} }
-            const URL = 'https://justadudewhohacks.github.io/face-api.js/models';
             try {
-                await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(URL),faceapi.nets.faceLandmark68Net.loadFromUri(URL),faceapi.nets.faceRecognitionNet.loadFromUri(URL)]);
-                isFaceModelLoaded.value = true;
-            } catch(e) { showToast('AI 模型載入失敗', 'error'); }
-            try { await navigator.mediaDevices.getUserMedia({ video: true }); const d = await navigator.mediaDevices.enumerateDevices(); videoDevices.value = d.filter(k=>k.kind==='videoinput'); const b = videoDevices.value.find(l=>l.label.toLowerCase().includes('back')); if(b) currentDeviceId.value = b.deviceId; } catch(e){}
-        });
+                const stream = await navigator.mediaDevices.getUserMedia(constraints);
+                STATE.videoEl.srcObject = stream;
+                
+                // 等待影片 Metadata 載入完畢才開始偵測
+                STATE.videoEl.onloadedmetadata = () => {
+                    STATE.videoEl.play();
+                    handleMirroring();
+                    startDetectionLoop();
+                };
+            } catch (err) {
+                updateStatus('unknown', '無法存取相機 (HTTPS Required)');
+            }
+        }
 
-        const initSupabase = () => {
-            if(!config.url || !config.key) return;
-            try { supabase = window.supabase.createClient(config.url, config.key); isConfigured.value = true; initSystemData(); } catch(e) { showToast('連線失敗', 'error'); }
-        };
+        function handleMirroring() {
+            const wrapper = document.getElementById('cameraWrapper');
+            // 如果是前鏡頭，將整個容器 (Video + Canvas) 一起翻轉
+            if (STATE.currentFacingMode === 'user') {
+                wrapper.classList.add('mirrored');
+            } else {
+                wrapper.classList.remove('mirrored');
+            }
+        }
 
-        const startVideo = async () => {
-            if(!isFaceModelLoaded.value) { showToast('AI 初始化中...', 'warning'); return null; }
-            const v = document.getElementById('video');
+        function toggleCamera() {
+            STATE.currentFacingMode = STATE.currentFacingMode === 'user' ? 'environment' : 'user';
+            startCamera();
+        }
+
+        // --- 核心功能 3: 高效偵測迴圈 ---
+        async function startDetectionLoop() {
+            // 清理舊 Canvas
+            const wrapper = document.getElementById('cameraWrapper');
+            const oldCanvas = wrapper.querySelector('canvas');
+            if (oldCanvas) oldCanvas.remove();
+
+            // 建立新 Canvas
+            STATE.canvasEl = faceapi.createCanvasFromMedia(STATE.videoEl);
+            wrapper.append(STATE.canvasEl);
+            
+            const displaySize = { width: STATE.videoEl.videoWidth, height: STATE.videoEl.videoHeight };
+            faceapi.matchDimensions(STATE.canvasEl, displaySize);
+
+            // 啟動迴圈
+            detectFrame();
+        }
+
+        async function detectFrame() {
+            // 如果視訊暫停或結束，停止迴圈
+            if (STATE.videoEl.paused || STATE.videoEl.ended || !STATE.isModelLoaded) {
+                return requestAnimationFrame(detectFrame);
+            }
+
+            // 鎖定機制：如果上一幀還沒算完，這幀先跳過 (避免卡頓)
+            if (STATE.isDetecting) {
+                return requestAnimationFrame(detectFrame);
+            }
+
+            STATE.isDetecting = true;
+
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined, width: { ideal: 640 }, height: { ideal: 480 } } });
-                v.srcObject = stream; videoStream = stream;
-                return new Promise(r => v.onloadedmetadata = () => { v.play(); r(v); });
-            } catch(e) { showToast('無法啟動相機', 'error'); return null; }
-        };
+                // 1. 偵測人臉
+                const detections = await faceapi.detectAllFaces(STATE.videoEl, detectOptions)
+                    .withFaceLandmarks()
+                    .withFaceDescriptors();
 
-        const captureFace = (video, box) => {
-            const canvas = document.createElement('canvas'); const pad = 50;
-            canvas.width = 150; canvas.height = 150;
-            const ctx = canvas.getContext('2d');
-            ctx.drawImage(video, Math.max(0, box.x-pad), Math.max(0, box.y-pad), box.width+pad*2, box.height+pad*2, 0, 0, 150, 150);
-            return canvas.toDataURL('image/jpeg', 0.8);
-        };
+                // 2. 調整尺寸
+                const displaySize = { width: STATE.videoEl.videoWidth, height: STATE.videoEl.videoHeight };
+                const resizedDetections = faceapi.resizeResults(detections, displaySize);
 
-        // 統一的掃描迴圈 (AI)
-        const scanningLoop = async (video) => {
-            if(!isScanning || !modals.faceScan) return;
-            const now = Date.now();
-            if(now - lastFpsTime >= 1000) { fps.value = frameCount; frameCount = 0; lastFpsTime = now; }
-            frameCount++;
-            try {
-                const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
-                if(detection) {
-                    const box = detection.detection.box;
-                    // 註冊模式
-                    if(app.scanMode === 'register') {
-                        isScanning = false;
-                        const cvs = document.createElement('canvas'); cvs.width=300; cvs.height=300;
-                        const ctx = cvs.getContext('2d'); const pad=50;
-                        ctx.drawImage(video, box.x-pad, box.y-pad, box.width+pad*2, box.height+pad*2, 0,0,300,300);
-                        const photo = cvs.toDataURL('image/jpeg', 0.8);
-                        const desc = Array.from(detection.descriptor);
-                        if(modals.register) { registerForm.photo=photo; registerForm.face_descriptor=desc; } else { form.photo=photo; form.face_descriptor=desc; }
-                        playSound('success'); stopFaceScan(); return;
-                    }
-                    // 刷臉模式
-                    if(app.scanMode === 'homepage_scan' && faceMatcher) {
-                        const match = faceMatcher.findBestMatch(detection.descriptor);
-                        if(match.label !== 'unknown') {
-                            const m = aiMembers.value.find(x => x.id === match.label); 
-                            if(m) {
-                                // 呼叫統一報到函式
-                                // 傳入的 member 物件需要稍微補充屬性以符合 handleCheckIn
-                                const fullMember = { ...m, photo: captureFace(video, box) }; 
-                                handleCheckIn(fullMember, 'face');
-                            }
-                        } else {
-                            if(now - lastUnknownScan.value > 5000) {
-                                lastUnknownScan.value = now;
-                                scanHistory.value.unshift({ 
-                                    id: now, name: '訪客', type: 'guest', time: new Date().toLocaleTimeString('zh-TW', {hour:'2-digit', minute:'2-digit'}), photo: captureFace(video, box) 
-                                });
-                                if (scanHistory.value.length > 50) scanHistory.value.pop();
-                            }
-                        }
-                    }
+                // 3. 清空畫布
+                const ctx = STATE.canvasEl.getContext('2d');
+                ctx.clearRect(0, 0, STATE.canvasEl.width, STATE.canvasEl.height);
+
+                // 4. 比對與繪製
+                if (resizedDetections.length > 0) {
+                    processDetections(resizedDetections);
+                } else {
+                    updateStatus('ok', '監控中...');
+                    document.getElementById('regBtn').disabled = true;
                 }
-            } catch(e){}
-            if(isScanning) requestAnimationFrame(() => scanningLoop(video));
-        };
 
-        const startScan = async (mode) => { app.scanMode = mode; modals.faceScan = true; isScanning = true; const v = await startVideo(); if(v) scanningLoop(v); };
-        
-        const saveConfig = () => { localStorage.setItem('supabase_config_v6', JSON.stringify(config)); initSupabase(); };
-        const resetConfigSecure = () => { if(prompt("密碼")===(config.adminPwd||'0000')) { localStorage.removeItem('supabase_config_v6'); location.reload(); } };
-        
-        // 統計邏輯：計算 scanHistory 中非 'guest' 的數量
-        const stats = computed(() => { 
-            const count = scanHistory.value.filter(log => log.type === 'member' || log.type === 'phone').length;
-            return { todayVisits: count }; 
-        });
+            } catch (error) {
+                console.error("Detection Error:", error);
+            } finally {
+                STATE.isDetecting = false;
+                requestAnimationFrame(detectFrame); // 請求下一幀
+            }
+        }
 
-        app.scanMode = ''; 
-        return {
-            config, isConfigured, saveConfig, resetConfigSecure, checkAdmin: (cb) => { const p=prompt('Pwd?'); if(p===(config.adminPwd||'0000'))cb(); else alert('Err'); },
-            displayMembers, aiMembers, totalMemberCount, searchMembers, searchQuery, isLoading, isLoadingList, isLoadingPhoto, isImporting, isExporting, importProgress, handleImport, exportFastExcel,
-            currentTab, tabs, modals, closeModals, confirmPrivacy,
-            form, registerForm, activeForm, activePhoto, submitForm, deleteMember, editMember,
-            openAdminAdd: () => { Object.assign(form, {id:null,name:'',phone:'',notes:'',photo:null,face_descriptor:null, created_at:null, updated_at:null}); modals.form=true; modals.register=false; },
-            openSelfRegister: () => { Object.assign(registerForm, {name:'',phone:'',notes:'',photo:null,face_descriptor:null, agree:false, hasRead:false}); modals.register=true; modals.form=false; },
-            startScanForForm: () => startScan('register'), startHomepageScan: () => startScan('homepage_scan'),
-            stopFaceScan, handleCameraSwitch: async () => { if(videoStream) { stopFaceScan(); await startScan(app.scanMode); } },
-            selfServiceInput, searchMode, verifyStatus, verifiedMember, verifiedMemberPhoto, performVerification, resetSelfService,
-            stats, isFaceModelLoaded, videoDevices, currentDeviceId, scanHistory, fps, app, unlockAudio, toasts, formatDate, formatDateSimple
-        };
-    }
-});
-app.mount('#app');
-</script>
+        // --- 核心功能 4: 辨識邏輯與 UI ---
+        function processDetections(detections) {
+            // 如果沒有註冊資料，全部視為陌生人
+            if (STATE.labeledDescriptors.length === 0) {
+                faceapi.draw.drawDetections(STATE.canvasEl, detections);
+                updateStatus('unknown', '偵測到陌生訪客 (未建立資料庫)');
+                document.getElementById('regBtn').disabled = false;
+                return;
+            }
+
+            // 建立 Matcher (建議：若人數多，Matcher 應緩存，不要每幀重建)
+            if (!STATE.faceMatcher) {
+                STATE.faceMatcher = new faceapi.FaceMatcher(STATE.labeledDescriptors, CONFIG.matchThreshold);
+            }
+
+            detections.forEach(d => {
+                const bestMatch = STATE.faceMatcher.findBestMatch(d.descriptor);
+                const { label, distance } = bestMatch;
+                
+                // 繪製框框
+                const box = d.detection.box;
+                const drawBox = new faceapi.draw.DrawBox(box, { 
+                    label: label === 'unknown' ? "陌生人" : `${label} (${Math.round((1-distance)*100)}%)`,
+                    boxColor: label === 'unknown' ? '#e74c3c' : '#2ecc71'
+                });
+                drawBox.draw(STATE.canvasEl);
+
+                // 更新 UI
+                if (label === 'unknown') {
+                    updateStatus('unknown', '陌生訪客 - 請註冊');
+                    document.getElementById('regBtn').disabled = false;
+                } else {
+                    updateStatus('ok', `歡迎會員：${label}`);
+                    document.getElementById('regBtn').disabled = true;
+                }
+            });
+        }
+
+        // --- 核心功能 5: 註冊流程 ---
+        async function handleRegistration() {
+            document.getElementById('regBtn').disabled = true;
+            
+            // 暫停偵測迴圈以獲得準確的單張快照
+            const wasDetecting = STATE.isDetecting;
+            STATE.isDetecting = true; 
+
+            const name = prompt("請輸入會員姓名：");
+            if (!name) {
+                STATE.isDetecting = false; // 恢復迴圈
+                return;
+            }
+
+            updateStatus('loading', `正在分析 ${name} 的臉部特徵...`);
+
+            try {
+                // 使用最精確的單一人臉偵測進行註冊
+                const detection = await faceapi.detectSingleFace(STATE.videoEl, detectOptions)
+                    .withFaceLandmarks()
+                    .withFaceDescriptor();
+
+                if (detection) {
+                    // 加入資料庫
+                    const newDescriptor = new faceapi.LabeledFaceDescriptors(name, [detection.descriptor]);
+                    STATE.labeledDescriptors.push(newDescriptor);
+                    
+                    // 強制更新 Matcher
+                    STATE.faceMatcher = new faceapi.FaceMatcher(STATE.labeledDescriptors, CONFIG.matchThreshold);
+                    
+                    alert(`註冊成功！系統已記錄 ${name}`);
+                } else {
+                    alert("註冊失敗：影像模糊或未偵測到人臉，請再試一次。");
+                }
+            } catch (e) {
+                console.error(e);
+                alert("系統錯誤");
+            } finally {
+                STATE.isDetecting = false; // 恢復迴圈
+            }
+        }
+
+        // --- 輔助：更新狀態 UI ---
+        function updateStatus(type, text) {
+            const badge = document.getElementById('statusBadge');
+            const result = document.getElementById('resultText');
+            
+            result.innerText = text;
+            badge.className = `status-badge status-${type}`;
+            
+            if (type === 'loading') {
+                badge.innerHTML = '<div class="loader"></div>處理中';
+            } else if (type === 'ok') {
+                badge.innerText = '系統正常';
+            } else {
+                badge.innerText = '待命/警示';
+            }
+        }
+
+        // 啟動點
+        window.addEventListener('load', initSystem);
+
+    </script>
 </body>
 </html>
