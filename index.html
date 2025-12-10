@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V7.2 (V6.6 引擎版)</title>
+    <title>AI 智能會員系統 V7.3 (HD 高畫質版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -28,8 +28,20 @@
         .numpad-btn { transition: all 0.1s; box-shadow: 0 4px 0 #cbd5e1; }
         .numpad-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #cbd5e1; }
         
-        #video-container video { width: 100%; height: 100%; object-fit: cover; }
-        .beauty-filter { filter: saturate(1.1) brightness(1.1) contrast(1.05) blur(0.4px); }
+        /* V7.3 更新重點：鏡像翻轉與濾鏡優化 
+           transform: scaleX(-1) -> 解決左右顛倒問題
+           filter: ... -> 加強銳利度與亮度
+        */
+        #video-container video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: cover; 
+            transform: scaleX(-1); 
+        }
+        .beauty-filter { 
+            filter: saturate(1.1) brightness(1.1) contrast(1.1); 
+        }
+
         .scan-line { position: absolute; width: 100%; height: 2px; background: #4f46e5; box-shadow: 0 0 15px #4f46e5; animation: scanning 2s infinite ease-in-out; }
         @keyframes scanning { 0% {top:0; opacity: 0;} 10% {opacity: 1;} 90% {opacity: 1;} 100% {top:100%; opacity: 0;} }
         
@@ -54,7 +66,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.2</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.3</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -67,7 +79,7 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded ml-2 shadow-sm">POS V7.2</span></h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded ml-2 shadow-sm">POS V7.3</span></h1>
             <div class="flex gap-4 items-center">
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
@@ -796,7 +808,14 @@ const app = createApp({
             if(!isFaceModelLoaded.value) { showToast('AI 初始化中...', 'warning'); return null; }
             const v = document.getElementById('video');
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined, width: { ideal: 640 }, height: { ideal: 480 } } });
+                // V7.3 關鍵更新：強制請求 HD 解析度 (720p/1080p)
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined, 
+                        width: { ideal: 1280 }, // 提升寬度
+                        height: { ideal: 720 }  // 提升高度 (HD)
+                    } 
+                });
                 v.srcObject = stream; videoStream = stream;
                 isFaceDetected.value = false; lastDetectedFace.value = null;
                 return new Promise(r => v.onloadedmetadata = () => { v.play(); r(v); });
@@ -828,7 +847,6 @@ const app = createApp({
             if(now - lastFpsTime >= 1000) { fps.value = frameCount; frameCount = 0; lastFpsTime = now; } 
             frameCount++;
 
-            // 回退 V6.6 設定: 移除 Throttle，並使用 224 解析度
             try {
                 const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
                 isFaceDetected.value = !!detection; if (detection) lastDetectedFace.value = detection;
