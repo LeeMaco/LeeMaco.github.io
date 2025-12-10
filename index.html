@@ -3,10 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="format-detection" content="telephone=no">
-    <title>AI 智能會員系統 V7.3 (POS 最終版)</title>
+    <title>AI 智能會員系統 V7.2 (POS 最終版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -17,7 +14,7 @@
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
 
     <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; overscroll-behavior: none; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
         
@@ -31,10 +28,8 @@
         .numpad-btn { transition: all 0.1s; box-shadow: 0 4px 0 #cbd5e1; }
         .numpad-btn:active { transform: translateY(4px); box-shadow: 0 0 0 #cbd5e1; }
         
-        #video-container video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); } /* 鏡像翻轉對體驗較好 */
-        /* 移除對 Video 的模糊濾鏡以提高 AI 準確率，僅保留飽和度調整 */
-        .beauty-filter { filter: saturate(1.1) brightness(1.1) contrast(1.05); }
-        
+        #video-container video { width: 100%; height: 100%; object-fit: cover; }
+        .beauty-filter { filter: saturate(1.1) brightness(1.1) contrast(1.05) blur(0.4px); }
         .scan-line { position: absolute; width: 100%; height: 2px; background: #4f46e5; box-shadow: 0 0 15px #4f46e5; animation: scanning 2s infinite ease-in-out; }
         @keyframes scanning { 0% {top:0; opacity: 0;} 10% {opacity: 1;} 90% {opacity: 1;} 100% {top:100%; opacity: 0;} }
         
@@ -59,7 +54,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl animate-fade-in-up">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.3</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.2</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">商店/公司名稱</label><input v-model="config.storeName" placeholder="例如：E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -72,9 +67,8 @@
 
     <header class="bg-white shadow-sm sticky top-0 z-40">
         <div class="px-5 py-4 flex justify-between items-center">
-            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded ml-2 shadow-sm">POS V7.3</span></h1>
+            <h1 class="text-xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-cube text-indigo-600 mr-2"></i>SmartMember <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded ml-2 shadow-sm">POS V7.2</span></h1>
             <div class="flex gap-4 items-center">
-                <button @click="toggleFullScreen" class="text-slate-300 hover:text-indigo-600 hidden sm:block"><i class="fa-solid fa-expand"></i></button>
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition"><i class="fa-solid fa-file-export text-xl"></i></button>
                 <div class="hidden sm:flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
@@ -545,28 +539,8 @@ const app = createApp({
         let lastFpsTime = 0;
         let frameCount = 0;
         let audioContext = null;
-        let wakeLock = null;
 
-        // Wake Lock 請求
-        const requestWakeLock = async () => {
-            if ('wakeLock' in navigator) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLock.addEventListener('release', () => { console.log('Wake Lock Released'); });
-                } catch (err) { console.error(`${err.name}, ${err.message}`); }
-            }
-        };
-
-        const stopFaceScan = () => { 
-            isScanning = false; 
-            modals.faceScan = false; 
-            if(videoStream) { 
-                videoStream.getTracks().forEach(t => t.stop()); 
-                videoStream = null; 
-            }
-            if(wakeLock) { wakeLock.release(); wakeLock = null; }
-        };
-        
+        const stopFaceScan = () => { isScanning = false; modals.faceScan = false; if(videoStream) { videoStream.getTracks().forEach(t => t.stop()); videoStream = null; } };
         const closeModals = () => { modals.form = false; modals.register = false; modals.faceScan = false; modals.io = false; stopFaceScan(); };
 
         const showToast = (msg, type='success', title='提示') => {
@@ -577,8 +551,7 @@ const app = createApp({
 
         const playSound = (type) => {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
-            if (audioContext.state === 'suspended') { audioContext.resume().catch(e=>console.log(e)); }
-            
+            if (audioContext.state === 'suspended') audioContext.resume();
             const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
             osc.connect(gain); gain.connect(audioContext.destination);
             
@@ -635,14 +608,11 @@ const app = createApp({
 
         const initSystemData = async () => {
             if(!supabase) return;
-            // 優化: 加入資料完整性檢查，確保 descriptor 長度正確
             const { data, error } = await supabase.from('members').select('id, name, face_descriptor, notes').not('face_descriptor', 'is', null);
             if(!error && data) {
-                // 過濾壞掉的資料 (FaceAPI 需要 Float32Array length=128)
-                const validData = data.filter(m => Array.isArray(m.face_descriptor) && m.face_descriptor.length === 128);
-                aiMembers.value = validData;
-                if(validData.length > 0) {
-                    const labeled = validData.map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
+                aiMembers.value = data;
+                if(data.length > 0) {
+                    const labeled = data.map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
                     faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
                 }
             }
@@ -789,7 +759,7 @@ const app = createApp({
                 const buffer = await file.arrayBuffer(); const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buffer); const ws = wb.getWorksheet(1);
                 const membersToUpsert = []; const seenPhones = new Set();
                 let idxName = 2; let idxPhone = 3; let idxNotes = 4;
-                const headerRow = ws.getRow(1).values; 
+                const headerRow = ws.getRow(1).values; let hasHeader = false;
                 if(Array.isArray(headerRow)) { headerRow.forEach((val, idx) => { if(!val) return; const v = val.toString().toLowerCase(); if(v.includes('姓名') || v.includes('name')) idxName = idx; else if(v.includes('電話') || v.includes('mobile')) idxPhone = idx; else if(v.includes('備註') || v.includes('notes')) idxNotes = idx; }); }
                 ws.eachRow((row, rowNumber) => { 
                     if(rowNumber === 1) return; 
@@ -824,7 +794,6 @@ const app = createApp({
 
         const startVideo = async () => {
             if(!isFaceModelLoaded.value) { showToast('AI 初始化中...', 'warning'); return null; }
-            requestWakeLock(); // 啟動相機時保持螢幕常亮
             const v = document.getElementById('video');
             try {
                 const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined, width: { ideal: 640 }, height: { ideal: 480 } } });
@@ -847,7 +816,6 @@ const app = createApp({
             if (lastDetectedFace.value && isFaceDetected.value) { box = lastDetectedFace.value.detection.box; desc = Array.from(lastDetectedFace.value.descriptor); } 
             else { const size = Math.min(video.videoWidth, video.videoHeight) * 0.6; box = { x: (video.videoWidth - size) / 2, y: (video.videoHeight - size) / 2, width: size, height: size }; }
             const cvs = document.createElement('canvas'); cvs.width=300; cvs.height=300; const ctx = cvs.getContext('2d');
-            // 注意: 若 Video 有 CSS transform scaleX(-1)，手動截圖需調整，這裡簡化為直接截取
             try { ctx.drawImage(video, box.x, box.y, box.width, box.height, 0,0,300,300); } catch(e) { ctx.drawImage(video, 0,0,300,300); }
             const photo = cvs.toDataURL('image/jpeg', 0.8);
             if(modals.register) { registerForm.photo = photo; registerForm.face_descriptor = desc; } else { form.photo = photo; form.face_descriptor = desc; }
@@ -860,8 +828,8 @@ const app = createApp({
             if(now - lastFpsTime >= 1000) { fps.value = frameCount; frameCount = 0; lastFpsTime = now; } 
             frameCount++;
 
+            // 回退 V6.6 設定: 移除 Throttle，並使用 224 解析度
             try {
-                // 使用 TinyFaceDetector 搭配 224x224 輸入尺寸以平衡速度與準確度
                 const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
                 isFaceDetected.value = !!detection; if (detection) lastDetectedFace.value = detection;
                 if(detection) {
@@ -883,14 +851,6 @@ const app = createApp({
         const resetConfigSecure = () => { if(prompt("密碼")===(config.adminPwd||'0000')) { localStorage.removeItem('supabase_config_v6'); location.reload(); } };
         const stats = computed(() => { const count = scanHistory.value.filter(log => log.type === 'member' || log.type === 'phone').length; return { todayVisits: count }; });
 
-        const toggleFullScreen = () => {
-            if (!document.fullscreenElement) {
-                document.documentElement.requestFullscreen();
-            } else if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
-        };
-
         return {
             config, isConfigured, saveConfig, resetConfigSecure, checkAdmin: (cb) => { const p=prompt('Pwd?'); if(p===(config.adminPwd||'0000'))cb(); else alert('Err'); },
             displayMembers, aiMembers, totalMemberCount, searchMembers, searchQuery, isLoading, isLoadingList, isLoadingPhoto, isImporting, isExporting, importProgress, exportProgress, handleImport, exportAllMembers,
@@ -902,7 +862,7 @@ const app = createApp({
             stopFaceScan, handleCameraSwitch: async () => { if(videoStream) { stopFaceScan(); await startScan(app.scanMode); } },
             selfServiceInput, searchMode, setSearchMode, handleKeypad, verifyStatus, verifiedMember, verifiedMemberPhoto, performVerification, resetSelfService,
             stats, isFaceModelLoaded, videoDevices, currentDeviceId, scanHistory, fps, app, unlockAudio, toasts, formatDate, formatDateSimple,
-            isFaceDetected, manualCapture, toggleFullScreen
+            isFaceDetected, manualCapture
         };
     }
 });
