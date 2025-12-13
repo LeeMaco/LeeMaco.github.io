@@ -3,12 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V7.3 (修復版)</title>
+    <title>AI 智能會員系統 V7.4 (商業進階版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
 
@@ -28,6 +31,10 @@
             100% { transform: scale(1); opacity: 1; }
         }
 
+        /* 全螢幕歡迎訊息 */
+        .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.4s ease; }
+        .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
+
         #video-container video { width: 100%; height: 100%; object-fit: cover; }
         .mirror-x { transform: scaleX(-1); }
         .beauty-filter { filter: saturate(1.2) brightness(1.1) contrast(1.1) blur(0.3px); }
@@ -41,6 +48,34 @@
 
 <div id="app" class="min-h-screen flex flex-col pb-safe" @click="unlockAudio">
     
+    <transition name="fullscreen-overlay">
+        <div v-if="fullscreenMsg.show" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl" @click="closeFullscreen">
+            <div class="transform scale-110 text-center p-8 max-w-lg w-full">
+                <div class="w-32 h-32 rounded-full flex items-center justify-center text-6xl mb-6 mx-auto animate-bounce shadow-2xl"
+                     :class="fullscreenMsg.type==='success' ? 'bg-emerald-100 text-emerald-500 ring-4 ring-emerald-50' : (fullscreenMsg.type==='warning' ? 'bg-amber-100 text-amber-500 ring-4 ring-amber-50' : 'bg-rose-100 text-rose-500 ring-4 ring-rose-50')">
+                    <i class="fa-solid" :class="fullscreenMsg.type==='success' ? 'fa-check' : (fullscreenMsg.type==='warning' ? 'fa-id-card' : 'fa-times')"></i>
+                </div>
+                
+                <h1 class="text-4xl font-black text-slate-800 mb-2 tracking-tight">{{ fullscreenMsg.title }}</h1>
+                
+                <div v-if="fullscreenMsg.type === 'success'" class="space-y-4 mt-4 animate-fade-in-up">
+                    <p class="text-4xl font-black text-indigo-600">{{ fullscreenMsg.sub }}</p>
+                    <p v-if="fullscreenMsg.note" class="text-2xl text-slate-600 bg-slate-100 px-6 py-3 rounded-2xl inline-block font-bold shadow-sm border border-slate-200">
+                        <i class="fa-solid fa-note-sticky mr-2 text-amber-400"></i> {{ fullscreenMsg.note }}
+                    </p>
+                </div>
+
+                <div v-else-if="fullscreenMsg.type === 'warning'" class="mt-4 px-4">
+                    <p class="text-xl font-bold text-slate-600 leading-relaxed">{{ fullscreenMsg.sub }}</p>
+                </div>
+
+                <div v-else class="mt-4">
+                    <p class="text-2xl font-bold text-slate-500">此號碼 <span class="text-rose-500 underline">{{ fullscreenMsg.sub }}</span> 尚未註冊</p>
+                </div>
+            </div>
+        </div>
+    </transition>
+
     <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] flex flex-col gap-4 pointer-events-none w-full max-w-sm px-4">
         <transition-group name="cute-toast">
             <div v-for="toast in toasts" :key="toast.id" class="pointer-events-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 p-6 flex flex-col items-center gap-3 text-center transform transition-all" 
@@ -57,7 +92,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.3</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.4</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -72,9 +107,19 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-pink-500 text-white px-2 py-0.5 rounded-full ml-2">V7.3</span>
+                <span class="text-xs bg-pink-500 text-white px-2 py-0.5 rounded-full ml-2">V7.4</span>
             </h1>
             <div class="flex gap-4 items-center">
+                <div class="hidden md:flex flex-col items-end w-36">
+                    <div class="flex justify-between w-full text-[10px] font-bold text-slate-400 mb-1">
+                        <span>Database</span>
+                        <span>{{ totalMemberCount }} 筆</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/10000)*100, 100) + '%'}"></div>
+                    </div>
+                </div>
+
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500"><i class="fa-solid fa-gear"></i></button>
                 <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
                     <span class="text-indigo-500 flex items-center"><i class="fa-solid fa-cloud mr-1.5"></i>Online</span>
@@ -122,12 +167,10 @@
 
                         <div class="flex gap-3">
                              <button @click="startHomepageScan" class="flex-1 py-4 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition no-zoom">
-                                <i class="fa-solid fa-expand text-xl text-pink-500"></i>
-                                AI 快速通關
+                                <i class="fa-solid fa-expand text-xl text-pink-500"></i> AI 快速通關
                             </button>
                              <button class="flex-1 py-4 rounded-2xl border-2 border-indigo-100 bg-indigo-50 text-indigo-600 font-bold flex flex-col items-center justify-center gap-1 cursor-default">
-                                <i class="fa-solid fa-phone text-xl"></i>
-                                電話查詢中
+                                <i class="fa-solid fa-phone text-xl"></i> 電話查詢中
                             </button>
                         </div>
                     </div>
@@ -158,16 +201,24 @@
                             <i v-else class="fa-solid fa-arrow-right"></i>
                         </button>
                     </div>
-                    <p class="text-center text-xs text-slate-300 font-bold mt-4">支援實體鍵盤輸入 (0-9, Enter)</p>
                 </div>
             </div>
         </div>
 
         <div v-show="currentTab === 'list'" class="space-y-4 max-w-6xl mx-auto animate-fade-in-up pb-20">
-             <div class="relative group">
-                 <i class="fa-solid fa-magnifying-glass absolute left-5 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                 <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="搜尋姓名、電話、註冊時間 (如 2023-12)..." class="w-full pl-12 pr-4 py-4 border-0 rounded-2xl shadow-lg shadow-slate-200 bg-white focus:ring-4 focus:ring-indigo-100 outline-none text-lg font-bold">
-                 <button @click="searchMembers" class="absolute right-3 top-1/2 -translate-y-1/2 bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
+             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-3">
+                 <div class="relative flex-1 group">
+                     <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                     <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="關鍵字：姓名、電話、註冊日(2023-12-01)..." class="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold">
+                 </div>
+                 <div class="flex items-center gap-2 bg-slate-50 px-3 rounded-xl border-2 border-slate-100">
+                     <span class="text-xs font-bold text-slate-400">註冊區間</span>
+                     <input v-model="dateStart" type="date" class="bg-transparent outline-none font-bold text-slate-600">
+                     <span class="text-slate-300">~</span>
+                     <input v-model="dateEnd" type="date" class="bg-transparent outline-none font-bold text-slate-600">
+                 </div>
+                 <button @click="searchMembers" class="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
+                 <button @click="modals.io = true" class="bg-emerald-500 text-white px-4 py-2 rounded-xl text-sm font-bold shadow hover:bg-emerald-600 transition"><i class="fa-solid fa-file-import mr-1"></i>匯入</button>
              </div>
              
              <div v-if="isLoadingList" class="py-20 text-center text-slate-400">
@@ -186,10 +237,12 @@
                                  <b class="truncate block text-xl text-slate-800">{{m.name}}</b>
                              </div>
                              <p class="text-base text-slate-500 font-bold tracking-wider mb-2">{{m.phone}}</p>
+                             
                              <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-2">
                                  <span class="text-xs text-slate-400 font-bold block uppercase">Created At</span>
-                                 <span class="text-sm text-indigo-600 font-bold">{{ formatDate(m.created_at) }}</span>
+                                 <span class="text-sm text-indigo-600 font-bold">{{ formatDate(m.created_at, true) }}</span>
                              </div>
+
                              <div v-if="m.notes" class="bg-amber-50 p-2 rounded-lg border border-amber-100">
                                  <span class="text-xs text-amber-400 font-bold block uppercase">Note</span>
                                  <p class="text-sm text-amber-700 font-bold truncate">{{m.notes}}</p>
@@ -217,7 +270,7 @@
             <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
                 <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
                     <h3 class="font-bold text-slate-800 text-lg">
-                        <i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>即時來客紀錄 (近50筆)
+                        <i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>即時來客紀錄
                     </h3>
                     <button @click="fetchLogs" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold"><i class="fa-solid fa-sync mr-1"></i>重新整理</button>
                 </div>
@@ -240,7 +293,7 @@
                                 </div>
                             </div>
                             <div class="text-left md:text-right bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-xl">
-                                <div class="text-base font-bold text-slate-600">{{ formatDate(log.check_in_time) }}</div>
+                                <div class="text-base font-bold text-slate-600">{{ formatDate(log.check_in_time, true) }}</div>
                                 <div class="text-xs text-slate-400 font-bold mt-1">
                                     {{ log.type === 'phone' ? '電話報到' : 'AI 掃臉' }}
                                 </div>
@@ -265,21 +318,9 @@
             </div>
             <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
                 <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
-                <p>為了保障您的權益，並提供更優質的 AI 快速通關體驗，我們需要蒐集您的姓名、電話及臉部特徵資料。</p>
-                <ul class="list-disc pl-5 space-y-2">
-                    <li>您的臉部資料僅用於本店之身分識別，不會用於其他用途。</li>
-                    <li>您可以隨時請求刪除您的會員資料與臉部數據。</li>
-                    <li>若不同意提供臉部資料，您仍可使用電話號碼進行會員登入。</li>
-                </ul>
-                <p class="text-rose-500 font-bold mt-4">請仔細閱讀後，點擊下方按鈕進行註冊。</p>
-            </div>
-            <div class="p-6 border-t border-slate-100 bg-white rounded-b-[2rem]">
-                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg hover:scale-[1.02] transition transform">
-                    我已詳閱並同意
-                </button>
-                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">
-                    取消
-                </button>
+                <p>為了保障您的權益，我們將蒐集您的姓名、電話及臉部特徵資料用於身分識別。</p>
+                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
+                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
             </div>
         </div>
     </div>
@@ -300,12 +341,8 @@
                             <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
                             <button v-if="!modals.register" @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
                         </div>
-                        <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200">
-                            <i class="fa-solid fa-image text-2xl"></i>
-                        </div>
-                        <button @click="startScanForForm" class="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition">
-                            <i class="fa-solid fa-camera mr-2"></i>{{ activeForm.face_descriptor ? '重拍照片' : '拍攝臉部' }}
-                        </button>
+                        <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
+                        <button @click="startScanForForm" class="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition"><i class="fa-solid fa-camera mr-2"></i>{{ activeForm.face_descriptor ? '重拍照片' : '拍攝臉部' }}</button>
                     </div>
                 </div>
             </div>
@@ -313,6 +350,19 @@
                 <button v-if="modals.form" @click="deleteMember" class="px-5 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
             </div>
+        </div>
+    </div>
+
+    <div v-if="modals.io" class="fixed inset-0 bg-slate-900/80 z-[90] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl">
+            <h3 class="font-bold text-xl mb-4">會員資料匯入</h3>
+            <div class="relative w-full py-4 bg-indigo-50 text-indigo-600 rounded-xl font-bold border-2 border-dashed border-indigo-200 hover:bg-indigo-100 cursor-pointer">
+                <i v-if="!isImporting" class="fa-solid fa-file-excel text-2xl mb-2 block"></i>
+                <i v-else class="fa-solid fa-circle-notch fa-spin text-2xl mb-2 block"></i>
+                {{ isImporting ? '匯入處理中...' : '點擊選擇 Excel 檔案' }}
+                <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
+            </div>
+            <button @click="modals.io=false" class="mt-4 text-slate-400 font-bold">關閉</button>
         </div>
     </div>
 
@@ -326,10 +376,6 @@
             <video id="video" autoplay muted playsinline class="w-full h-full object-cover beauty-filter transition-transform duration-300" :class="{'mirror-x': isFrontCamera}"></video>
             <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
                  <div class="w-64 h-64 border-4 border-white/20 rounded-[3rem] relative overflow-hidden backdrop-blur-[2px]">
-                    <div class="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-pink-400 rounded-tl-xl"></div>
-                    <div class="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-pink-400 rounded-tr-xl"></div>
-                    <div class="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-pink-400 rounded-bl-xl"></div>
-                    <div class="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-pink-400 rounded-br-xl"></div>
                     <div class="scan-line"></div>
                  </div>
             </div>
@@ -357,29 +403,30 @@ const app = createApp({
         const config = reactive({ url: '', key: '', adminPwd: '', storeName: '' });
         const isConfigured = ref(false);
         const displayMembers = ref([]); 
-        const aiMembers = ref([]); 
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         
         const toasts = ref([]);
+        const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '' });
         const isLoading = ref(false);
         const isLoadingList = ref(false);
         const isLoadingPhoto = ref(false);
+        const isImporting = ref(false);
         
         const currentTab = ref('self_service');
         const searchQuery = ref('');
-        const modals = reactive({ form: false, faceScan: false, register: false, privacy: false });
+        const dateStart = ref('');
+        const dateEnd = ref('');
+        const modals = reactive({ form: false, faceScan: false, register: false, privacy: false, io: false });
         const tabs = [{id:'self_service', label:'接待櫃台', icon:'fa-solid fa-desktop'},{id:'list', label:'會員管理', icon:'fa-solid fa-users-gear'},{id:'dashboard', label:'營運分析', icon:'fa-solid fa-chart-pie'}];
 
-        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, face_descriptor: null, created_at: null, updated_at: null });
+        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, face_descriptor: null, created_at: null });
         const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, face_descriptor: null });
         const activeForm = computed(() => modals.register ? registerForm : form);
         const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
 
         const isFaceModelLoaded = ref(false);
         const verifyStatus = ref('idle');
-        const verifiedMember = ref(null);
-        const verifiedMemberPhoto = ref(null);
         const searchMode = ref('phone'); 
         const scanMode = ref('');
         const selfServiceInput = ref('');
@@ -387,10 +434,8 @@ const app = createApp({
         const memberCooldowns = reactive({});
         const videoDevices = ref([]);
         const currentDeviceId = ref('');
-        const fps = ref(0);
 
         let supabase = null;
-        let faceMatcher = null;
         let videoStream = null;
         let isScanning = false;
         let audioContext = null;
@@ -413,87 +458,66 @@ const app = createApp({
         const playSound = (type) => {
             if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
             if (audioContext.state === 'suspended') audioContext.resume();
-            
-            const osc = audioContext.createOscillator();
-            const gain = audioContext.createGain();
-            osc.connect(gain);
-            gain.connect(audioContext.destination);
-
+            const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
+            osc.connect(gain); gain.connect(audioContext.destination);
             if (type === 'success') {
                 const now = audioContext.currentTime;
-                const playNote = (freq, time) => {
-                    const o = audioContext.createOscillator();
-                    const g = audioContext.createGain();
-                    o.connect(g);
-                    g.connect(audioContext.destination);
-                    o.type = 'sine';
-                    o.frequency.value = freq;
-                    g.gain.setValueAtTime(0.1, time);
-                    g.gain.exponentialRampToValueAtTime(0.001, time + 0.5);
-                    o.start(time);
-                    o.stop(time + 0.5);
-                };
-                playNote(523.25, now); playNote(659.25, now + 0.1); playNote(783.99, now + 0.2);
+                [523.25, 659.25, 783.99].forEach((f, i) => {
+                    const o = audioContext.createOscillator(); const g = audioContext.createGain();
+                    o.connect(g); g.connect(audioContext.destination); o.frequency.value = f;
+                    g.gain.setValueAtTime(0.1, now + i*0.1); g.gain.exponentialRampToValueAtTime(0.001, now + i*0.1 + 0.5);
+                    o.start(now + i*0.1); o.stop(now + i*0.1 + 0.5);
+                });
             } else {
-                osc.type = 'sawtooth';
-                osc.frequency.setValueAtTime(150, audioContext.currentTime);
-                osc.frequency.exponentialRampToValueAtTime(100, audioContext.currentTime + 0.3);
-                gain.gain.setValueAtTime(0.1, audioContext.currentTime);
-                gain.gain.exponentialRampToValueAtTime(0.001, audioContext.currentTime + 0.3);
-                osc.start();
-                osc.stop(audioContext.currentTime + 0.3);
+                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioContext.currentTime); gain.gain.setValueAtTime(0.1, audioContext.currentTime); osc.start(); osc.stop(audioContext.currentTime + 0.3);
             }
         };
         const unlockAudio = () => { if(!audioContext) playSound('success'); };
 
         const showToast = (msg, type='success', title='提示') => {
             const id = Date.now();
-            if(type === 'success') { title = "太棒了！"; playSound('success'); }
-            else { title = "哎呀！"; playSound('error'); }
-            toasts.value.push({ id, msg, type, title });
+            toasts.value.push({ id, msg, type, title: type==='success'?'太棒了':'哎呀' });
             setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 2500);
         };
 
-        const formatDate = (isoString) => isoString ? new Date(isoString).toLocaleString('zh-TW', { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }) : '--';
+        // 4. 優化：歡迎畫面
+        const showFullscreen = (title, sub, type='success', note='') => {
+            fullscreenMsg.title = title; fullscreenMsg.sub = sub; fullscreenMsg.type = type; fullscreenMsg.note = note; fullscreenMsg.show = true;
+            playSound(type);
+            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; }, 2000);
+        };
+
+        // 3. 24小時制時間格式
+        const formatDate = (iso, time=false) => {
+            if(!iso) return '--';
+            const d = new Date(iso);
+            const ds = `${d.getFullYear()}/${(d.getMonth()+1).toString().padStart(2,'0')}/${d.getDate().toString().padStart(2,'0')}`;
+            return time ? `${ds} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : ds;
+        };
+
+        // 1. 每小時更新 DB 用量 (透過 Row Count 模擬)
+        const updateDbUsage = async () => {
+            if(!supabase) return;
+            const { count } = await supabase.from('members').select('*', { count: 'exact', head: true });
+            totalMemberCount.value = count || 0;
+        };
+        setInterval(updateDbUsage, 3600000); // 1hr
 
         const fetchLogs = async () => {
             if(!supabase) return;
             try {
-                const { data, error } = await supabase
-                    .from('visit_logs')
-                    .select('*')
-                    .order('check_in_time', { ascending: false })
-                    .limit(50);
-                
-                if(error) { console.error(error); dashboardLogs.value = []; return; }
-
-                const now = new Date();
-                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+                const { data, error } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50);
+                if(error) { dashboardLogs.value = []; return; }
+                const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
                 const { data: monthData } = await supabase.from('visit_logs').select('member_id').gte('check_in_time', startOfMonth);
-                
-                const countMap = {};
-                if(monthData) {
-                    monthData.forEach(log => { if(log.member_id) countMap[log.member_id] = (countMap[log.member_id] || 0) + 1; });
-                }
-
-                dashboardLogs.value = data.map(log => ({
-                    ...log,
-                    monthCount: countMap[log.member_id] || 1
-                }));
+                const countMap = {}; if(monthData) monthData.forEach(log => countMap[log.member_id] = (countMap[log.member_id] || 0) + 1);
+                dashboardLogs.value = data.map(log => ({ ...log, monthCount: countMap[log.member_id] || 1 }));
             } catch(e) { console.error(e); }
         };
 
-        const stats = computed(() => { return { monthVisits: dashboardLogs.value.length > 0 ? dashboardLogs.value.length : 0 }; });
-
         const logVisit = async (member, type) => {
             if(!supabase) return;
-            await supabase.from('visit_logs').insert({
-                member_id: member.id,
-                name: member.name,
-                phone: member.phone,
-                type: type,
-                check_in_time: new Date()
-            });
+            await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type, check_in_time: new Date() });
             fetchLogs();
         };
 
@@ -501,168 +525,191 @@ const app = createApp({
             const now = Date.now();
             if (type === 'face' && now - (memberCooldowns[member.id]||0) < 60000) return;
             memberCooldowns[member.id] = now;
-            
-            verifyStatus.value = 'success';
-            verifiedMember.value = member;
-            verifiedMemberPhoto.value = member.photo;
-            showToast(`歡迎回來，${member.name}！`, 'success');
+            // 4. 優化歡迎畫面內容
+            showFullscreen(`歡迎光臨`, `${member.name}`, 'success', member.notes);
             logVisit(member, type);
             if(supabase) await supabase.from('members').update({ updated_at: new Date() }).eq('id', member.id);
-            setTimeout(() => { if(verifyStatus.value === 'success') resetSelfService(); }, 3500);
-        };
-
-        const searchMembers = async (overrideQuery) => {
-            if(!supabase) return;
-            isLoadingList.value = true;
-            try {
-                let queryBuilder = supabase.from('members').select('*');
-                const q = (typeof overrideQuery === 'string' ? overrideQuery : searchQuery.value).trim();
-                
-                if(q) {
-                    if (q.includes('-') || q.startsWith('20')) {
-                        queryBuilder = queryBuilder.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`);
-                    } else {
-                        queryBuilder = queryBuilder.or(`name.ilike.%${q}%,phone.ilike.%${q}%`);
-                    }
-                } else {
-                    queryBuilder = queryBuilder.order('created_at', {ascending:false}).limit(50);
-                }
-                const { data, error } = await queryBuilder;
-                if(error) throw error;
-                displayMembers.value = data || [];
-            } catch(e) { showToast('搜尋失敗', 'error'); } finally { isLoadingList.value = false; }
-        };
-
-        const initSystemData = async () => {
-            if(!supabase) return;
-            const { data } = await supabase.from('members').select('id, name, face_descriptor').not('face_descriptor', 'is', null);
-            if(data) {
-                aiMembers.value = data;
-                if(data.length > 0) {
-                    const labeled = data.map(m => new faceapi.LabeledFaceDescriptors(m.id, [new Float32Array(m.face_descriptor)]));
-                    faceMatcher = new faceapi.FaceMatcher(labeled, 0.45);
-                }
-            }
-            searchMembers('');
-            const { count } = await supabase.from('members').select('*', { count: 'exact', head: true });
-            totalMemberCount.value = count || 0;
-            fetchLogs();
         };
 
         const performVerification = async () => {
             const val = selfServiceInput.value.trim();
             if(!val) return;
             isLoading.value = true;
-            const { data } = await supabase.from('members').select('*').eq('phone', val).single();
+            try {
+                const { data } = await supabase.from('members').select('*').eq('phone', val).single();
+                if(data) await handleCheckIn(data, 'phone');
+                else showFullscreen('查詢失敗', val, 'error');
+            } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
             isLoading.value = false;
-            if(data) await handleCheckIn(data, 'phone');
-            else showToast('查無此電話', 'error');
         };
 
+        // 2. 註冊日期搜尋邏輯 (包含日期區間)
+        const searchMembers = async () => {
+            if(!supabase) return;
+            isLoadingList.value = true;
+            try {
+                let qb = supabase.from('members').select('*');
+                // 一般關鍵字搜尋
+                if(searchQuery.value) {
+                    const q = searchQuery.value;
+                    // 如果輸入像日期的字串，也搜尋 created_at
+                    if (q.includes('-') || q.startsWith('20')) {
+                         qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`);
+                    } else {
+                         qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,notes.ilike.%${q}%`);
+                    }
+                }
+                // 日期篩選器
+                if(dateStart.value) qb = qb.gte('created_at', dateStart.value);
+                if(dateEnd.value) qb = qb.lte('created_at', dateEnd.value + 'T23:59:59');
+                
+                const { data, error } = await qb.order('created_at', {ascending:false}).limit(50);
+                if(error) throw error;
+                displayMembers.value = data || [];
+            } catch(e){ showToast('搜尋失敗', 'error'); } finally { isLoadingList.value = false; }
+        };
+
+        // 7. 手動註冊防重複檢查
+        const submitForm = async () => {
+            if(!registerForm.name || !registerForm.phone) return showToast('請填寫完整', 'error');
+            isLoadingPhoto.value = true;
+            try {
+                // Check duplicate
+                const { data: exist } = await supabase.from('members').select('id').eq('phone', registerForm.phone).single();
+                if(exist) {
+                    showFullscreen('重複註冊', '此電話已註冊過，請出示證件確認', 'warning');
+                    isLoadingPhoto.value = false;
+                    return;
+                }
+
+                const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                const { error } = await supabase.from('members').insert({ ...registerForm, id, created_at: new Date() });
+                if(error) throw error;
+                
+                showToast('註冊成功', 'success'); 
+                closeModals(); 
+                // 5. 註冊成功後清空表單
+                Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null, face_descriptor: null });
+                updateDbUsage();
+            } catch(e) { showToast('註冊失敗:' + e.message, 'error'); }
+            isLoadingPhoto.value = false;
+        };
+
+        // 6. Excel 匯入 (含重複過濾)
+        const handleImport = async (e) => {
+            const file = e.target.files[0]; if (!file) return; 
+            isImporting.value = true;
+            try {
+                const buffer = await file.arrayBuffer(); const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buffer); const ws = wb.getWorksheet(1);
+                const membersToInsert = []; 
+                let successCount = 0; let skipCount = 0;
+
+                // 簡單解析 (假設 A:姓名 B:電話 C:備註)
+                // 先抓資料庫現有電話以供比對 (量大時應改用後端 check)
+                const { data: existing } = await supabase.from('members').select('phone');
+                const existingPhones = new Set(existing ? existing.map(m => m.phone) : []);
+
+                ws.eachRow((row, rowNumber) => {
+                    if (rowNumber === 1) return; // Skip Header
+                    let name = row.getCell(1).text?.trim();
+                    let phone = row.getCell(2).text?.trim();
+                    let notes = row.getCell(3).text?.trim() || '';
+                    
+                    if (name && phone) {
+                        if (existingPhones.has(phone)) {
+                            skipCount++;
+                        } else {
+                            membersToInsert.push({ 
+                                id: Date.now() + Math.random().toString(36).substr(2, 5), // Unique ID
+                                name, phone, notes, created_at: new Date() 
+                            });
+                            existingPhones.add(phone); // 避免 Excel 內部重複
+                        }
+                    }
+                });
+
+                if(membersToInsert.length > 0) {
+                    // 分批寫入
+                    const BATCH = 100;
+                    for (let i=0; i<membersToInsert.length; i+=BATCH) {
+                        await supabase.from('members').insert(membersToInsert.slice(i, i+BATCH));
+                    }
+                    showToast(`成功匯入 ${membersToInsert.length} 筆，跳過重複 ${skipCount} 筆`, 'success');
+                    updateDbUsage();
+                    searchMembers(); // Refresh List
+                } else {
+                    showToast(`無新資料匯入 (重複 ${skipCount} 筆)`, 'warning');
+                }
+                modals.io = false;
+            } catch(e) { showToast('匯入失敗: ' + e.message, 'error'); } finally { isImporting.value = false; e.target.value = ''; }
+        };
+
+        // ... (Camera & Scanning Logic 同前版)
         const startVideo = async () => {
              const v = document.getElementById('video'); if(!v) return;
              try {
-                 const stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: currentDeviceId.value ? { exact: currentDeviceId.value } : undefined, width: { ideal: 1280 }, height: { ideal: 720 } } });
-                 v.srcObject = stream; videoStream = stream;
-                 return new Promise(r => v.onloadedmetadata = () => { v.play(); r(v); });
+                 const s = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
+                 v.srcObject = s; videoStream = s;
+                 v.onloadedmetadata = () => v.play();
              } catch(e) { showToast('無法啟動相機', 'error'); }
         };
 
-        const scanningLoop = async (video) => {
+        const scanningLoop = async () => {
             if(!isScanning || !modals.faceScan) return;
+            const v = document.getElementById('video');
             try {
-                const detection = await faceapi.detectSingleFace(video, new faceapi.TinyFaceDetectorOptions({ inputSize: 416, scoreThreshold: 0.5 })).withFaceLandmarks().withFaceDescriptor();
-                if(detection && scanMode.value === 'homepage_scan' && faceMatcher) {
-                    const match = faceMatcher.findBestMatch(detection.descriptor);
-                    if(match.label !== 'unknown') {
-                        const m = aiMembers.value.find(x => x.id === match.label);
-                        if(m) {
-                            const { data } = await supabase.from('members').select('*').eq('id', m.id).single();
-                            if(data) { stopFaceScan(); handleCheckIn(data, 'face'); }
-                        }
+                const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 })).withFaceLandmarks().withFaceDescriptor();
+                if(det && scanMode.value === 'homepage_scan') {
+                    const { data } = await supabase.rpc('match_face_vectors', { query_embedding: Array.from(det.descriptor), match_threshold: 0.5, match_count: 1 });
+                    if(data && data.length) {
+                        const { data: m } = await supabase.from('members').select('*').eq('id', data[0].id).single();
+                        if(m) { stopFaceScan(); handleCheckIn(m, 'face'); }
                     }
                 }
             } catch(e){}
-            if(isScanning) requestAnimationFrame(() => scanningLoop(video));
+            if(isScanning) requestAnimationFrame(scanningLoop);
         };
 
-        const manualCapture = () => {
+        const manualCapture = async () => {
             const v = document.getElementById('video');
-            const cvs = document.createElement('canvas'); cvs.width=400; cvs.height=400;
-            const ctx = cvs.getContext('2d');
-            const size = Math.min(v.videoWidth, v.videoHeight) * 0.6;
-            ctx.drawImage(v, (v.videoWidth-size)/2, (v.videoHeight-size)/2, size, size, 0,0,400,400);
+            const cvs = document.createElement('canvas'); cvs.width=400; cvs.height=400; 
+            const ctx = cvs.getContext('2d'); ctx.drawImage(v, 0, 0, 400, 400); 
             registerForm.photo = cvs.toDataURL('image/jpeg');
-            showToast('照片已擷取', 'success');
-            stopFaceScan();
+            const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
+            if(det) registerForm.face_descriptor = Array.from(det.descriptor);
+            showToast('已拍照', 'success'); stopFaceScan();
         };
 
-        const submitForm = async () => {
-            if(!registerForm.name || !registerForm.phone) return showToast('請填寫完整', 'error');
-            isLoading.value = true;
-            try {
-                // 產生隨機 ID，解決註冊失敗問題
-                const newId = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-                const payload = { ...registerForm, id: newId, created_at: new Date() };
-                const { error } = await supabase.from('members').insert(payload);
-                if(error) throw error;
-                showToast('註冊成功！歡迎加入', 'success');
-                closeModals();
-                initSystemData();
-            } catch(e) { 
-                console.error(e);
-                showToast('註冊失敗：' + e.message, 'error'); 
-            } 
-            isLoading.value = false;
-        };
-        
         const appendNumber = (n) => { if (selfServiceInput.value.length < 10) selfServiceInput.value += n; };
         const backspace = () => selfServiceInput.value = selfServiceInput.value.slice(0,-1);
         const clearInput = () => selfServiceInput.value = '';
-        
-        // V7.3 流程修復：註冊前先開個資同意書
-        const openSelfRegister = () => { modals.privacy = true; };
+        const openSelfRegister = () => modals.privacy = true;
         const confirmPrivacy = () => { modals.privacy = false; modals.register = true; };
-
-        const startHomepageScan = async () => { scanMode.value = 'homepage_scan'; modals.faceScan = true; isScanning = true; await nextTick(); const v = await startVideo(); if(v) scanningLoop(v); };
-        const startScanForForm = async () => { scanMode.value = 'register'; modals.faceScan = true; isScanning = true; await nextTick(); const v = await startVideo(); if(v) scanningLoop(v); };
+        const startHomepageScan = async () => { scanMode.value = 'homepage_scan'; modals.faceScan = true; isScanning = true; await nextTick(); await startVideo(); scanningLoop(); };
+        const startScanForForm = async () => { scanMode.value = 'register'; modals.faceScan = true; isScanning = true; await nextTick(); await startVideo(); scanningLoop(); };
         const stopFaceScan = () => { isScanning = false; modals.faceScan = false; if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); };
-        const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; modals.register = false; };
-        const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); initSystemData(); };
+        const closeModals = () => { modals.form=false; modals.register=false; modals.faceScan=false; modals.privacy=false; modals.io=false; stopFaceScan(); };
+        const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; };
+        const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); updateDbUsage(); };
+        const saveConfig = () => { localStorage.setItem('supabase_config_v8', JSON.stringify(config)); location.reload(); };
+        const resetConfigSecure = () => { if(prompt('PWD?')===config.adminPwd) {localStorage.removeItem('supabase_config_v8'); location.reload();} };
         const deletePhoto = () => { if(confirm('刪除照片?')) { form.photo = null; form.face_descriptor = null; }};
-        const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; };
-        const saveConfig = () => { localStorage.setItem('supabase_config_v7', JSON.stringify(config)); initSupabase(); };
-        const resetConfigSecure = () => { if(prompt('PWD?')===config.adminPwd) {localStorage.removeItem('supabase_config_v7'); location.reload();} };
-        const closeModals = () => { modals.form=false; modals.register=false; modals.faceScan=false; modals.privacy=false; stopFaceScan(); };
-        const initSupabase = () => { if(!config.url) return; supabase = window.supabase.createClient(config.url, config.key); isConfigured.value = true; initSystemData(); };
 
         onMounted(async () => {
-             const s = localStorage.getItem('supabase_config_v7');
+             const s = localStorage.getItem('supabase_config_v8');
              if(s) Object.assign(config, JSON.parse(s));
-             if(config.url) initSupabase();
+             if(config.url) {
+                 supabase = window.supabase.createClient(config.url, config.key);
+                 isConfigured.value = true;
+                 updateDbUsage();
+                 fetchLogs();
+             }
              window.addEventListener('keydown', handleKeyboard);
-
-             const URL = 'https://justadudewhohacks.github.io/face-api.js/models';
-             await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri(URL),faceapi.nets.faceLandmark68Net.loadFromUri(URL),faceapi.nets.faceRecognitionNet.loadFromUri(URL)]);
-             isFaceModelLoaded.value = true;
-             
-             try {
-                 await navigator.mediaDevices.getUserMedia({video:true});
-                 const d = await navigator.mediaDevices.enumerateDevices();
-                 videoDevices.value = d.filter(k=>k.kind==='videoinput');
-                 const b = videoDevices.value.find(l=>l.label.toLowerCase().includes('back'));
-                 if(b) currentDeviceId.value = b.deviceId;
-             } catch(e){}
+             await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'), faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'), faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models')]);
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return {
-            config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, stats,
-            currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto,
-            searchQuery, searchMembers, isLoading, isLoadingList, isLoadingPhoto, selfServiceInput, appendNumber, backspace, clearInput, performVerification,
-            openSelfRegister, confirmPrivacy, startHomepageScan, startScanForForm, stopFaceScan, manualCapture, toasts, isFaceModelLoaded, verifyStatus, verifiedMember, verifiedMemberPhoto,
-            videoDevices, currentDeviceId, scanMode, isFrontCamera, fetchLogs, formatDate
-        };
+        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, stats: computed(()=>({monthVisits: dashboardLogs.value.length})), currentTab, tabs, modals, closeModals, form, registerForm, activeForm, submitForm, editMember, deleteMember, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, startHomepageScan, startScanForForm, stopFaceScan, manualCapture, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, scanMode, fetchLogs, formatDate, isImporting, handleImport, deletePhoto, activePhoto };
     }
 });
 app.mount('#app');
