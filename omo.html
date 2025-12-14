@@ -1,0 +1,422 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>SmartMember OMO</title>
+    
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap" rel="stylesheet">
+
+    <style>
+        body { font-family: 'Noto Sans TC', sans-serif; background-color: #f1f5f9; -webkit-tap-highlight-color: transparent; }
+        .no-zoom { touch-action: manipulation; }
+        
+        /* 顧客手機端專用樣式 */
+        .mobile-layout { background: linear-gradient(135deg, #6366f1 0%, #a855f7 100%); min-height: 100vh; color: white; }
+        .glass-card { background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(10px); color: #334155; }
+        
+        /* POS 端動畫 */
+        .ping-dot { position: absolute; top: -2px; right: -2px; width: 12px; height: 12px; background: #ef4444; border-radius: 50%; border: 2px solid white; }
+        .animate-ping-slow { animation: ping 2s cubic-bezier(0, 0, 0.2, 1) infinite; }
+        @keyframes ping { 75%, 100% { transform: scale(2); opacity: 0; } }
+    </style>
+</head>
+<body>
+
+<div id="app" class="min-h-screen">
+
+    <div v-if="isMobileMode" class="mobile-layout flex flex-col items-center justify-center p-6">
+        <div v-if="!registerCompleted" class="w-full max-w-md">
+            <div class="text-center mb-8">
+                <div class="w-20 h-20 bg-white/20 rounded-full flex items-center justify-center mx-auto mb-4 backdrop-blur-sm">
+                    <i class="fa-solid fa-store text-4xl text-white"></i>
+                </div>
+                <h1 class="text-3xl font-black mb-1">{{ config.storeName || '會員招募' }}</h1>
+                <p class="text-white/80">加入會員享專屬優惠</p>
+            </div>
+
+            <div class="glass-card rounded-3xl p-6 shadow-2xl space-y-5">
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 ml-1">您的姓名</label>
+                    <input v-model="registerForm.name" type="text" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 font-bold outline-none focus:ring-2 focus:ring-indigo-500" placeholder="請輸入真實姓名">
+                </div>
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 ml-1">手機號碼</label>
+                    <input v-model="registerForm.phone" type="tel" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 font-bold outline-none focus:ring-2 focus:ring-indigo-500" placeholder="09xxxxxxxx">
+                </div>
+                
+                <div>
+                    <label class="block text-xs font-bold text-slate-500 mb-1 ml-1">本人照片 (供店員核對用)</label>
+                    <div class="relative group cursor-pointer">
+                        <input type="file" accept="image/*" capture="user" @change="handleMobilePhoto" class="absolute inset-0 opacity-0 z-10 w-full h-full cursor-pointer">
+                        <div class="w-full aspect-square rounded-2xl bg-slate-100 border-2 border-dashed border-slate-300 flex flex-col items-center justify-center overflow-hidden transition group-active:scale-95">
+                            <img v-if="registerForm.photo" :src="registerForm.photo" class="w-full h-full object-cover">
+                            <div v-else class="text-slate-400 flex flex-col items-center">
+                                <i class="fa-solid fa-camera text-4xl mb-2"></i>
+                                <span class="font-bold">點擊拍攝大頭照</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="submitMobileRegister" :disabled="isLoading" class="w-full bg-indigo-600 text-white py-4 rounded-xl font-bold shadow-lg shadow-indigo-200 active:scale-95 transition flex items-center justify-center gap-2">
+                    <i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+                    <span>送出申請</span>
+                </button>
+            </div>
+        </div>
+
+        <div v-else class="text-center animate-fade-in-up">
+            <div class="w-24 h-24 bg-emerald-400 rounded-full flex items-center justify-center mx-auto mb-6 shadow-xl text-white text-5xl">
+                <i class="fa-solid fa-check"></i>
+            </div>
+            <h2 class="text-3xl font-black text-white mb-2">申請已送出！</h2>
+            <p class="text-white/80 font-bold mb-8">請通知櫃台人員進行審核</p>
+            <button @click="registerCompleted=false" class="bg-white/20 backdrop-blur text-white px-6 py-2 rounded-full font-bold text-sm">再填一筆</button>
+        </div>
+    </div>
+
+
+    <div v-else class="flex flex-col h-screen bg-slate-50">
+        
+        <header class="bg-white shadow-sm px-6 py-3 flex justify-between items-center z-20">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 bg-indigo-600 rounded-lg flex items-center justify-center text-white"><i class="fa-solid fa-cash-register"></i></div>
+                <h1 class="font-bold text-xl text-slate-800 tracking-tight">{{ config.storeName || 'POS System' }}</h1>
+            </div>
+            <div class="flex items-center gap-4">
+                <button @click="modals.audit = true" class="relative p-2 rounded-full hover:bg-slate-100 transition">
+                    <i class="fa-solid fa-bell text-xl text-slate-400"></i>
+                    <div v-if="pendingCount > 0" class="absolute top-1 right-1 w-5 h-5 bg-rose-500 rounded-full text-[10px] font-bold text-white flex items-center justify-center border-2 border-white animate-bounce">
+                        {{ pendingCount }}
+                    </div>
+                </button>
+                <button @click="modals.qr = true" class="bg-slate-800 text-white px-4 py-2 rounded-full text-sm font-bold shadow hover:bg-slate-700 transition">
+                    <i class="fa-solid fa-qrcode mr-2"></i>顯示註冊碼
+                </button>
+            </div>
+        </header>
+
+        <main class="flex-1 p-6 overflow-hidden flex flex-col md:flex-row gap-6 max-w-7xl mx-auto w-full">
+            
+            <div class="flex-1 flex flex-col gap-6">
+                <div class="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-100 text-center flex-1 flex flex-col justify-center">
+                    <h2 class="text-slate-400 font-bold mb-6 text-sm tracking-widest uppercase">Member Login</h2>
+                    <div class="relative max-w-md mx-auto w-full">
+                        <input v-model="searchInput" @keyup.enter="posSearch" type="text" placeholder="輸入電話號碼 (或掃描證件)" class="w-full text-center text-3xl font-black text-slate-800 bg-slate-50 border-2 border-slate-200 rounded-2xl py-6 focus:border-indigo-500 focus:bg-white outline-none transition placeholder:text-slate-300">
+                        <button @click="posSearch" class="absolute right-3 top-3 bottom-3 aspect-square bg-indigo-600 rounded-xl text-white text-xl hover:bg-indigo-700 transition shadow-lg shadow-indigo-200">
+                            <i class="fa-solid fa-arrow-right"></i>
+                        </button>
+                    </div>
+                    
+                    <div class="mt-8 flex justify-center gap-4">
+                         <div class="text-xs font-bold text-slate-400 bg-slate-100 px-3 py-1 rounded-full">
+                            <i class="fa-solid fa-keyboard mr-1"></i> 支援條碼掃描
+                         </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="w-full md:w-[450px] relative">
+                <transition name="fade" mode="out-in">
+                    <div v-if="verifiedMember" class="bg-white h-full rounded-[2rem] shadow-xl border-4 border-indigo-50 overflow-hidden flex flex-col relative">
+                        <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                        <button @click="clearMember" class="absolute top-4 right-4 text-slate-300 hover:text-slate-500"><i class="fa-solid fa-times text-xl"></i></button>
+                        
+                        <div class="p-8 flex flex-col items-center flex-1">
+                            <div class="relative mb-6 group">
+                                <div class="w-48 h-48 rounded-full p-1 bg-gradient-to-tr from-indigo-500 to-pink-500 shadow-2xl">
+                                    <img :src="verifiedMember.photo || 'https://via.placeholder.com/300?text=No+Photo'" class="w-full h-full rounded-full object-cover border-4 border-white bg-slate-100">
+                                </div>
+                                <div class="absolute -bottom-4 left-1/2 -translate-x-1/2 bg-rose-500 text-white px-4 py-1.5 rounded-full text-xs font-bold shadow-md whitespace-nowrap animate-bounce">
+                                    <i class="fa-solid fa-eye mr-1"></i> 請核對本人
+                                </div>
+                            </div>
+
+                            <h2 class="text-3xl font-black text-slate-800 mb-1">{{ verifiedMember.name }}</h2>
+                            <p class="text-xl text-slate-400 font-bold tracking-wider mb-6">{{ verifiedMember.phone }}</p>
+
+                            <div class="w-full bg-slate-50 rounded-2xl p-4 border border-slate-100 mb-6">
+                                <div class="flex justify-between items-center mb-2">
+                                    <span class="text-xs font-bold text-slate-400">會員狀態</span>
+                                    <span class="text-xs font-bold text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded">Active</span>
+                                </div>
+                                <div class="flex justify-between items-center">
+                                    <span class="text-xs font-bold text-slate-400">加入日期</span>
+                                    <span class="text-sm font-bold text-slate-600">{{ new Date(verifiedMember.created_at).toLocaleDateString() }}</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="p-6 bg-slate-50 border-t border-slate-100">
+                             <button @click="confirmIdentity" class="w-full py-4 bg-slate-800 text-white rounded-xl font-bold hover:bg-slate-700 transition shadow-lg">
+                                 <i class="fa-solid fa-check-circle mr-2"></i> 確認本人，完成報到
+                             </button>
+                        </div>
+                    </div>
+
+                    <div v-else class="bg-white/50 h-full rounded-[2rem] border-2 border-dashed border-slate-200 flex flex-col items-center justify-center text-slate-300">
+                        <i class="fa-regular fa-id-card text-6xl mb-4 opacity-50"></i>
+                        <p class="font-bold">請輸入電話或掃描條碼</p>
+                    </div>
+                </transition>
+            </div>
+        </main>
+    </div>
+
+    <div v-if="modals.audit" class="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-2xl h-[80vh] rounded-2xl shadow-2xl flex flex-col overflow-hidden">
+            <div class="p-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                <h3 class="font-black text-lg text-slate-700">
+                    <i class="fa-solid fa-user-clock text-indigo-500 mr-2"></i>待審核會員 ({{ pendingMembers.length }})
+                </h3>
+                <button @click="modals.audit=false" class="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-200"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-100">
+                <div v-if="pendingMembers.length === 0" class="h-full flex flex-col items-center justify-center text-slate-400">
+                    <i class="fa-solid fa-clipboard-check text-5xl mb-3"></i>
+                    <p class="font-bold">目前沒有待審核申請</p>
+                </div>
+                <div v-for="m in pendingMembers" :key="m.id" class="bg-white p-4 rounded-xl shadow-sm flex gap-4 border border-slate-200">
+                    <img :src="m.photo" class="w-24 h-24 rounded-lg object-cover bg-slate-100 border border-slate-100 flex-shrink-0 cursor-pointer" onclick="window.open(this.src)">
+                    <div class="flex-1">
+                        <div class="flex justify-between items-start">
+                            <div>
+                                <h4 class="font-black text-xl text-slate-800">{{ m.name }}</h4>
+                                <p class="text-slate-500 font-bold">{{ m.phone }}</p>
+                            </div>
+                            <span class="text-xs bg-amber-100 text-amber-600 font-bold px-2 py-1 rounded">Pending</span>
+                        </div>
+                        <p class="text-xs text-slate-400 mt-2">申請時間: {{ new Date(m.created_at).toLocaleString() }}</p>
+                        <div class="flex gap-2 mt-3">
+                            <button @click="auditMember(m, 'active')" class="flex-1 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 text-sm">核准入會</button>
+                            <button @click="auditMember(m, 'rejected')" class="px-4 border-2 border-slate-200 text-slate-500 rounded-lg font-bold hover:bg-slate-50 text-sm">拒絕</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.qr" class="fixed inset-0 bg-slate-900/80 z-50 flex items-center justify-center p-4" @click.self="modals.qr=false">
+        <div class="bg-white p-8 rounded-3xl text-center max-w-sm w-full animate-bounce-in">
+            <h3 class="font-black text-2xl text-slate-800 mb-2">掃描註冊會員</h3>
+            <p class="text-slate-500 font-bold mb-6 text-sm">請顧客使用手機相機掃描</p>
+            <div id="qrcode" class="flex justify-center mb-6 p-4 bg-white border-4 border-indigo-50 rounded-xl"></div>
+            <button @click="modals.qr=false" class="text-slate-400 font-bold hover:text-indigo-600">關閉視窗</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const { createApp, ref, reactive, onMounted, computed, watch } = Vue;
+
+createApp({
+    setup() {
+        // --- 設定與狀態 ---
+        const config = reactive({ 
+            // ⚠️ 請填入您的 Supabase URL 和 Key
+            url: 'https://YOUR_PROJECT.supabase.co', 
+            key: 'YOUR_ANON_KEY',
+            storeName: 'E書漫'
+        });
+
+        const isMobileMode = ref(false);
+        const registerCompleted = ref(false);
+        const isLoading = ref(false);
+        
+        // POS 狀態
+        const searchInput = ref('');
+        const verifiedMember = ref(null);
+        const pendingMembers = ref([]);
+        const modals = reactive({ audit: false, qr: false });
+        
+        // 表單
+        const registerForm = reactive({ name: '', phone: '', photo: null });
+        
+        let supabase = null;
+
+        // --- 初始化 ---
+        onMounted(() => {
+            // 1. 判斷模式
+            const params = new URLSearchParams(window.location.search);
+            if(params.has('register')) {
+                isMobileMode.value = true;
+            } else {
+                initSupabase(); // 只有 POS 端需要連接即時監聽
+                generateQRCode();
+            }
+        });
+
+        const initSupabase = () => {
+            if(!config.url) return;
+            supabase = window.supabase.createClient(config.url, config.key);
+            
+            // 載入待審核名單
+            fetchPending();
+            
+            // 開啟 Realtime 監聽 (即時收到新註冊)
+            supabase.channel('member-audit')
+                .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'members' }, payload => {
+                    // 當有新資料插入時
+                    if(payload.new.status === 'pending') {
+                        pendingMembers.value.unshift(payload.new);
+                        playSound('ding'); // 提示音
+                    }
+                })
+                .subscribe();
+        };
+
+        // --- POS 功能 ---
+
+        const fetchPending = async () => {
+            const { data } = await supabase.from('members').select('*').eq('status', 'pending').order('created_at', {ascending:false});
+            pendingMembers.value = data || [];
+        };
+
+        const posSearch = async () => {
+            const q = searchInput.value.trim();
+            if(!q) return;
+            
+            // 只搜尋 active (已審核) 的會員
+            const { data, error } = await supabase.from('members')
+                .select('*')
+                .eq('status', 'active') 
+                .or(`phone.eq.${q}, id.eq.${q}`) // 支援電話或ID搜尋
+                .maybeSingle();
+
+            if(data) {
+                verifiedMember.value = data;
+                playSound('success');
+                searchInput.value = ''; // 清空輸入框
+            } else {
+                alert('查無此會員或尚未通過審核');
+                verifiedMember.value = null;
+            }
+        };
+
+        const confirmIdentity = () => {
+            alert(`完成報到！會員：${verifiedMember.value.name}`);
+            // 這裡可以寫入 visit_logs
+            verifiedMember.value = null; 
+        };
+
+        const auditMember = async (member, status) => {
+            if(!confirm(`確定要 ${status === 'active' ? '核准' : '拒絕'} ${member.name} ?`)) return;
+            
+            if(status === 'rejected') {
+                await supabase.from('members').delete().eq('id', member.id);
+            } else {
+                await supabase.from('members').update({ status: 'active' }).eq('id', member.id);
+            }
+            
+            // 更新列表
+            pendingMembers.value = pendingMembers.value.filter(m => m.id !== member.id);
+        };
+
+        const clearMember = () => verifiedMember.value = null;
+
+        // --- 顧客手機端功能 ---
+
+        const handleMobilePhoto = (e) => {
+            const file = e.target.files[0];
+            if(!file) return;
+            // 壓縮圖片並轉 Base64
+            const reader = new FileReader();
+            reader.onload = (event) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    // 縮圖到 600px 寬，避免 Base64 太大塞爆資料庫
+                    const scale = 600 / img.width;
+                    canvas.width = 600;
+                    canvas.height = img.height * scale;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+                    registerForm.photo = canvas.toDataURL('image/jpeg', 0.7);
+                };
+                img.src = event.target.result;
+            };
+            reader.readAsDataURL(file);
+        };
+
+        const submitMobileRegister = async () => {
+            if(!registerForm.name || !registerForm.phone || !registerForm.photo) {
+                alert('請完整填寫並拍攝照片');
+                return;
+            }
+            isLoading.value = true;
+            
+            // 這裡重新初始化一個臨時 client (因為手機端也需要連線)
+            // 實際專案中，手機端建議透過 Backend API 呼叫，避免 Key 暴露，但此為 MVP
+            const tempClient = window.supabase.createClient(config.url, config.key);
+            
+            const { error } = await tempClient.from('members').insert({
+                name: registerForm.name,
+                phone: registerForm.phone,
+                photo: registerForm.photo,
+                status: 'pending', // 重點：標記為待審核
+                created_at: new Date()
+            });
+
+            if(error) {
+                alert('註冊失敗：' + error.message);
+            } else {
+                registerCompleted.value = true;
+                // 清空
+                Object.assign(registerForm, { name:'', phone:'', photo:null });
+            }
+            isLoading.value = false;
+        };
+
+        // --- 工具 ---
+        const generateQRCode = () => {
+            setTimeout(() => {
+                const url = window.location.href.split('?')[0] + '?register=1';
+                new QRCode(document.getElementById("qrcode"), {
+                    text: url,
+                    width: 200,
+                    height: 200
+                });
+            }, 500);
+        };
+
+        const playSound = (type) => {
+            // 簡單音效模擬
+            const ctx = new (window.AudioContext || window.webkitAudioContext)();
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            osc.connect(gain); gain.connect(ctx.destination);
+            
+            if(type === 'ding') { // 審核通知音 (叮咚)
+                osc.frequency.setValueAtTime(800, ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(400, ctx.currentTime + 0.1);
+                gain.gain.setValueAtTime(0.1, ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.5);
+                osc.start(); osc.stop(ctx.currentTime + 0.5);
+            } else { // 成功音
+                osc.frequency.value = 600;
+                gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.3);
+                osc.start(); osc.stop(ctx.currentTime + 0.3);
+            }
+        };
+
+        return { 
+            config, isMobileMode, registerForm, registerCompleted, isLoading,
+            handleMobilePhoto, submitMobileRegister,
+            searchInput, verifiedMember, pendingMembers, modals, 
+            posSearch, confirmIdentity, auditMember, clearMember,
+            pendingCount: computed(() => pendingMembers.value.length)
+        };
+    }
+}).mount('#app');
+</script>
+</body>
+</html>
