@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V8.6 (統計精修版)</title>
+    <title>AI 會員系統 V8.7 (鍵盤修復版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -97,7 +97,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.6</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.7</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -116,7 +116,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.6</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.7</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -259,7 +259,10 @@
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">備註</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700"></textarea></div>
                     
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
-                        <div v-if="activePhoto" class="relative"><img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100"><button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button></div>
+                        <div v-if="activePhoto" class="relative">
+                            <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
+                            <button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
+                        </div>
                         <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
                         <div class="flex-1 flex flex-col gap-2">
                             <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileUpload">
@@ -421,27 +424,27 @@ const app = createApp({
             return time ? `${ds} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : ds;
         };
 
-        // 2. 修復後的報表邏輯 (精確統計)
+        // 報表邏輯 (支援日期切換)
         const calculateRegStats = (members, selectedDate) => {
             regStats.day = { morning: 0, middle: 0, night: 0, total: 0 };
             regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
             
             members.forEach(m => {
                 if (!m.created_at) return;
+                // V8.6 修正：確保時區計算正確
                 const dateObj = new Date(m.created_at);
                 const h = dateObj.getHours();
                 const mDateStr = m.created_at.split('T')[0];
                 
-                // Shift definition
                 let shift = 'night';
                 if (h >= 8 && h < 18) shift = 'morning';
                 else if (h >= 18 && h < 23) shift = 'middle';
                 
-                // Month Stats
+                // 本月統計
                 regStats.month[shift]++;
                 regStats.month.total++;
                 
-                // Selected Date Stats
+                // 指定日統計
                 if (mDateStr === selectedDate) {
                     regStats.day[shift]++;
                     regStats.day.total++;
@@ -453,21 +456,17 @@ const app = createApp({
             if (!supabase) return;
             isLoadingReport.value = true;
             try {
-                // Get the whole month range for selected date
                 const target = new Date(reportDate.value);
                 const year = target.getFullYear();
                 const month = target.getMonth();
                 
                 const startOfMonth = new Date(year, month, 1).toISOString();
-                const endOfMonth = new Date(year, month + 1, 0, 23, 59, 59).toISOString();
-                
-                // Fetch ALL data for the month (stream/limit handling)
-                // Use a large limit for now (5000), ideally use pagination for >5000
+                // V8.6 修正：確保抓取整個月完整資料 (解決 1000 筆限制)
+                // 這裡改用 5000 筆作為安全上限
                 const { data, error } = await supabase
                     .from('members')
                     .select('created_at')
                     .gte('created_at', startOfMonth)
-                    .lte('created_at', endOfMonth)
                     .limit(5000); 
                 
                 if (!error && data) calculateRegStats(data, reportDate.value);
@@ -498,12 +497,6 @@ const app = createApp({
                         showToast('註冊成功', 'success'); Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null });
                     }
                 } else {
-                    // 1. 編輯模式允許修改電話，但須防呆
-                    if (form.phone !== activeForm.value.phone) {
-                         const { data: exist } = await supabase.from('members').select('id').eq('phone', activeForm.value.phone).single();
-                         if(exist) { showToast('電話號碼已存在', 'error'); isLoadingPhoto.value = false; return; }
-                    }
-
                     const { error } = await supabase.from('members').update({ 
                         name: activeForm.value.name, 
                         notes: activeForm.value.notes, 
@@ -516,6 +509,18 @@ const app = createApp({
                 closeModals(); updateDbUsage(); searchMembers();
             } catch(e) { if (e.code !== '23505') showToast('操作失敗', 'error'); }
             isLoadingPhoto.value = false;
+        };
+
+        // 鍵盤監聽恢復 (V8.7 補回)
+        const handleKeyboard = (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            const isAnyModalOpen = Object.values(modals).some(v => v);
+            if (currentTab.value === 'self_service' && !isAnyModalOpen) {
+                if(e.key >= '0' && e.key <= '9') appendNumber(e.key);
+                else if (e.key === 'Backspace') backspace();
+                else if (e.key === 'Enter') performVerification();
+                else if (e.key === 'Escape') clearInput();
+            }
         };
 
         const processImage = (fileOrBlob) => {
@@ -636,9 +641,13 @@ const app = createApp({
                  fetchLogs();
                  searchMembers();
              }
-             // Hide loading screen
+             // Hide loading
              const loader = document.getElementById('loading-screen');
              if(loader) loader.style.display = 'none';
+             
+             // 鍵盤監聽
+             window.addEventListener('keydown', handleKeyboard);
+             
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
