@@ -3,11 +3,10 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V8.3 (極速觸控版)</title>
+    <title>AI 會員系統 V8.4 (報表增強版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
@@ -22,23 +21,19 @@
     <style>
         body { font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
         
-        /* 關鍵修正：防止亂碼顯示 */
+        /* 徹底解決亂碼問題 */
         [v-cloak] { display: none !important; }
-        
-        /* 載入中畫面 */
-        #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #cbd5e1; }
+        #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; justify-content: center; align-items: center; }
 
-        .no-zoom { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-        
-        /* 按鈕按壓特效 (針對 Touch 優化) */
-        .numpad-btn { transition: transform 0.05s, background-color 0.1s; }
+        .no-zoom { touch-action: manipulation; user-select: none; }
+        .numpad-btn { transition: transform 0.05s, background 0.1s; }
         .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
 
-        /* Toast 動畫 */
+        /* 動畫 */
         .cute-toast-enter-active { animation: bounceIn 0.4s; }
         .cute-toast-leave-active { transition: all 0.3s; opacity: 0; transform: scale(0.8); }
         @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
-
+        
         .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.3s ease; }
         .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
 
@@ -54,9 +49,9 @@
 <body class="bg-slate-50">
 
 <div id="loading-screen">
-    <div class="text-center">
-        <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-500"></i>
-        <p>System Loading...</p>
+    <div class="text-center text-indigo-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
+        <p class="font-bold">System Loading...</p>
     </div>
 </div>
 
@@ -106,14 +101,14 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.3</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.4</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-rose-500">管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">商店名稱</label><input v-model="config.storeName" placeholder="E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none"></div>
                 <div>
-                    <label class="text-xs font-bold text-indigo-500">提示音量 ({{ Math.round(config.volume * 100) }}%)</label>
+                    <label class="text-xs font-bold text-indigo-500">提示音量</label>
                     <input type="range" v-model="config.volume" min="0" max="1" step="0.1" class="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg cursor-pointer">
                 </div>
                 <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
@@ -125,7 +120,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.3</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.4</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -154,33 +149,21 @@
                 <div class="w-full md:w-[35%] p-6 md:p-8 flex flex-col justify-between border-r border-slate-100 bg-white relative">
                     <div class="absolute top-0 right-0 w-40 h-40 bg-pink-50 rounded-full translate-x-1/2 -translate-y-1/2 opacity-60 pointer-events-none"></div>
                     <div class="mt-2 text-center md:text-left z-10">
-                        <div class="inline-flex w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl items-center justify-center text-indigo-600 mb-4 shadow-sm transform rotate-3">
-                            <i class="fa-solid fa-robot text-4xl animate-bounce"></i>
-                        </div>
+                        <div class="inline-flex w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl items-center justify-center text-indigo-600 mb-4 shadow-sm transform rotate-3"><i class="fa-solid fa-robot text-4xl animate-bounce"></i></div>
                         <h2 class="text-3xl font-black text-slate-800 tracking-tight">{{ config.storeName || '智能櫃台' }}</h2>
                         <p class="text-slate-400 font-bold mt-1">請輸入電話或註冊</p>
                     </div>
                     <div class="flex flex-col gap-4 mt-6 z-10">
                         <button @click="openSelfRegister" class="w-full py-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition transform active:scale-95 group relative overflow-hidden no-zoom">
                             <div class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition"></div>
-                            <div class="flex items-center justify-center gap-3">
-                                <i class="fa-solid fa-user-plus text-3xl"></i>
-                                <div class="text-left">
-                                    <span class="block text-2xl font-black tracking-wide">新會員註冊</span>
-                                    <span class="block text-xs text-indigo-100 font-bold">加入我們 享專屬優惠</span>
-                                </div>
-                            </div>
+                            <div class="flex items-center justify-center gap-3"><i class="fa-solid fa-user-plus text-3xl"></i><div class="text-left"><span class="block text-2xl font-black tracking-wide">新會員註冊</span><span class="block text-xs text-indigo-100 font-bold">加入我們 享專屬優惠</span></div></div>
                         </button>
                     </div>
                 </div>
-                
                 <div class="w-full md:w-[65%] p-4 md:p-8 flex flex-col justify-center bg-slate-50/50 relative">
                     <div class="mb-4 text-center">
                         <div class="bg-amber-100 border border-amber-200 rounded-xl p-3 mb-4 inline-block shadow-sm mx-4">
-                            <p class="text-amber-800 text-sm font-bold leading-relaxed">
-                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
-                                會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。
-                            </p>
+                            <p class="text-amber-800 text-sm font-bold leading-relaxed"><i class="fa-solid fa-triangle-exclamation mr-1"></i> 會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。</p>
                         </div>
                         <label class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 block">Member Phone Login</label>
                         <div class="h-20 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-slate-200 mx-auto max-w-md w-full relative">
@@ -189,31 +172,11 @@
                             <button v-if="selfServiceInput" @click="clearInput" class="absolute right-4 text-slate-300 hover:text-rose-400 text-xl w-12 h-12 flex items-center justify-center"><i class="fa-solid fa-circle-xmark"></i></button>
                         </div>
                     </div>
-                    
                     <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full">
-                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" 
-                                @touchstart.prevent="appendNumber(n)" 
-                                @mousedown.prevent="appendNumber(n)"
-                                class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">
-                            {{ n }}
-                        </button>
-                        
-                        <button @touchstart.prevent="backspace" @mousedown.prevent="backspace" 
-                                class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1">
-                            <i class="fa-solid fa-delete-left"></i>
-                        </button>
-                        
-                        <button @touchstart.prevent="appendNumber(0)" @mousedown.prevent="appendNumber(0)" 
-                                class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">
-                            0
-                        </button>
-                        
-                        <button @touchstart.prevent="performVerification" @mousedown.prevent="performVerification" 
-                                :disabled="isLoading" 
-                                class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50">
-                            <i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i>
-                            <i v-else class="fa-solid fa-arrow-right"></i>
-                        </button>
+                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @touchstart.prevent="appendNumber(n)" @mousedown.prevent="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
+                        <button @touchstart.prevent="backspace" @mousedown.prevent="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
+                        <button @touchstart.prevent="appendNumber(0)" @mousedown.prevent="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
+                        <button @touchstart.prevent="performVerification" @mousedown.prevent="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -221,45 +184,22 @@
 
         <div v-show="currentTab === 'list'" class="space-y-4 max-w-6xl mx-auto animate-fade-in-up pb-20">
              <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-3">
-                 <div class="relative flex-1 group">
-                     <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                     <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="搜尋：姓名、電話、註冊日..." class="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold">
-                 </div>
-                 <div class="flex items-center gap-2 bg-slate-50 px-3 rounded-xl border-2 border-slate-100">
-                     <span class="text-xs font-bold text-slate-400">註冊區間</span>
-                     <input v-model="dateStart" type="date" class="bg-transparent outline-none font-bold text-slate-600">
-                     <span class="text-slate-300">~</span>
-                     <input v-model="dateEnd" type="date" class="bg-transparent outline-none font-bold text-slate-600">
-                 </div>
+                 <div class="relative flex-1 group"><i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="搜尋：姓名、電話、註冊日..." class="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold"></div>
+                 <div class="flex items-center gap-2 bg-slate-50 px-3 rounded-xl border-2 border-slate-100"><span class="text-xs font-bold text-slate-400">註冊區間</span><input v-model="dateStart" type="date" class="bg-transparent outline-none font-bold text-slate-600"><span class="text-slate-300">~</span><input v-model="dateEnd" type="date" class="bg-transparent outline-none font-bold text-slate-600"></div>
                  <button @click="searchMembers" class="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
-                 <button @click="openRegReport" class="bg-pink-500 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-pink-600 transition flex items-center">
-                     <i class="fa-solid fa-chart-bar mr-2"></i>註冊報表
-                 </button>
+                 <button @click="openRegReport" class="bg-pink-500 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-pink-600 transition flex items-center"><i class="fa-solid fa-chart-bar mr-2"></i>註冊報表</button>
              </div>
-             
              <div v-if="isLoadingList" class="py-20 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-300"></i><p class="font-bold">資料讀取中...</p></div>
-
              <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-                 <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" 
-                      class="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition border-l-8 cursor-pointer relative group"
-                      :class="getMemberBorder(m.created_at)">
+                 <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" class="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition border-l-8 cursor-pointer relative group" :class="getMemberBorder(m.created_at)">
                      <div class="flex items-start gap-4">
-                         <div v-if="m.photo" class="w-16 h-16 rounded-2xl bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
-                             <img :src="m.photo" class="w-full h-full object-cover">
-                         </div>
-                         <div v-else class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl flex-shrink-0">
-                            {{ m.name ? m.name.charAt(0) : '?' }}
-                         </div>
+                         <div v-if="m.photo" class="w-16 h-16 rounded-2xl bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200"><img :src="m.photo" class="w-full h-full object-cover"></div>
+                         <div v-else class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl flex-shrink-0">{{ m.name ? m.name.charAt(0) : '?' }}</div>
                          <div class="flex-1 overflow-hidden">
                              <b class="truncate block text-xl text-slate-800 mb-1">{{m.name}}</b>
                              <p class="text-base text-slate-500 font-bold tracking-wider mb-2">{{m.phone}}</p>
-                             <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-2">
-                                 <span class="text-xs text-slate-400 font-bold block uppercase">Created At</span>
-                                 <span class="text-sm text-indigo-600 font-bold">{{ formatDate(m.created_at, true) }}</span>
-                             </div>
-                             <div v-if="m.notes" class="bg-amber-50 p-2 rounded-lg border border-amber-100">
-                                 <p class="text-sm text-amber-700 font-bold truncate">{{m.notes}}</p>
-                             </div>
+                             <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-2"><span class="text-xs text-slate-400 font-bold block uppercase">Created At</span><span class="text-sm text-indigo-600 font-bold">{{ formatDate(m.created_at, true) }}</span></div>
+                             <div v-if="m.notes" class="bg-amber-50 p-2 rounded-lg border border-amber-100"><p class="text-sm text-amber-700 font-bold truncate">{{m.notes}}</p></div>
                          </div>
                      </div>
                  </div>
@@ -268,16 +208,11 @@
 
         <div v-show="currentTab === 'dashboard'" class="max-w-4xl mx-auto animate-fade-in-up pb-20">
             <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl shadow-lg text-white">
-                    <h3 class="text-indigo-100 font-bold mb-2">本月來客總數</h3><span class="text-5xl font-black">{{ stats.monthVisits }}</span>
-                </div>
+                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl shadow-lg text-white"><h3 class="text-indigo-100 font-bold mb-2">本月來客總數</h3><span class="text-5xl font-black">{{ stats.monthVisits }}</span></div>
                 <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100"><h3 class="text-slate-400 font-bold mb-2">資料庫會員</h3><span class="text-5xl font-black text-slate-800">{{ totalMemberCount }}</span></div>
             </div>
             <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
-                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="font-bold text-slate-800 text-lg">即時來客紀錄</h3>
-                    <button @click="fetchLogs" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold"><i class="fa-solid fa-sync mr-1"></i>重新整理</button>
-                </div>
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50"><h3 class="font-bold text-slate-800 text-lg">即時來客紀錄</h3><button @click="fetchLogs" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold"><i class="fa-solid fa-sync mr-1"></i>重新整理</button></div>
                 <ul v-if="dashboardLogs.length > 0" class="divide-y divide-slate-100">
                     <li v-for="log in dashboardLogs" :key="log.id" class="p-5 flex justify-between items-center hover:bg-slate-50 transition gap-4">
                         <div class="flex items-center gap-4">
@@ -295,77 +230,9 @@
         </div>
     </main>
 
-    <div v-if="modals.report" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[85] flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
-            <div class="px-8 py-6 bg-gradient-to-r from-pink-500 to-rose-500 text-white flex justify-between items-center">
-                <h3 class="font-black text-2xl tracking-wide flex items-center"><i class="fa-solid fa-chart-bar mr-3"></i>會員註冊統計</h3>
-                <button @click="modals.report = false" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
-            </div>
-            
-            <div v-if="isLoadingReport" class="flex-1 flex flex-col items-center justify-center p-12 text-slate-400">
-                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-pink-300"></i>
-                <p class="font-bold">數據分析中...</p>
-            </div>
-
-            <div v-else class="p-8 overflow-y-auto space-y-8 bg-slate-50">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
-                            <h4 class="font-black text-slate-700 text-lg">今日新增</h4>
-                            <span class="text-4xl font-black text-pink-500">{{ regStats.today.total }}</span>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班 (08-17)</span>
-                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.today.morning }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班 (18-22)</span>
-                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.today.middle }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班 (23-07)</span>
-                                <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.today.night }}</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
-                            <h4 class="font-black text-slate-700 text-lg">本月累計</h4>
-                            <span class="text-4xl font-black text-indigo-500">{{ regStats.month.total }}</span>
-                        </div>
-                        <div class="space-y-4">
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班</span>
-                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.morning }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班</span>
-                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.middle }}</span>
-                            </div>
-                            <div class="flex justify-between items-center">
-                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班</span>
-                                <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.night }}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-                
-                <div class="text-center text-xs text-slate-400 font-bold">
-                    統計範圍：{{ new Date().getFullYear() }}年{{ new Date().getMonth()+1 }}月
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
-            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]">
-                <h3 class="font-black text-xl text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書
-                </h3>
-            </div>
+            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
             <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
                 <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
                 <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
@@ -391,21 +258,13 @@
                                :disabled="!modals.register">
                     </div>
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">備註</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700"></textarea></div>
-                    
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
-                        <div v-if="activePhoto" class="relative">
-                            <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
-                            <button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
-                        </div>
+                        <div v-if="activePhoto" class="relative"><img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100"><button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button></div>
                         <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
                         <div class="flex-1 flex flex-col gap-2">
                             <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileUpload">
-                            <button @click="$refs.fileInput.click()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold border border-slate-200 hover:bg-slate-200 transition text-sm">
-                                <i class="fa-solid fa-upload mr-1"></i>上傳照片
-                            </button>
-                            <button @click="openCamera" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition text-sm">
-                                <i class="fa-solid fa-camera mr-1"></i>開啟相機
-                            </button>
+                            <button @click="$refs.fileInput.click()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold border border-slate-200 hover:bg-slate-200 transition text-sm"><i class="fa-solid fa-upload mr-1"></i>上傳照片</button>
+                            <button @click="openCamera" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition text-sm"><i class="fa-solid fa-camera mr-1"></i>開啟相機</button>
                         </div>
                     </div>
                 </div>
@@ -413,6 +272,71 @@
             <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
                 <button v-if="modals.form" @click="deleteMember" class="px-5 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.report" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[85] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-8 py-6 bg-gradient-to-r from-pink-500 to-rose-500 text-white flex justify-between items-center">
+                <h3 class="font-black text-2xl tracking-wide flex items-center"><i class="fa-solid fa-chart-bar mr-3"></i>會員註冊統計</h3>
+                <button @click="modals.report = false" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+            
+            <div class="bg-white px-8 py-4 border-b border-slate-100 flex items-center justify-between">
+                <label class="text-slate-500 font-bold">選擇日期：</label>
+                <input type="date" v-model="reportDate" class="bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none focus:border-pink-300" @change="refreshReport">
+            </div>
+
+            <div v-if="isLoadingReport" class="flex-1 flex flex-col items-center justify-center p-12 text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-pink-300"></i>
+                <p class="font-bold">數據分析中...</p>
+            </div>
+
+            <div v-else class="p-8 overflow-y-auto space-y-8 bg-slate-50">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
+                            <h4 class="font-black text-slate-700 text-lg">{{ reportDate === todayStr ? '今日' : reportDate }} 新增</h4>
+                            <span class="text-4xl font-black text-pink-500">{{ regStats.day.total }}</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班</span>
+                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.morning }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班</span>
+                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.middle }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班</span>
+                                <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.night }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 opacity-80">
+                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
+                            <h4 class="font-black text-slate-700 text-lg">本月累計</h4>
+                            <span class="text-4xl font-black text-indigo-500">{{ regStats.month.total }}</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班</span>
+                                <span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.morning }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班</span>
+                                <span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.middle }}</span>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班</span>
+                                <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.night }}</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -451,8 +375,11 @@ const app = createApp({
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         
+        // 報表數據 (增加 Day)
+        const todayStr = new Date().toISOString().split('T')[0];
+        const reportDate = ref(todayStr); // 預設今天
         const regStats = reactive({
-            today: { morning: 0, middle: 0, night: 0, total: 0 },
+            day: { morning: 0, middle: 0, night: 0, total: 0 },
             month: { morning: 0, middle: 0, night: 0, total: 0 }
         });
         
@@ -526,39 +453,60 @@ const app = createApp({
             return time ? `${ds} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : ds;
         };
 
+        // 報表邏輯 (支援日期切換)
         const calculateRegStats = (members) => {
-            regStats.today = { morning: 0, middle: 0, night: 0, total: 0 };
+            regStats.day = { morning: 0, middle: 0, night: 0, total: 0 };
             regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
-            const now = new Date();
-            const todayStr = now.toISOString().split('T')[0];
+            
+            const targetDateStr = reportDate.value; // 使用者選擇的日期
+            
             members.forEach(m => {
                 if (!m.created_at) return;
                 const d = new Date(m.created_at);
                 const h = d.getHours();
                 const mDateStr = m.created_at.split('T')[0];
+                
                 let shift = 'night';
                 if (h >= 8 && h < 18) shift = 'morning';
                 else if (h >= 18 && h < 23) shift = 'middle';
+                
+                // Month Stats (Query filter covers current month)
                 regStats.month[shift]++;
                 regStats.month.total++;
-                if (mDateStr === todayStr) {
-                    regStats.today[shift]++;
-                    regStats.today.total++;
+                
+                // Selected Date Stats
+                if (mDateStr === targetDateStr) {
+                    regStats.day[shift]++;
+                    regStats.day.total++;
                 }
             });
         };
 
-        const openRegReport = async () => {
+        const refreshReport = async () => {
             if (!supabase) return;
-            modals.report = true;
             isLoadingReport.value = true;
             try {
-                const now = new Date();
+                // 為了算本月累計，我們抓整個月份的資料
+                // 同時也涵蓋了使用者選擇的那一天 (如果選的是本月日期)
+                const now = new Date(reportDate.value); // 依選取日期決定月份
                 const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-                const { data, error } = await supabase.from('members').select('created_at').gte('created_at', startOfMonth);
+                const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString();
+                
+                const { data, error } = await supabase
+                    .from('members')
+                    .select('created_at')
+                    .gte('created_at', startOfMonth)
+                    .lte('created_at', endOfMonth + 'T23:59:59');
+                
                 if (!error && data) calculateRegStats(data);
-            } catch (e) { showToast('報表失敗', 'error'); }
+            } catch (e) { showToast('報表錯誤', 'error'); }
             isLoadingReport.value = false;
+        };
+
+        const openRegReport = () => {
+            modals.report = true;
+            reportDate.value = todayStr; // Reset to today
+            refreshReport();
         };
 
         const submitForm = async () => {
@@ -581,7 +529,8 @@ const app = createApp({
                     const { error } = await supabase.from('members').update({ 
                         name: activeForm.value.name, 
                         notes: activeForm.value.notes, 
-                        photo: activeForm.value.photo 
+                        photo: activeForm.value.photo,
+                        phone: activeForm.value.phone 
                     }).eq('id', activeForm.value.id);
                     if(error) throw error;
                     showToast('修改成功', 'success');
@@ -715,7 +664,7 @@ const app = createApp({
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, shiftStats: computed(()=>({})), regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, stats: computed(()=>({monthVisits: dashboardLogs.value.length})) };
+        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats: computed(()=>({monthVisits: dashboardLogs.value.length})) };
     }
 });
 app.mount('#app');
