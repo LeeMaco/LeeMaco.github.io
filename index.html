@@ -3,12 +3,11 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 智能會員系統 V7.5 (企業管理版)</title>
+    <title>會員系統 V7.9 (專業報表版)</title>
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
@@ -30,26 +29,31 @@
         .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.4s ease; }
         .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
 
-        #video-container video { width: 100%; height: 100%; object-fit: cover; }
-        .mirror-x { transform: scaleX(-1); }
-        .beauty-filter { filter: saturate(1.2) brightness(1.1) contrast(1.1) blur(0.3px); }
-        .scan-line { position: absolute; width: 100%; height: 3px; background: #ec4899; box-shadow: 0 0 20px #ec4899; animation: scanning 1.5s infinite ease-in-out; }
-        @keyframes scanning { 0% {top:0; opacity: 0;} 10% {opacity: 1;} 90% {opacity: 1;} 100% {top:100%; opacity: 0;} }
+        /* 時段外框顏色定義 */
+        .border-time-day { border-color: #f97316; background-color: #fff7ed; } /* 橘色早班 */
+        .border-time-night { border-color: #10b981; background-color: #ecfdf5; } /* 綠色中班 */
+        .border-time-late { border-color: #8b5cf6; background-color: #f5f3ff; } /* 紫色晚班 */
+
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+        .mirror-x { transform: scaleX(-1); }
     </style>
 </head>
 <body class="bg-slate-50">
 
-<div id="app" class="min-h-screen flex flex-col pb-safe" @click="unlockAudio">
+<div id="app" class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
     
     <transition name="fullscreen-overlay">
         <div v-if="fullscreenMsg.show" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl" @click="closeFullscreen">
             <div class="transform scale-110 text-center p-8 max-w-lg w-full">
-                <div class="w-32 h-32 rounded-full flex items-center justify-center text-6xl mb-6 mx-auto animate-bounce shadow-2xl"
+                <div v-if="fullscreenMsg.photo" class="mb-6 mx-auto animate-bounce">
+                    <img :src="fullscreenMsg.photo" class="w-40 h-40 rounded-full object-cover border-4 border-white shadow-2xl mx-auto bg-gray-100">
+                </div>
+                <div v-else class="w-32 h-32 rounded-full flex items-center justify-center text-6xl mb-6 mx-auto animate-bounce shadow-2xl"
                      :class="fullscreenMsg.type==='success' ? 'bg-emerald-100 text-emerald-500 ring-4 ring-emerald-50' : (fullscreenMsg.type==='warning' ? 'bg-amber-100 text-amber-500 ring-4 ring-amber-50' : 'bg-rose-100 text-rose-500 ring-4 ring-rose-50')">
                     <i class="fa-solid" :class="fullscreenMsg.type==='success' ? 'fa-check' : (fullscreenMsg.type==='warning' ? 'fa-id-card' : 'fa-times')"></i>
                 </div>
+                
                 <h1 class="text-4xl font-black text-slate-800 mb-2 tracking-tight">{{ fullscreenMsg.title }}</h1>
                 
                 <div v-if="fullscreenMsg.type === 'success'" class="space-y-4 mt-4 animate-fade-in-up">
@@ -84,12 +88,16 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.5</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.9</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-rose-500">設定管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">商店名稱</label><input v-model="config.storeName" placeholder="E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none"></div>
+                <div>
+                    <label class="text-xs font-bold text-indigo-500">提示音量 ({{ Math.round(config.volume * 100) }}%)</label>
+                    <input type="range" v-model="config.volume" min="0" max="1" step="0.1" class="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                </div>
                 <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
             </div>
         </div>
@@ -99,7 +107,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-pink-500 text-white px-2 py-0.5 rounded-full ml-2">V7.5</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V7.9</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -111,18 +119,10 @@
                         <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/10000)*100, 100) + '%'}"></div>
                     </div>
                 </div>
-
-                <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition p-2 rounded-full hover:bg-slate-100">
-                    <i class="fa-solid fa-cloud-arrow-up-down text-xl"></i>
-                </button>
-
+                <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-cloud-arrow-up-down text-xl"></i></button>
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500 p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-gear"></i></button>
                 <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
                     <span class="text-indigo-500 flex items-center"><i class="fa-solid fa-cloud mr-1.5"></i>Online</span>
-                    <span class="w-[1px] h-3 bg-slate-300 mx-1"></span>
-                    <span :class="isFaceModelLoaded ? 'text-emerald-500' : 'text-slate-400'" class="flex items-center">
-                        <i class="fa-solid" :class="isFaceModelLoaded ? 'fa-face-smile' : 'fa-circle-notch fa-spin'"></i>
-                    </span>
                 </div>
             </div>
         </div>
@@ -134,7 +134,6 @@
     </header>
 
     <main class="flex-grow p-4 overflow-y-auto">
-        
         <div v-show="currentTab === 'self_service'" class="w-full max-w-6xl mx-auto h-[82vh] flex items-center justify-center">
             <div class="bg-white w-full h-full md:h-auto md:aspect-[16/10] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
                 <div class="w-full md:w-[35%] p-6 md:p-8 flex flex-col justify-between border-r border-slate-100 bg-white relative">
@@ -157,18 +156,17 @@
                                 </div>
                             </div>
                         </button>
-                        <div class="flex gap-3">
-                             <button @click="startHomepageScan" class="flex-1 py-4 rounded-2xl border-2 border-slate-200 text-slate-600 font-bold flex flex-col items-center justify-center gap-1 hover:bg-slate-50 transition no-zoom">
-                                <i class="fa-solid fa-expand text-xl text-pink-500"></i> AI 快速通關
-                            </button>
-                             <button class="flex-1 py-4 rounded-2xl border-2 border-indigo-100 bg-indigo-50 text-indigo-600 font-bold flex flex-col items-center justify-center gap-1 cursor-default">
-                                <i class="fa-solid fa-phone text-xl"></i> 電話查詢中
-                            </button>
-                        </div>
                     </div>
                 </div>
+                
                 <div class="w-full md:w-[65%] p-4 md:p-8 flex flex-col justify-center bg-slate-50/50 relative">
                     <div class="mb-4 text-center">
+                        <div class="bg-amber-100 border border-amber-200 rounded-xl p-3 mb-4 inline-block shadow-sm mx-4">
+                            <p class="text-amber-800 text-sm font-bold leading-relaxed">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                                會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。
+                            </p>
+                        </div>
                         <label class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 block">Member Phone Login</label>
                         <div class="h-20 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-slate-200 mx-auto max-w-md w-full relative">
                             <span v-if="selfServiceInput" class="text-5xl font-black text-slate-800 tracking-widest">{{ selfServiceInput }}</span>
@@ -190,7 +188,7 @@
              <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-3">
                  <div class="relative flex-1 group">
                      <i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
-                     <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="關鍵字：姓名、電話、註冊日(2023-12-01)..." class="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold">
+                     <input v-model="searchQuery" @keyup.enter="searchMembers" type="text" placeholder="搜尋：姓名、電話、註冊日..." class="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold">
                  </div>
                  <div class="flex items-center gap-2 bg-slate-50 px-3 rounded-xl border-2 border-slate-100">
                      <span class="text-xs font-bold text-slate-400">註冊區間</span>
@@ -201,28 +199,27 @@
                  <button @click="searchMembers" class="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
              </div>
              
-             <div v-if="isLoadingList" class="py-20 text-center text-slate-400">
-                 <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-300"></i>
-                 <p class="font-bold">資料讀取中...</p>
-             </div>
+             <div v-if="isLoadingList" class="py-20 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-300"></i><p class="font-bold">資料讀取中...</p></div>
 
              <div v-else class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3">
-                 <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" class="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition border-2 border-transparent hover:border-indigo-100 cursor-pointer relative group">
+                 <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" 
+                      class="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition border-l-8 cursor-pointer relative group"
+                      :class="getMemberBorder(m.created_at)">
                      <div class="flex items-start gap-4">
-                         <div class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl flex-shrink-0 group-hover:bg-indigo-50 group-hover:text-indigo-500 transition">
+                         <div v-if="m.photo" class="w-16 h-16 rounded-2xl bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200">
+                             <img :src="m.photo" class="w-full h-full object-cover">
+                         </div>
+                         <div v-else class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl flex-shrink-0">
                             {{ m.name ? m.name.charAt(0) : '?' }}
                          </div>
                          <div class="flex-1 overflow-hidden">
-                             <div class="flex justify-between items-start mb-1">
-                                 <b class="truncate block text-xl text-slate-800">{{m.name}}</b>
-                             </div>
+                             <b class="truncate block text-xl text-slate-800 mb-1">{{m.name}}</b>
                              <p class="text-base text-slate-500 font-bold tracking-wider mb-2">{{m.phone}}</p>
                              <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-2">
                                  <span class="text-xs text-slate-400 font-bold block uppercase">Created At</span>
                                  <span class="text-sm text-indigo-600 font-bold">{{ formatDate(m.created_at, true) }}</span>
                              </div>
                              <div v-if="m.notes" class="bg-amber-50 p-2 rounded-lg border border-amber-100">
-                                 <span class="text-xs text-amber-400 font-bold block uppercase">Note</span>
                                  <p class="text-sm text-amber-700 font-bold truncate">{{m.notes}}</p>
                              </div>
                          </div>
@@ -232,57 +229,66 @@
         </div>
 
         <div v-show="currentTab === 'dashboard'" class="max-w-4xl mx-auto animate-fade-in-up pb-20">
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
-                <div class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl shadow-lg text-white relative overflow-hidden">
-                    <i class="fa-solid fa-users absolute -right-6 -bottom-6 text-9xl opacity-20"></i>
-                    <h3 class="text-indigo-100 font-bold mb-2">本月來客總數</h3>
-                    <span class="text-5xl font-black">{{ stats.monthVisits }}</span>
-                    <p class="text-sm text-indigo-200 mt-2">包含掃臉與電話報到</p>
+            <div class="grid grid-cols-2 gap-4 mb-6">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-black text-slate-700 mb-3 border-b pb-2">今日 ({{ shiftStats.today.total }}人)</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center text-sm font-bold">
+                            <span class="text-orange-500"><i class="fa-solid fa-sun mr-1"></i>早班</span>
+                            <span class="bg-orange-100 text-orange-600 px-3 py-1 rounded-full">{{ shiftStats.today.morning }}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm font-bold">
+                            <span class="text-emerald-500"><i class="fa-solid fa-moon mr-1"></i>中班</span>
+                            <span class="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full">{{ shiftStats.today.middle }}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm font-bold">
+                            <span class="text-purple-500"><i class="fa-solid fa-star mr-1"></i>晚班</span>
+                            <span class="bg-purple-100 text-purple-600 px-3 py-1 rounded-full">{{ shiftStats.today.night }}</span>
+                        </div>
+                    </div>
                 </div>
-                <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 relative overflow-hidden">
-                     <h3 class="text-slate-400 font-bold mb-2">資料庫會員</h3>
-                     <span class="text-5xl font-black text-slate-800">{{ totalMemberCount }}</span>
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-100">
+                    <h3 class="font-black text-slate-700 mb-3 border-b pb-2">本月 ({{ shiftStats.month.total }}人)</h3>
+                    <div class="space-y-3">
+                        <div class="flex justify-between items-center text-sm font-bold">
+                            <span class="text-orange-500"><i class="fa-solid fa-sun mr-1"></i>早班</span>
+                            <span class="bg-orange-100 text-orange-600 px-3 py-1 rounded-full">{{ shiftStats.month.morning }}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm font-bold">
+                            <span class="text-emerald-500"><i class="fa-solid fa-moon mr-1"></i>中班</span>
+                            <span class="bg-emerald-100 text-emerald-600 px-3 py-1 rounded-full">{{ shiftStats.month.middle }}</span>
+                        </div>
+                        <div class="flex justify-between items-center text-sm font-bold">
+                            <span class="text-purple-500"><i class="fa-solid fa-star mr-1"></i>晚班</span>
+                            <span class="bg-purple-100 text-purple-600 px-3 py-1 rounded-full">{{ shiftStats.month.night }}</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-            
+
             <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
                 <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50">
-                    <h3 class="font-bold text-slate-800 text-lg">
-                        <i class="fa-solid fa-clock-rotate-left text-indigo-600 mr-2"></i>即時來客紀錄
-                    </h3>
+                    <h3 class="font-bold text-slate-800 text-lg">即時來客紀錄</h3>
                     <button @click="fetchLogs" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold"><i class="fa-solid fa-sync mr-1"></i>重新整理</button>
                 </div>
-                
                 <ul v-if="dashboardLogs.length > 0" class="divide-y divide-slate-100">
                     <transition-group name="list">
-                        <li v-for="log in dashboardLogs" :key="log.id" class="p-5 flex flex-col md:flex-row md:items-center justify-between hover:bg-slate-50 transition gap-4">
+                        <li v-for="log in dashboardLogs" :key="log.id" class="p-5 flex justify-between items-center hover:bg-slate-50 transition gap-4">
                             <div class="flex items-center gap-4">
-                                <div class="w-14 h-14 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-md transform rotate-3" :class="log.type === 'phone' ? 'bg-indigo-400' : 'bg-pink-400'">
-                                    <i class="fa-solid" :class="log.type === 'phone' ? 'fa-phone' : 'fa-camera'"></i>
+                                <div class="w-12 h-12 rounded-2xl flex items-center justify-center text-white font-bold" 
+                                     :class="getShiftColor(log.check_in_time)">
+                                    <i class="fa-solid fa-clock"></i>
                                 </div>
                                 <div>
-                                    <div class="font-black text-slate-800 text-lg flex items-center gap-2">
-                                        {{ log.name }}
-                                        <span v-if="log.monthCount > 1" class="bg-rose-500 text-white text-[10px] px-2 py-0.5 rounded-full shadow-sm">
-                                            本月第 {{ log.monthCount }} 次
-                                        </span>
-                                    </div>
+                                    <div class="font-black text-slate-800 text-lg">{{ log.name }}</div>
                                     <div class="text-sm text-slate-400 font-bold">{{ log.phone || '無電話' }}</div>
                                 </div>
                             </div>
-                            <div class="text-left md:text-right bg-slate-50 md:bg-transparent p-3 md:p-0 rounded-xl">
-                                <div class="text-base font-bold text-slate-600">{{ formatDate(log.check_in_time, true) }}</div>
-                                <div class="text-xs text-slate-400 font-bold mt-1">
-                                    {{ log.type === 'phone' ? '電話報到' : 'AI 掃臉' }}
-                                </div>
-                            </div>
+                            <div class="text-right text-sm font-bold text-slate-500">{{ formatDate(log.check_in_time, true) }}</div>
                         </li>
                     </transition-group>
                 </ul>
-                <div v-else class="p-16 text-center text-slate-400">
-                    <i class="fa-solid fa-box-open text-5xl mb-4 block opacity-30"></i>
-                    <p class="font-bold">尚無紀錄 (請確認 SQL 是否已執行)</p>
-                </div>
+                <div v-else class="p-16 text-center text-slate-400"><p class="font-bold">尚無紀錄</p></div>
             </div>
         </div>
     </main>
@@ -290,13 +296,11 @@
     <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
             <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]">
-                <h3 class="font-black text-xl text-slate-800 flex items-center gap-2">
-                    <i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書
-                </h3>
+                <h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3>
             </div>
             <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
                 <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
-                <p>為了保障您的權益，我們將蒐集您的姓名、電話及臉部特徵資料用於身分識別。</p>
+                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
                 <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
                 <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
             </div>
@@ -312,15 +316,28 @@
             <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
                 <div class="space-y-4">
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
-                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label>
+                        <input v-model="activeForm.phone" type="tel" 
+                               class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700">
+                    </div>
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">備註</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700"></textarea></div>
+                    
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
                         <div v-if="activePhoto" class="relative">
                             <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
-                            <button v-if="!modals.register" @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
+                            <button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
                         </div>
                         <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
-                        <button @click="startScanForForm" class="flex-1 py-3 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition"><i class="fa-solid fa-camera mr-2"></i>{{ activeForm.face_descriptor ? '重拍照片' : '拍攝臉部' }}</button>
+                        <div class="flex-1 flex flex-col gap-2">
+                            <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileUpload">
+                            <button @click="$refs.fileInput.click()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold border border-slate-200 hover:bg-slate-200 transition text-sm">
+                                <i class="fa-solid fa-upload mr-1"></i>上傳照片
+                            </button>
+                            <button @click="openCamera" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition text-sm">
+                                <i class="fa-solid fa-camera mr-1"></i>開啟相機
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -337,14 +354,11 @@
             <div class="space-y-4">
                 <button @click="exportAllMembers" :disabled="isExporting" class="w-full py-4 bg-white text-indigo-600 rounded-xl font-bold border-2 border-indigo-100 hover:bg-indigo-50 transition shadow-sm flex items-center justify-center gap-2">
                     <i v-if="!isExporting" class="fa-solid fa-file-export"></i>
-                    <i v-else class="fa-solid fa-circle-notch fa-spin"></i>
-                    {{ isExporting ? '匯出處理中...' : '匯出所有會員 (Excel)' }}
+                    {{ isExporting ? '處理中...' : '匯出所有會員' }}
                 </button>
-
                 <div class="relative w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg cursor-pointer flex items-center justify-center gap-2">
                     <i v-if="!isImporting" class="fa-solid fa-file-import"></i>
-                    <i v-else class="fa-solid fa-circle-notch fa-spin"></i>
-                    {{ isImporting ? '匯入處理中...' : '匯入會員資料 (Excel)' }}
+                    {{ isImporting ? '處理中...' : '匯入會員資料' }}
                     <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
                 </div>
             </div>
@@ -352,30 +366,13 @@
         </div>
     </div>
 
-    <div v-show="modals.faceScan" class="fixed inset-0 bg-black z-[60] flex flex-col">
-        <div id="video-container" class="relative w-full h-[60vh] bg-black overflow-hidden rounded-b-[2rem] shadow-2xl">
-            <button @click="stopFaceScan" class="absolute top-6 right-6 w-12 h-12 rounded-full bg-black/40 backdrop-blur-md text-white z-40 border border-white/20 flex items-center justify-center active:scale-95 text-xl"><i class="fa-solid fa-times"></i></button>
-            <select v-model="currentDeviceId" @change="handleCameraSwitch" class="absolute top-6 left-6 bg-black/40 text-white border border-white/20 py-2 pl-4 pr-8 rounded-full text-sm backdrop-blur-md outline-none appearance-none z-40 max-w-[150px]">
-                <option value="">切換鏡頭</option>
-                <option v-for="cam in videoDevices" :key="cam.deviceId" :value="cam.deviceId">{{ cam.label || 'Camera' }}</option>
-            </select>
-            <video id="video" autoplay muted playsinline class="w-full h-full object-cover beauty-filter transition-transform duration-300" :class="{'mirror-x': isFrontCamera}"></video>
-            <div class="absolute inset-0 flex items-center justify-center pointer-events-none">
-                 <div class="w-64 h-64 border-4 border-white/20 rounded-[3rem] relative overflow-hidden backdrop-blur-[2px]">
-                    <div class="scan-line"></div>
-                 </div>
-            </div>
-            <div class="absolute bottom-4 left-0 right-0 text-center text-white/70 font-bold text-sm">AI Face ID Running</div>
+    <div v-if="modals.camera" class="fixed inset-0 bg-black z-[100] flex flex-col">
+        <div class="relative flex-1 bg-black flex flex-col items-center justify-center overflow-hidden">
+            <video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover mirror-x"></video>
+            <button @click="closeCamera" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"><i class="fa-solid fa-times"></i></button>
         </div>
-        <div v-if="scanMode === 'register'" class="flex-1 bg-white flex flex-col items-center justify-center text-slate-600 p-6 text-center">
-            <h3 class="text-2xl font-black text-slate-800 mb-2">建立臉部資料</h3>
-            <p class="text-slate-400 mb-8 font-bold">請正對鏡頭，保持光線充足</p>
-             <button @click="manualCapture" class="w-20 h-20 rounded-full border-4 border-indigo-100 bg-white flex items-center justify-center transition-all active:scale-90 relative cursor-pointer shadow-xl">
-                 <div class="w-16 h-16 rounded-full bg-indigo-500 shadow-inner"></div>
-             </button>
-        </div>
-        <div v-else class="flex-1 bg-slate-900 flex items-center justify-center">
-            <p class="text-slate-500 font-bold animate-pulse">Waiting for member...</p>
+        <div class="h-32 bg-black flex items-center justify-center pb-safe">
+            <button @click="capturePhoto" class="w-20 h-20 rounded-full border-4 border-white bg-transparent flex items-center justify-center active:scale-95 transition"><div class="w-16 h-16 rounded-full bg-white"></div></button>
         </div>
     </div>
 
@@ -386,14 +383,20 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 
 const app = createApp({
     setup() {
-        const config = reactive({ url: '', key: '', adminPwd: '', storeName: '' });
+        const config = reactive({ url: '', key: '', adminPwd: '', storeName: '', volume: 0.5 });
         const isConfigured = ref(false);
         const displayMembers = ref([]); 
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         
+        // 報表數據
+        const shiftStats = reactive({
+            today: { morning: 0, middle: 0, night: 0, total: 0 },
+            month: { morning: 0, middle: 0, night: 0, total: 0 }
+        });
+        
         const toasts = ref([]);
-        const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '' });
+        const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '', photo: null });
         const isLoading = ref(false);
         const isLoadingList = ref(false);
         const isLoadingPhoto = ref(false);
@@ -404,80 +407,62 @@ const app = createApp({
         const searchQuery = ref('');
         const dateStart = ref('');
         const dateEnd = ref('');
-        const modals = reactive({ form: false, faceScan: false, register: false, privacy: false, io: false });
+        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false });
         const tabs = [{id:'self_service', label:'接待櫃台', icon:'fa-solid fa-desktop'},{id:'list', label:'會員管理', icon:'fa-solid fa-users-gear'},{id:'dashboard', label:'營運分析', icon:'fa-solid fa-chart-pie'}];
 
-        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, face_descriptor: null, created_at: null });
-        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, face_descriptor: null });
+        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, created_at: null });
+        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null });
         const activeForm = computed(() => modals.register ? registerForm : form);
         const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
 
-        const isFaceModelLoaded = ref(false);
-        const verifyStatus = ref('idle');
-        const searchMode = ref('phone'); 
-        const scanMode = ref('');
         const selfServiceInput = ref('');
-        
-        const memberCooldowns = reactive({});
-        const videoDevices = ref([]);
-        const currentDeviceId = ref('');
-
         let supabase = null;
-        let videoStream = null;
-        let isScanning = false;
         let audioContext = null;
+        let videoStream = null;
 
-        const isFrontCamera = computed(() => {
-            const cam = videoDevices.value.find(d => d.deviceId === currentDeviceId.value);
-            return cam ? (cam.label.toLowerCase().includes('front') || cam.label.toLowerCase().includes('user')) : true;
-        });
-
-        // 1. 管理員權限檢查
-        const checkAdmin = (cb) => {
-            const p = prompt('請輸入管理員密碼');
-            if (p === (config.adminPwd || '0000')) cb();
-            else showToast('密碼錯誤', 'error');
-        };
-
-        const handleKeyboard = (e) => {
-            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
-            if (currentTab.value === 'self_service' && !modals.register && !modals.form && !modals.faceScan && !modals.privacy) {
-                if(e.key >= '0' && e.key <= '9') appendNumber(e.key);
-                else if (e.key === 'Backspace') backspace();
-                else if (e.key === 'Enter') performVerification();
-                else if (e.key === 'Escape') clearInput();
-            }
-        };
-
+        const initAudioContext = () => { if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); };
         const playSound = (type) => {
-            if (!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            if (!audioContext) initAudioContext();
             if (audioContext.state === 'suspended') audioContext.resume();
-            const osc = audioContext.createOscillator(); const gain = audioContext.createGain();
-            osc.connect(gain); gain.connect(audioContext.destination);
-            if (type === 'success') {
-                const now = audioContext.currentTime;
-                [523.25, 659.25, 783.99].forEach((f, i) => {
-                    const o = audioContext.createOscillator(); const g = audioContext.createGain();
-                    o.connect(g); g.connect(audioContext.destination); o.frequency.value = f;
-                    g.gain.setValueAtTime(0.1, now + i*0.1); g.gain.exponentialRampToValueAtTime(0.001, now + i*0.1 + 0.5);
-                    o.start(now + i*0.1); o.stop(now + i*0.1 + 0.5);
-                });
-            } else {
-                osc.type = 'sawtooth'; osc.frequency.setValueAtTime(150, audioContext.currentTime); gain.gain.setValueAtTime(0.1, audioContext.currentTime); osc.start(); osc.stop(audioContext.currentTime + 0.3);
-            }
+            const gainNode = audioContext.createGain();
+            gainNode.connect(audioContext.destination);
+            gainNode.gain.value = config.volume;
+            const now = audioContext.currentTime;
+            const playOsc = (freq, time, type='sine') => {
+                const osc = audioContext.createOscillator(); osc.type = type; osc.frequency.value = freq; osc.connect(gainNode); osc.start(time); osc.stop(time + 0.15);
+            };
+            if (type === 'success') { playOsc(523.25, now); playOsc(659.25, now + 0.1); playOsc(783.99, now + 0.2); playOsc(1046.50, now + 0.3); } 
+            else if (type === 'warning') { playOsc(440, now, 'triangle'); playOsc(440, now + 0.2, 'triangle'); } 
+            else { playOsc(150, now, 'sawtooth'); playOsc(100, now + 0.2, 'sawtooth'); }
         };
-        const unlockAudio = () => { if(!audioContext) playSound('success'); };
 
         const showToast = (msg, type='success', title='提示') => {
             const id = Date.now();
-            toasts.value.push({ id, msg, type, title: type==='success'?'太棒了':'哎呀' });
+            toasts.value.push({ id, msg, type, title: type==='success'?'太棒了':(type==='warning'?'注意':'哎呀') });
+            playSound(type);
             setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 2500);
         };
 
-        const showFullscreen = (title, sub, type='success', note='') => {
-            fullscreenMsg.title = title; fullscreenMsg.sub = sub; fullscreenMsg.type = type; fullscreenMsg.note = note; fullscreenMsg.show = true;
+        const showFullscreen = (title, sub, type='success', note='', photo=null) => {
+            fullscreenMsg.title = title; fullscreenMsg.sub = sub; fullscreenMsg.type = type; fullscreenMsg.note = note; fullscreenMsg.photo = photo; fullscreenMsg.show = true;
             playSound(type);
-            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; }, 2000);
+            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000);
+        };
+
+        const getMemberBorder = (isoDate) => {
+            if (!isoDate) return '';
+            const h = new Date(isoDate).getHours();
+            if (h >= 8 && h < 18) return 'border-time-day'; 
+            if (h >= 18 && h < 23) return 'border-time-night'; 
+            return 'border-time-late'; 
+        };
+        
+        const getShiftColor = (isoDate) => {
+            if (!isoDate) return 'bg-gray-400';
+            const h = new Date(isoDate).getHours();
+            if (h >= 8 && h < 18) return 'bg-orange-400';
+            if (h >= 18 && h < 23) return 'bg-emerald-400';
+            return 'bg-purple-400';
         };
 
         const formatDate = (iso, time=false) => {
@@ -487,55 +472,137 @@ const app = createApp({
             return time ? `${ds} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : ds;
         };
 
-        const updateDbUsage = async () => {
-            if(!supabase) return;
-            const { count } = await supabase.from('members').select('*', { count: 'exact', head: true });
-            totalMemberCount.value = count || 0;
+        // 報表邏輯
+        const calculateStats = (logs) => {
+            // Reset
+            shiftStats.today = { morning: 0, middle: 0, night: 0, total: 0 };
+            shiftStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
+            
+            const now = new Date();
+            const todayStr = now.toISOString().split('T')[0];
+            const monthStr = todayStr.slice(0, 7);
+
+            logs.forEach(log => {
+                const date = new Date(log.check_in_time);
+                const h = date.getHours();
+                const logDateStr = log.check_in_time.split('T')[0];
+                const logMonthStr = logDateStr.slice(0, 7);
+                
+                let shift = 'night';
+                if (h >= 8 && h < 18) shift = 'morning';
+                else if (h >= 18 && h < 23) shift = 'middle';
+
+                // Month Stats
+                if (logMonthStr === monthStr) {
+                    shiftStats.month[shift]++;
+                    shiftStats.month.total++;
+                    // Today Stats
+                    if (logDateStr === todayStr) {
+                        shiftStats.today[shift]++;
+                        shiftStats.today.total++;
+                    }
+                }
+            });
         };
-        setInterval(updateDbUsage, 3600000); 
 
         const fetchLogs = async () => {
             if(!supabase) return;
             try {
+                // 1. Fetch recent list
                 const { data, error } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50);
-                if(error) { dashboardLogs.value = []; return; }
-                const now = new Date(); const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-                const { data: monthData } = await supabase.from('visit_logs').select('member_id').gte('check_in_time', startOfMonth);
-                const countMap = {}; if(monthData) monthData.forEach(log => countMap[log.member_id] = (countMap[log.member_id] || 0) + 1);
-                dashboardLogs.value = data.map(log => ({ ...log, monthCount: countMap[log.member_id] || 1 }));
+                if(!error) dashboardLogs.value = data || [];
+                
+                // 2. Fetch ALL logs for current month for stats
+                const now = new Date();
+                const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+                const { data: monthData } = await supabase.from('visit_logs').select('check_in_time').gte('check_in_time', startOfMonth);
+                if(monthData) calculateStats(monthData);
+                
             } catch(e) { console.error(e); }
         };
 
-        const stats = computed(() => { return { monthVisits: dashboardLogs.value.length > 0 ? dashboardLogs.value.length : 0 }; });
+        const submitForm = async () => {
+            if(!activeForm.value.name || !activeForm.value.phone) return showToast('請填寫完整', 'error');
+            isLoadingPhoto.value = true;
+            try {
+                if (modals.register) {
+                    const { data: exist } = await supabase.from('members').select('id').eq('phone', activeForm.value.phone).single();
+                    if(exist) { showFullscreen('重複註冊', '此電話已註冊過', 'warning'); isLoadingPhoto.value = false; return; }
 
-        const logVisit = async (member, type) => {
-            if(!supabase) return;
-            await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type, check_in_time: new Date() });
-            fetchLogs();
+                    const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                    const { error } = await supabase.from('members').insert({ ...activeForm.value, id, created_at: new Date() });
+                    if(error) {
+                        if (error.code === '23505') showFullscreen('重複註冊', '此電話已註冊過', 'warning');
+                        else throw error;
+                    } else {
+                        showToast('註冊成功', 'success'); Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null });
+                    }
+                } else {
+                    const { error } = await supabase.from('members').update({ 
+                        name: activeForm.value.name, 
+                        notes: activeForm.value.notes, 
+                        photo: activeForm.value.photo,
+                        phone: activeForm.value.phone 
+                    }).eq('id', activeForm.value.id);
+                    if(error) throw error;
+                    showToast('修改成功', 'success');
+                }
+                closeModals(); updateDbUsage(); searchMembers();
+            } catch(e) { 
+                if (e.code !== '23505') showToast('操作失敗:' + e.message, 'error'); 
+            }
+            isLoadingPhoto.value = false;
         };
 
-        const handleCheckIn = async (member, type) => {
-            const now = Date.now();
-            if (type === 'face' && now - (memberCooldowns[member.id]||0) < 60000) return;
-            memberCooldowns[member.id] = now;
-            showFullscreen(`歡迎光臨`, `${member.name}`, 'success', member.notes);
-            logVisit(member, type);
-            if(supabase) await supabase.from('members').update({ updated_at: new Date() }).eq('id', member.id);
+        const processImage = (fileOrBlob) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width; let height = img.height;
+                    const MAX_WIDTH = 800;
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    canvas.width = width; canvas.height = height;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+                    resolve(canvas.toDataURL('image/webp', 0.6));
+                };
+                img.src = URL.createObjectURL(fileOrBlob);
+            });
         };
 
+        const openCamera = async () => {
+            modals.camera = true; await nextTick(); const video = document.getElementById('cameraVideo');
+            try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }); video.srcObject = stream; videoStream = stream; } 
+            catch(e) { showToast('無法啟動相機', 'error'); modals.camera = false; }
+        };
+        const capturePhoto = async () => {
+            const video = document.getElementById('cameraVideo'); const canvas = document.createElement('canvas');
+            const size = Math.min(video.videoWidth, video.videoHeight); canvas.width = 640; canvas.height = 640;
+            const ctx = canvas.getContext('2d'); ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640);
+            canvas.toBlob(async (blob) => { const compressed = await processImage(blob); if(modals.register) registerForm.photo = compressed; else form.photo = compressed; closeCamera(); }, 'image/jpeg', 0.9);
+        };
+        const closeCamera = () => { if(videoStream) videoStream.getTracks().forEach(t => t.stop()); modals.camera = false; };
+        const handleFileUpload = async (e) => { const file = e.target.files[0]; if (!file) return; const compressed = await processImage(file); if (modals.register) registerForm.photo = compressed; else form.photo = compressed; };
+
+        const updateDbUsage = async () => { if(supabase) { const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); totalMemberCount.value = count || 0; }};
+        const logVisit = async (member) => { if(supabase) await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type: 'phone', check_in_time: new Date() }); fetchLogs(); };
+        
         const performVerification = async () => {
             const val = selfServiceInput.value.trim();
             if(!val) return;
             isLoading.value = true;
             try {
                 const { data } = await supabase.from('members').select('*').eq('phone', val).single();
-                if(data) await handleCheckIn(data, 'phone');
-                else showFullscreen('查詢失敗', val, 'error');
+                if(data) {
+                    showFullscreen(`歡迎光臨`, `${data.name}`, 'success', data.notes, data.photo);
+                    logVisit(data);
+                    await supabase.from('members').update({ updated_at: new Date() }).eq('id', data.id);
+                } else showFullscreen('查詢失敗', val, 'error');
             } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
             isLoading.value = false;
         };
 
-        // 2. 搜尋：預設顯示最新50筆
         const searchMembers = async () => {
             if(!supabase) return;
             isLoadingList.value = true;
@@ -543,149 +610,15 @@ const app = createApp({
                 let qb = supabase.from('members').select('*');
                 if(searchQuery.value) {
                     const q = searchQuery.value;
-                    if (q.includes('-') || q.startsWith('20')) {
-                         qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`);
-                    } else {
-                         qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,notes.ilike.%${q}%`);
-                    }
+                    if (q.includes('-') || q.startsWith('20')) qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`);
+                    else qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,notes.ilike.%${q}%`);
                 }
                 if(dateStart.value) qb = qb.gte('created_at', dateStart.value);
                 if(dateEnd.value) qb = qb.lte('created_at', dateEnd.value + 'T23:59:59');
-                
                 const { data, error } = await qb.order('created_at', {ascending:false}).limit(50);
                 if(error) throw error;
                 displayMembers.value = data || [];
             } catch(e){ showToast('搜尋失敗', 'error'); } finally { isLoadingList.value = false; }
-        };
-
-        const submitForm = async () => {
-            if(!registerForm.name || !registerForm.phone) return showToast('請填寫完整', 'error');
-            isLoadingPhoto.value = true;
-            try {
-                // 7. 防重複
-                const { data: exist } = await supabase.from('members').select('id').eq('phone', registerForm.phone).single();
-                if(exist) {
-                    showFullscreen('重複註冊', '此電話已註冊過，請出示證件確認', 'warning');
-                    isLoadingPhoto.value = false;
-                    return;
-                }
-
-                const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-                const { error } = await supabase.from('members').insert({ ...registerForm, id, created_at: new Date() });
-                if(error) throw error;
-                
-                showToast('註冊成功', 'success'); 
-                closeModals(); 
-                // 5. 清空表單
-                Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null, face_descriptor: null });
-                updateDbUsage();
-                searchMembers();
-            } catch(e) { showToast('註冊失敗:' + e.message, 'error'); }
-            isLoadingPhoto.value = false;
-        };
-
-        // 3. 補回匯出功能
-        const exportAllMembers = async () => {
-            if(!supabase) return;
-            isExporting.value = true;
-            try {
-                // 為了效能，分批抓取
-                const BATCH_SIZE = 1000;
-                let page = 0;
-                let allData = [];
-                while(true) {
-                    const { data, error } = await supabase.from('members').select('*').range(page*BATCH_SIZE, (page+1)*BATCH_SIZE-1);
-                    if(error || !data.length) break;
-                    allData.push(...data);
-                    if(data.length < BATCH_SIZE) break;
-                    page++;
-                }
-
-                const wb = new ExcelJS.Workbook();
-                const ws = wb.addWorksheet('Members');
-                ws.columns = [
-                    {header:'ID', key:'id', width:15},
-                    {header:'姓名', key:'name', width:15},
-                    {header:'電話', key:'phone', width:15},
-                    {header:'備註', key:'notes', width:20},
-                    {header:'註冊時間', key:'created_at', width:20}
-                ];
-                allData.forEach(m => ws.addRow(m));
-                const buffer = await wb.xlsx.writeBuffer();
-                saveAs(new Blob([buffer]), `Members_Export_${new Date().toISOString().slice(0,10)}.xlsx`);
-                showToast(`成功匯出 ${allData.length} 筆`, 'success');
-            } catch(e) { showToast('匯出失敗', 'error'); }
-            isExporting.value = false;
-        };
-
-        const handleImport = async (e) => {
-            const file = e.target.files[0]; if (!file) return; 
-            isImporting.value = true;
-            try {
-                const buffer = await file.arrayBuffer(); const wb = new ExcelJS.Workbook(); await wb.xlsx.load(buffer); const ws = wb.getWorksheet(1);
-                const membersToInsert = []; 
-                let skipCount = 0;
-
-                const { data: existing } = await supabase.from('members').select('phone');
-                const existingPhones = new Set(existing ? existing.map(m => m.phone) : []);
-
-                ws.eachRow((row, rowNumber) => {
-                    if (rowNumber === 1) return;
-                    let name = row.getCell(1).text?.trim();
-                    let phone = row.getCell(2).text?.trim();
-                    let notes = row.getCell(3).text?.trim() || '';
-                    if (name && phone) {
-                        if (existingPhones.has(phone)) skipCount++;
-                        else {
-                            membersToInsert.push({ id: Date.now() + Math.random().toString(36).substr(2, 5), name, phone, notes, created_at: new Date() });
-                            existingPhones.add(phone);
-                        }
-                    }
-                });
-
-                if(membersToInsert.length > 0) {
-                    const BATCH = 100;
-                    for (let i=0; i<membersToInsert.length; i+=BATCH) await supabase.from('members').insert(membersToInsert.slice(i, i+BATCH));
-                    showToast(`成功匯入 ${membersToInsert.length} 筆，跳過重複 ${skipCount} 筆`, 'success');
-                    updateDbUsage(); searchMembers();
-                } else showToast(`無新資料 (重複 ${skipCount} 筆)`, 'warning');
-                modals.io = false;
-            } catch(e) { showToast('匯入失敗', 'error'); } finally { isImporting.value = false; e.target.value = ''; }
-        };
-
-        const startVideo = async () => {
-             const v = document.getElementById('video'); if(!v) return;
-             try {
-                 const s = await navigator.mediaDevices.getUserMedia({ video: { width: 1280, height: 720 } });
-                 v.srcObject = s; videoStream = s;
-                 v.onloadedmetadata = () => v.play();
-             } catch(e) { showToast('無法啟動相機', 'error'); }
-        };
-
-        const scanningLoop = async () => {
-            if(!isScanning || !modals.faceScan) return;
-            const v = document.getElementById('video');
-            try {
-                const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions({ inputSize: 416 })).withFaceLandmarks().withFaceDescriptor();
-                if(det && scanMode.value === 'homepage_scan') {
-                    const { data } = await supabase.rpc('match_face_vectors', { query_embedding: Array.from(det.descriptor), match_threshold: 0.5, match_count: 1 });
-                    if(data && data.length) {
-                        const { data: m } = await supabase.from('members').select('*').eq('id', data[0].id).single();
-                        if(m) { stopFaceScan(); handleCheckIn(m, 'face'); }
-                    }
-                }
-            } catch(e){}
-            if(isScanning) requestAnimationFrame(scanningLoop);
-        };
-
-        const manualCapture = async () => {
-            const v = document.getElementById('video');
-            const cvs = document.createElement('canvas'); cvs.width=400; cvs.height=400; 
-            const ctx = cvs.getContext('2d'); ctx.drawImage(v, 0, 0, 400, 400); 
-            registerForm.photo = cvs.toDataURL('image/jpeg');
-            const det = await faceapi.detectSingleFace(v, new faceapi.TinyFaceDetectorOptions()).withFaceLandmarks().withFaceDescriptor();
-            if(det) registerForm.face_descriptor = Array.from(det.descriptor);
-            showToast('已拍照', 'success'); stopFaceScan();
         };
 
         const appendNumber = (n) => { if (selfServiceInput.value.length < 10) selfServiceInput.value += n; };
@@ -693,28 +626,55 @@ const app = createApp({
         const clearInput = () => selfServiceInput.value = '';
         const openSelfRegister = () => modals.privacy = true;
         const confirmPrivacy = () => { modals.privacy = false; modals.register = true; };
-        const startHomepageScan = async () => { scanMode.value = 'homepage_scan'; modals.faceScan = true; isScanning = true; await nextTick(); await startVideo(); scanningLoop(); };
-        const startScanForForm = async () => { scanMode.value = 'register'; modals.faceScan = true; isScanning = true; await nextTick(); await startVideo(); scanningLoop(); };
-        const stopFaceScan = () => { isScanning = false; modals.faceScan = false; if(videoStream) videoStream.getTracks().forEach(t=>t.stop()); };
-        const closeModals = () => { modals.form=false; modals.register=false; modals.faceScan=false; modals.privacy=false; modals.io=false; stopFaceScan(); };
+        const closeModals = () => { modals.form=false; modals.register=false; modals.privacy=false; modals.io=false; modals.camera=false; };
         const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; };
         const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); updateDbUsage(); searchMembers(); };
-        const deletePhoto = () => { if(confirm('刪除照片?')) { form.photo = null; form.face_descriptor = null; }};
-        const resetSelfService = () => { verifyStatus.value = 'idle'; selfServiceInput.value = ''; verifiedMember.value = null; };
-        const saveConfig = () => { localStorage.setItem('supabase_config_v8', JSON.stringify(config)); location.reload(); };
-        const resetConfigSecure = () => { if(prompt('PWD?')===config.adminPwd) {localStorage.removeItem('supabase_config_v8'); location.reload();} };
-        const initSupabase = () => { if(!config.url) return; supabase = window.supabase.createClient(config.url, config.key); isConfigured.value = true; updateDbUsage(); fetchLogs(); searchMembers(); };
+        const deletePhoto = () => { if(modals.register) registerForm.photo = null; else form.photo = null; };
+        const saveConfig = () => { localStorage.setItem('supabase_config_v7', JSON.stringify(config)); location.reload(); };
+        const resetConfigSecure = () => { if(prompt('PWD?')===config.adminPwd) {localStorage.removeItem('supabase_config_v7'); location.reload();} };
+        const checkAdmin = (cb) => { if(prompt('Admin Pwd')===config.adminPwd) cb(); else showToast('密碼錯誤', 'error'); };
+        
+        const exportAllMembers = async () => {
+            isExporting.value = true;
+            try {
+                const BATCH=1000; let page=0; let all=[];
+                while(true) { const {data} = await supabase.from('members').select('*').range(page*BATCH, (page+1)*BATCH-1); if(!data?.length) break; all.push(...data); page++; }
+                const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Members');
+                ws.columns = [{header:'ID',key:'id'},{header:'Name',key:'name'},{header:'Phone',key:'phone'},{header:'Notes',key:'notes'},{header:'Date',key:'created_at'}];
+                all.forEach(m => ws.addRow(m));
+                const buf = await wb.xlsx.writeBuffer(); saveAs(new Blob([buf]), `Members_${new Date().toISOString().slice(0,10)}.xlsx`);
+                showToast(`匯出 ${all.length} 筆`, 'success');
+            } catch(e) { showToast('匯出失敗', 'error'); } isExporting.value = false;
+        };
+        const handleImport = async (e) => {
+            const f = e.target.files[0]; if(!f) return; isImporting.value = true;
+            try {
+                const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.getWorksheet(1);
+                const items = []; const { data: exist } = await supabase.from('members').select('phone'); const existSet = new Set(exist?.map(x=>x.phone));
+                ws.eachRow((row, n) => {
+                    if(n===1) return;
+                    let name = row.getCell(1).text?.trim(), phone = row.getCell(2).text?.trim(), notes = row.getCell(3).text?.trim();
+                    if(name && phone && !existSet.has(phone)) { items.push({ id: Date.now()+Math.random().toString(36).substr(2,5), name, phone, notes, created_at: new Date() }); existSet.add(phone); }
+                });
+                if(items.length) { for(let i=0; i<items.length; i+=100) await supabase.from('members').insert(items.slice(i, i+100)); showToast(`匯入 ${items.length} 筆`, 'success'); updateDbUsage(); searchMembers(); }
+                modals.io = false;
+            } catch(e){ showToast('匯入失敗', 'error'); } isImporting.value = false; e.target.value = '';
+        };
 
         onMounted(async () => {
-             const s = localStorage.getItem('supabase_config_v8');
+             const s = localStorage.getItem('supabase_config_v7');
              if(s) Object.assign(config, JSON.parse(s));
-             if(config.url) initSupabase();
-             window.addEventListener('keydown', handleKeyboard);
-             await Promise.all([faceapi.nets.tinyFaceDetector.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'), faceapi.nets.faceLandmark68Net.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models'), faceapi.nets.faceRecognitionNet.loadFromUri('https://justadudewhohacks.github.io/face-api.js/models')]);
+             if(config.url) {
+                 supabase = window.supabase.createClient(config.url, config.key);
+                 isConfigured.value = true;
+                 updateDbUsage();
+                 fetchLogs();
+                 searchMembers();
+             }
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, stats: computed(()=>({monthVisits: dashboardLogs.value.length})), currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, startHomepageScan, startScanForForm, stopFaceScan, manualCapture, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, scanMode, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, videoDevices, currentDeviceId, isFrontCamera };
+        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, shiftStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, getShiftColor, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera };
     }
 });
 app.mount('#app');
