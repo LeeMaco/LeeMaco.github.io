@@ -3,11 +3,16 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>會員系統 V7.8 (註冊報表版)</title>
+    <title>AI 會員系統 V8.3 (極速觸控版)</title>
+    
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
     <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
@@ -16,40 +21,52 @@
 
     <style>
         body { font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; }
+        
+        /* 關鍵修正：防止亂碼顯示 */
+        [v-cloak] { display: none !important; }
+        
+        /* 載入中畫面 */
+        #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; justify-content: center; align-items: center; font-weight: bold; color: #cbd5e1; }
+
         .no-zoom { touch-action: manipulation; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
-        .numpad-btn { transition: all 0.1s; }
-        .numpad-btn:active { transform: scale(0.95); background-color: #f1f5f9; }
+        
+        /* 按鈕按壓特效 (針對 Touch 優化) */
+        .numpad-btn { transition: transform 0.05s, background-color 0.1s; }
+        .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
 
         /* Toast 動畫 */
-        .cute-toast-enter-active { animation: bounceIn 0.5s; }
+        .cute-toast-enter-active { animation: bounceIn 0.4s; }
         .cute-toast-leave-active { transition: all 0.3s; opacity: 0; transform: scale(0.8); }
-        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 70% { transform: scale(0.9); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
 
-        /* 全螢幕覆蓋 */
-        .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.4s ease; }
+        .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.3s ease; }
         .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
 
-        /* 時段外框顏色定義 */
-        .border-time-day { border-color: #ef4444; background-color: #fef2f2; }
+        .border-time-day { border-color: #f97316; background-color: #fff7ed; }
         .border-time-night { border-color: #10b981; background-color: #ecfdf5; }
         .border-time-late { border-color: #8b5cf6; background-color: #f5f3ff; }
-
+        .mirror-x { transform: scaleX(-1); }
+        
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* 鏡像翻轉 */
-        .mirror-x { transform: scaleX(-1); }
     </style>
 </head>
 <body class="bg-slate-50">
 
-<div id="app" class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
+<div id="loading-screen">
+    <div class="text-center">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-500"></i>
+        <p>System Loading...</p>
+    </div>
+</div>
+
+<div id="app" v-cloak class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
     
     <transition name="fullscreen-overlay">
         <div v-if="fullscreenMsg.show" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl" @click="closeFullscreen">
             <div class="transform scale-110 text-center p-8 max-w-lg w-full">
                 <div v-if="fullscreenMsg.photo" class="mb-6 mx-auto animate-bounce">
-                    <img :src="fullscreenMsg.photo" class="w-40 h-40 rounded-full object-cover border-4 border-white shadow-2xl mx-auto bg-gray-100">
+                    <img :src="fullscreenMsg.photo" class="w-48 h-48 rounded-full object-cover border-8 border-white shadow-2xl mx-auto bg-gray-100">
                 </div>
                 <div v-else class="w-32 h-32 rounded-full flex items-center justify-center text-6xl mb-6 mx-auto animate-bounce shadow-2xl"
                      :class="fullscreenMsg.type==='success' ? 'bg-emerald-100 text-emerald-500 ring-4 ring-emerald-50' : (fullscreenMsg.type==='warning' ? 'bg-amber-100 text-amber-500 ring-4 ring-amber-50' : 'bg-rose-100 text-rose-500 ring-4 ring-rose-50')">
@@ -76,29 +93,28 @@
 
     <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] flex flex-col gap-4 pointer-events-none w-full max-w-sm px-4">
         <transition-group name="cute-toast">
-            <div v-for="toast in toasts" :key="toast.id" class="pointer-events-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 p-6 flex flex-col items-center gap-3 text-center transform transition-all" 
+            <div v-for="toast in toasts" :key="toast.id" class="pointer-events-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 p-6 flex flex-col items-center gap-3 text-center" 
                  :class="toast.type==='success' ? 'border-emerald-400 shadow-emerald-200' : (toast.type==='error'?'border-rose-400 shadow-rose-200':'border-amber-400')">
-                <div class="w-20 h-20 rounded-full flex items-center justify-center text-4xl mb-1 animate-bounce"
-                     :class="toast.type==='success' ? 'bg-emerald-100 text-emerald-500' : 'bg-rose-100 text-rose-500'">
-                    <i class="fa-solid" :class="toast.type==='success' ? 'fa-check' : (toast.type==='error'?'fa-times':'fa-exclamation')"></i>
+                <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-1" :class="toast.type==='success'?'bg-emerald-100 text-emerald-500':'bg-rose-100 text-rose-500'">
+                    <i class="fa-solid" :class="toast.type==='success'?'fa-check':'fa-exclamation'"></i>
                 </div>
-                <h4 class="font-black text-3xl text-slate-800 tracking-wider">{{ toast.title }}</h4>
-                <p class="text-lg text-slate-500 font-bold">{{ toast.msg }}</p>
+                <h4 class="font-black text-2xl text-slate-800">{{ toast.title }}</h4>
+                <p class="text-base text-slate-500 font-bold">{{ toast.msg }}</p>
             </div>
         </transition-group>
     </div>
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V7.8</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.3</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
-                <div><label class="text-xs font-bold text-rose-500">設定管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
+                <div><label class="text-xs font-bold text-rose-500">管理員密碼</label><input v-model="config.adminPwd" type="password" placeholder="預設: 0000" class="w-full border-2 border-rose-200 p-3 rounded-xl focus:border-rose-500 bg-rose-50 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">商店名稱</label><input v-model="config.storeName" placeholder="E書漫" class="w-full border-2 border-slate-200 p-3 rounded-xl outline-none"></div>
                 <div>
                     <label class="text-xs font-bold text-indigo-500">提示音量 ({{ Math.round(config.volume * 100) }}%)</label>
-                    <input type="range" v-model="config.volume" min="0" max="1" step="0.1" class="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer">
+                    <input type="range" v-model="config.volume" min="0" max="1" step="0.1" class="w-full accent-indigo-600 h-2 bg-slate-200 rounded-lg cursor-pointer">
                 </div>
                 <button @click="saveConfig" class="w-full bg-indigo-600 text-white py-3 rounded-xl font-bold hover:bg-indigo-700 transition">啟動系統</button>
             </div>
@@ -109,7 +125,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V7.8</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.3</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -123,9 +139,6 @@
                 </div>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-cloud-arrow-up-down text-xl"></i></button>
                 <button @click="resetConfigSecure" class="text-slate-300 hover:text-slate-500 p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-gear"></i></button>
-                <div class="flex items-center gap-2 text-xs font-bold bg-slate-100 px-3 py-1.5 rounded-full">
-                    <span class="text-indigo-500 flex items-center"><i class="fa-solid fa-cloud mr-1.5"></i>Online</span>
-                </div>
             </div>
         </div>
         <div class="flex bg-white px-4 border-b border-gray-100 overflow-x-auto no-scrollbar">
@@ -173,14 +186,34 @@
                         <div class="h-20 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-slate-200 mx-auto max-w-md w-full relative">
                             <span v-if="selfServiceInput" class="text-5xl font-black text-slate-800 tracking-widest">{{ selfServiceInput }}</span>
                             <span v-else class="text-4xl font-bold text-slate-200 tracking-widest">09XX...</span>
-                            <button v-if="selfServiceInput" @click="clearInput" class="absolute right-4 text-slate-300 hover:text-rose-400 text-xl"><i class="fa-solid fa-circle-xmark"></i></button>
+                            <button v-if="selfServiceInput" @click="clearInput" class="absolute right-4 text-slate-300 hover:text-rose-400 text-xl w-12 h-12 flex items-center justify-center"><i class="fa-solid fa-circle-xmark"></i></button>
                         </div>
                     </div>
+                    
                     <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full">
-                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @click="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
-                        <button @click="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
-                        <button @click="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
-                        <button @click="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
+                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" 
+                                @touchstart.prevent="appendNumber(n)" 
+                                @mousedown.prevent="appendNumber(n)"
+                                class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">
+                            {{ n }}
+                        </button>
+                        
+                        <button @touchstart.prevent="backspace" @mousedown.prevent="backspace" 
+                                class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1">
+                            <i class="fa-solid fa-delete-left"></i>
+                        </button>
+                        
+                        <button @touchstart.prevent="appendNumber(0)" @mousedown.prevent="appendNumber(0)" 
+                                class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">
+                            0
+                        </button>
+                        
+                        <button @touchstart.prevent="performVerification" @mousedown.prevent="performVerification" 
+                                :disabled="isLoading" 
+                                class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50">
+                            <i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i>
+                            <i v-else class="fa-solid fa-arrow-right"></i>
+                        </button>
                     </div>
                 </div>
             </div>
@@ -262,70 +295,6 @@
         </div>
     </main>
 
-    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
-            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
-            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
-                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
-                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
-                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
-                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
-            </div>
-        </div>
-    </div>
-
-    <div v-if="modals.register || modals.form" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
-            <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
-                <h3 class="font-black text-xl tracking-wide">{{ modals.register ? 'Welcome! 新會員' : '編輯資料' }}</h3>
-                <button @click="closeModals" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
-            </div>
-            <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
-                <div class="space-y-4">
-                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
-                    <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label>
-                        <input v-model="activeForm.phone" type="tel" 
-                               class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700">
-                    </div>
-                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">備註</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700"></textarea></div>
-                    
-                    <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
-                        <div v-if="activePhoto" class="relative">
-                            <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
-                            <button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
-                        </div>
-                        <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
-                        <div class="flex-1 flex flex-col gap-2">
-                            <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileUpload">
-                            <button @click="$refs.fileInput.click()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold border border-slate-200 hover:bg-slate-200 transition text-sm">
-                                <i class="fa-solid fa-upload mr-1"></i>上傳照片
-                            </button>
-                            <button @click="openCamera" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition text-sm">
-                                <i class="fa-solid fa-camera mr-1"></i>開啟相機
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
-                <button v-if="modals.form" @click="deleteMember" class="px-5 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
-                <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
-            </div>
-        </div>
-    </div>
-
-    <div v-if="modals.io" class="fixed inset-0 bg-slate-900/80 z-[90] flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl">
-            <h3 class="font-black text-xl mb-4 text-slate-800">資料庫管理</h3>
-            <div class="space-y-4">
-                <button @click="exportAllMembers" :disabled="isExporting" class="w-full py-4 bg-white text-indigo-600 rounded-xl font-bold border-2 border-indigo-100 hover:bg-indigo-50 transition shadow-sm flex items-center justify-center gap-2"><i v-if="!isExporting" class="fa-solid fa-file-export"></i>{{ isExporting ? '處理中...' : '匯出所有會員' }}</button>
-                <div class="relative w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg cursor-pointer flex items-center justify-center gap-2"><i v-if="!isImporting" class="fa-solid fa-file-import"></i>{{ isImporting ? '處理中...' : '匯入會員資料' }}<input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting"></div>
-            </div>
-            <button @click="modals.io=false" class="mt-6 text-slate-400 font-bold hover:text-slate-600">關閉</button>
-        </div>
-    </div>
-
     <div v-if="modals.report" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[85] flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
             <div class="px-8 py-6 bg-gradient-to-r from-pink-500 to-rose-500 text-white flex justify-between items-center">
@@ -390,6 +359,75 @@
         </div>
     </div>
 
+    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]">
+                <h3 class="font-black text-xl text-slate-800 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書
+                </h3>
+            </div>
+            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
+                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
+                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
+                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
+                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.register || modals.form" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
+                <h3 class="font-black text-xl tracking-wide">{{ modals.register ? 'Welcome! 新會員' : '編輯資料' }}</h3>
+                <button @click="closeModals" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
+                <div class="space-y-4">
+                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label>
+                        <input v-model="activeForm.phone" type="tel" 
+                               class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700 disabled:bg-slate-100 disabled:text-slate-400" 
+                               :disabled="!modals.register">
+                    </div>
+                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">備註</label><textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700"></textarea></div>
+                    
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
+                        <div v-if="activePhoto" class="relative">
+                            <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
+                            <button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
+                        <div class="flex-1 flex flex-col gap-2">
+                            <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileUpload">
+                            <button @click="$refs.fileInput.click()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold border border-slate-200 hover:bg-slate-200 transition text-sm">
+                                <i class="fa-solid fa-upload mr-1"></i>上傳照片
+                            </button>
+                            <button @click="openCamera" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition text-sm">
+                                <i class="fa-solid fa-camera mr-1"></i>開啟相機
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
+                <button v-if="modals.form" @click="deleteMember" class="px-5 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
+                <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.io" class="fixed inset-0 bg-slate-900/80 z-[90] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl">
+            <h3 class="font-black text-xl mb-4 text-slate-800">資料庫管理</h3>
+            <div class="space-y-4">
+                <button @click="exportAllMembers" :disabled="isExporting" class="w-full py-4 bg-white text-indigo-600 rounded-xl font-bold border-2 border-indigo-100 hover:bg-indigo-50 transition shadow-sm flex items-center justify-center gap-2"><i v-if="!isExporting" class="fa-solid fa-file-export"></i>{{ isExporting ? '處理中...' : '匯出所有會員' }}</button>
+                <div class="relative w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg cursor-pointer flex items-center justify-center gap-2"><i v-if="!isImporting" class="fa-solid fa-file-import"></i>{{ isImporting ? '處理中...' : '匯入會員資料' }}<input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting"></div>
+            </div>
+            <button @click="modals.io=false" class="mt-6 text-slate-400 font-bold hover:text-slate-600">關閉</button>
+        </div>
+    </div>
+
     <div v-if="modals.camera" class="fixed inset-0 bg-black z-[100] flex flex-col">
         <div class="relative flex-1 bg-black flex flex-col items-center justify-center overflow-hidden">
             <video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover mirror-x"></video>
@@ -413,7 +451,6 @@ const app = createApp({
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         
-        // 註冊報表數據
         const regStats = reactive({
             today: { morning: 0, middle: 0, night: 0, total: 0 },
             month: { morning: 0, middle: 0, night: 0, total: 0 }
@@ -424,7 +461,7 @@ const app = createApp({
         const isLoading = ref(false);
         const isLoadingList = ref(false);
         const isLoadingPhoto = ref(false);
-        const isLoadingReport = ref(false); // 報表讀取狀態
+        const isLoadingReport = ref(false);
         const isImporting = ref(false);
         const isExporting = ref(false);
         
@@ -489,29 +526,21 @@ const app = createApp({
             return time ? `${ds} ${d.getHours().toString().padStart(2,'0')}:${d.getMinutes().toString().padStart(2,'0')}` : ds;
         };
 
-        // 註冊報表邏輯
         const calculateRegStats = (members) => {
             regStats.today = { morning: 0, middle: 0, night: 0, total: 0 };
             regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
-            
             const now = new Date();
             const todayStr = now.toISOString().split('T')[0];
-            
             members.forEach(m => {
                 if (!m.created_at) return;
                 const d = new Date(m.created_at);
                 const h = d.getHours();
                 const mDateStr = m.created_at.split('T')[0];
-                
-                let shift = 'night'; // Default night (23-07)
+                let shift = 'night';
                 if (h >= 8 && h < 18) shift = 'morning';
                 else if (h >= 18 && h < 23) shift = 'middle';
-                
-                // Month Stats (Query already filtered for this month)
                 regStats.month[shift]++;
                 regStats.month.total++;
-                
-                // Today Stats
                 if (mDateStr === todayStr) {
                     regStats.today[shift]++;
                     regStats.today.total++;
@@ -524,24 +553,11 @@ const app = createApp({
             modals.report = true;
             isLoadingReport.value = true;
             try {
-                // Get start of current month
                 const now = new Date();
                 const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
-                
-                // Fetch all members registered this month (to calculate accurate stats)
-                // Note: For very large datasets, this aggregation should move to a Database Function (RPC).
-                const { data, error } = await supabase
-                    .from('members')
-                    .select('created_at')
-                    .gte('created_at', startOfMonth);
-                
-                if (!error && data) {
-                    calculateRegStats(data);
-                }
-            } catch (e) {
-                console.error(e);
-                showToast('報表產生失敗', 'error');
-            }
+                const { data, error } = await supabase.from('members').select('created_at').gte('created_at', startOfMonth);
+                if (!error && data) calculateRegStats(data);
+            } catch (e) { showToast('報表失敗', 'error'); }
             isLoadingReport.value = false;
         };
 
@@ -565,16 +581,13 @@ const app = createApp({
                     const { error } = await supabase.from('members').update({ 
                         name: activeForm.value.name, 
                         notes: activeForm.value.notes, 
-                        photo: activeForm.value.photo,
-                        phone: activeForm.value.phone 
+                        photo: activeForm.value.photo 
                     }).eq('id', activeForm.value.id);
                     if(error) throw error;
                     showToast('修改成功', 'success');
                 }
                 closeModals(); updateDbUsage(); searchMembers();
-            } catch(e) { 
-                if (e.code !== '23505') showToast('操作失敗:' + e.message, 'error'); 
-            }
+            } catch(e) { if (e.code !== '23505') showToast('操作失敗', 'error'); }
             isLoadingPhoto.value = false;
         };
 
@@ -696,10 +709,13 @@ const app = createApp({
                  fetchLogs();
                  searchMembers();
              }
+             // Hide loading screen
+             const loader = document.getElementById('loading-screen');
+             if(loader) loader.style.display = 'none';
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, shiftStats, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, getShiftColor, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport };
+        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, shiftStats: computed(()=>({})), regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, stats: computed(()=>({monthVisits: dashboardLogs.value.length})) };
     }
 });
 app.mount('#app');
