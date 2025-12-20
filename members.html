@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="zh-TW">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V8.9 (iPad/大數據修正版)</title>
+    <title>AI 會員系統 V9.0 (營業日邏輯版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -27,7 +27,6 @@
         .no-zoom { touch-action: manipulation; user-select: none; }
         .numpad-btn { transition: transform 0.05s, background 0.1s; position: relative; overflow: hidden; }
         .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
-        /* 增加按鍵回饋效果 */
         .numpad-btn::after { content: ""; position: absolute; top: 50%; left: 50%; width: 5px; height: 5px; background: rgba(0,0,0,0.2); opacity: 0; border-radius: 100%; transform: scale(1, 1) translate(-50%); transform-origin: 50% 50%; }
         .numpad-btn:active::after { animation: ripple 0.4s ease-out; }
         @keyframes ripple { 0% { transform: scale(0, 0); opacity: 0.5; } 100% { transform: scale(40, 40); opacity: 0; } }
@@ -43,12 +42,9 @@
         .border-time-night { border-color: #10b981; background-color: #ecfdf5; }
         .border-time-late { border-color: #8b5cf6; background-color: #f5f3ff; }
         .mirror-x { transform: scaleX(-1); }
-        
         .no-scrollbar::-webkit-scrollbar { display: none; }
         .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        
-        /* 優化輸入框聚焦 */
-        input:focus, textarea:focus { font-size: 16px; } /* 防止 iOS 自動放大 */
+        input:focus, textarea:focus { font-size: 16px; } 
     </style>
 </head>
 <body class="bg-slate-50">
@@ -104,7 +100,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.9</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V9.0</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -123,7 +119,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.9</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.0</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -132,7 +128,7 @@
                         <span>{{ totalMemberCount }} 筆</span>
                     </div>
                     <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/25000)*100, 100) + '%'}"></div>
+                        <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/30000)*100, 100) + '%'}"></div>
                     </div>
                 </div>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-cloud-arrow-up-down text-xl"></i></button>
@@ -319,18 +315,27 @@
                 <button @click="modals.report = false" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
             </div>
             <div class="bg-white px-8 py-4 border-b border-slate-100 flex items-center justify-between">
-                <label class="text-slate-500 font-bold">選擇日期：</label>
+                <label class="text-slate-500 font-bold">選擇營業日：</label>
                 <input type="date" v-model="reportDate" class="bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none focus:border-pink-300" @change="refreshReport">
             </div>
             <div v-if="isLoadingReport" class="flex-1 flex flex-col items-center justify-center p-12 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-pink-300"></i><p class="font-bold">數據分析中...</p></div>
             <div v-else class="p-8 overflow-y-auto space-y-8 bg-slate-50">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2"><h4 class="font-black text-slate-700 text-lg">{{ reportDate === todayStr ? '今日' : reportDate }} 新增</h4><span class="text-4xl font-black text-pink-500">{{ regStats.day.total }}</span></div>
+                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
+                            <h4 class="font-black text-slate-700 text-lg">{{ reportDate }} 新增</h4>
+                            <span class="text-4xl font-black text-pink-500">{{ regStats.day.total }}</span>
+                        </div>
                         <div class="space-y-4">
                             <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班 (08-18)</span><span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.morning }}</span></div>
                             <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班 (18-23)</span><span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.middle }}</span></div>
-                            <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班 (23-08)</span><span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.night }}</span></div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center flex-col items-start">
+                                    <span><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班 (跨日)</span>
+                                    <span class="text-[10px] text-slate-300 ml-6">23:00 ~ 隔日08:00</span>
+                                </span>
+                                <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.night }}</span>
+                            </div>
                         </div>
                     </div>
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 opacity-80">
@@ -341,6 +346,9 @@
                             <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班</span><span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.night }}</span></div>
                         </div>
                     </div>
+                </div>
+                <div v-if="bulkCount > 0" class="text-center text-xs text-slate-400 font-bold bg-slate-100 py-2 rounded-lg">
+                    已自動過濾 {{ bulkCount }} 筆大量匯入數據
                 </div>
             </div>
         </div>
@@ -369,13 +377,14 @@ const app = createApp({
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         
-        // V8.9: Refactor stats to ref for manual control
+        // V9.0 Fix: Ensure stats is reactive
         const stats = ref({ monthVisits: 0 });
 
         const getTaiwanDate = () => new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
         const todayStr = getTaiwanDate().toISOString().split('T')[0];
         
         const reportDate = ref(todayStr); 
+        const bulkCount = ref(0);
         const regStats = reactive({
             day: { morning: 0, middle: 0, night: 0, total: 0 },
             month: { morning: 0, middle: 0, night: 0, total: 0 }
@@ -396,7 +405,6 @@ const app = createApp({
         const dateStart = ref('');
         const dateEnd = ref('');
         
-        // V8.8: 分頁控制
         const currentPage = ref(0);
         const hasMore = ref(true);
         const PAGE_SIZE = 50;
@@ -443,7 +451,6 @@ const app = createApp({
             setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000);
         };
 
-        // UI 顯示用 (依賴瀏覽器但只用於顯示，不影響邏輯)
         const getMemberBorder = (isoDate) => {
             if (!isoDate) return '';
             const d = new Date(isoDate);
@@ -467,44 +474,88 @@ const app = createApp({
             }).replace(/\//g, '-');
         };
 
-        // V8.9 Fix: iPad/Safari 數學計算法
-        const calculateRegStats = (members, selectedDate) => {
+        // V9.0 核心：營業日判定與匯入排除
+        const calculateRegStats = (members, selectedDateStr) => {
+            // 1. 初始化
             regStats.day = { morning: 0, middle: 0, night: 0, total: 0 };
             regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
             
+            // 2. 偵測大量匯入 (同秒數出現 > 3 筆)
+            const timeCount = {};
+            members.forEach(m => {
+                if(!m.created_at) return;
+                // 取到秒，作為 Key
+                const tKey = new Date(m.created_at).getTime(); 
+                timeCount[tKey] = (timeCount[tKey] || 0) + 1;
+            });
+
+            let skippedCount = 0;
+
+            // 3. 遍歷統計
             members.forEach(m => {
                 if (!m.created_at) return;
                 
-                // 使用 UTC 時間直接數學運算，避開 iPad 解析字串 Bug
+                // 匯入排除邏輯：如果該秒數有超過 3 筆，則視為 Excel 匯入，跳過
+                const tKey = new Date(m.created_at).getTime();
+                if (timeCount[tKey] > 3) {
+                    skippedCount++;
+                    return; 
+                }
+
+                // 4. 時區與班別運算
+                // 使用 UTC 時間，轉成台灣時間 Date 物件
                 const d = new Date(m.created_at);
-                const utcHour = d.getUTCHours();
-                const twHour = (utcHour + 8) % 24;
-                
-                // 計算台灣日期字串 (YYYY-MM-DD)
-                const twDateObj = new Date(d.getTime() + (8 * 60 * 60 * 1000));
-                const mDateStr = twDateObj.toISOString().split('T')[0];
-                
-                let shift = 'night';
-                if (twHour >= 8 && twHour < 18) shift = 'morning';
-                else if (twHour >= 18 && twHour < 23) shift = 'middle';
-                
-                regStats.month[shift]++;
-                regStats.month.total++;
-                
-                if (mDateStr === selectedDate) {
-                    regStats.day[shift]++;
-                    regStats.day.total++;
+                const taiwanTime = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
+                const twHour = taiwanTime.getHours();
+                const twDateStr = taiwanTime.toISOString().split('T')[0];
+
+                // 判斷班別 (歸屬判斷)
+                let shift = null;
+                // 歸屬日期 (Business Date)
+                // 預設是當天
+                let businessDateStr = twDateStr;
+
+                if (twHour >= 8 && twHour < 18) {
+                    shift = 'morning';
+                } else if (twHour >= 18 && twHour < 23) {
+                    shift = 'middle';
+                } else {
+                    shift = 'night';
+                    // 關鍵：如果是凌晨 (00:00 - 07:59)，它其實屬於「前一天」的晚班
+                    if (twHour < 8) {
+                        const prevDate = new Date(taiwanTime);
+                        prevDate.setDate(prevDate.getDate() - 1);
+                        businessDateStr = prevDate.toISOString().split('T')[0];
+                    }
+                }
+
+                if (shift) {
+                    // 月報表統計：只要 BusinessDate 在當月即可
+                    // 這裡簡化處理：直接統計所有撈回來的資料
+                    regStats.month[shift]++;
+                    regStats.month.total++;
+
+                    // 日報表統計：比對 BusinessDate 是否等於 使用者選擇的日期
+                    if (businessDateStr === selectedDateStr) {
+                        regStats.day[shift]++;
+                        regStats.day.total++;
+                    }
                 }
             });
+            
+            bulkCount.value = skippedCount;
         };
 
-        // V8.9 Fix: 分頁迴圈抓取無限資料
         const refreshReport = async () => {
             if (!supabase) return;
             isLoadingReport.value = true;
             try {
+                // V9.0: 抓取範圍擴大，確保跨日晚班都能被抓到
+                // 策略：抓取選定日期的「當月1號」到「下個月1號」，一次抓足
                 const target = new Date(reportDate.value);
                 const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).toISOString();
+                // 結束時間設為下個月 2 號，確保涵蓋所有跨日資料
+                const endQuery = new Date(target.getFullYear(), target.getMonth() + 1, 2).toISOString();
                 
                 let allData = [];
                 let page = 0;
@@ -515,6 +566,7 @@ const app = createApp({
                         .from('members')
                         .select('created_at')
                         .gte('created_at', startOfMonth)
+                        .lt('created_at', endQuery)
                         .range(page * pageSize, (page + 1) * pageSize - 1);
                     
                     if (error) throw error;
@@ -527,7 +579,7 @@ const app = createApp({
                 }
                 
                 calculateRegStats(allData, reportDate.value);
-            } catch (e) { showToast('報表錯誤', 'error'); }
+            } catch (e) { console.error(e); showToast('報表錯誤', 'error'); }
             isLoadingReport.value = false;
         };
 
@@ -615,17 +667,21 @@ const app = createApp({
 
         const updateDbUsage = async () => { if(supabase) { const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); totalMemberCount.value = count || 0; }};
         
-        // V8.9 Fix: 分離列表查詢與總數查詢
+        // V9.0 Fix: 強制使用獨立 Count 查詢確保來客數正確
         const fetchLogs = async () => {
             if(!supabase) return;
-            // List (Limit 50 for UI)
+            // 列表顯示用 (只抓 50 筆)
             const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50);
             dashboardLogs.value = data || [];
 
-            // Count (Total for stats)
+            // 統計總數用 (抓本月全部 Count)
             const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-            const { count } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth);
-            if(count !== null) stats.value.monthVisits = count;
+            const { count, error } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth);
+            
+            if(!error && count !== null) {
+                // 強制更新 UI
+                stats.value.monthVisits = count;
+            }
         };
 
         const logVisit = async (member) => { if(supabase) await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type: 'phone', check_in_time: new Date() }); fetchLogs(); };
@@ -759,7 +815,7 @@ const app = createApp({
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore };
+        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount };
     }
 });
 app.mount('#app');
