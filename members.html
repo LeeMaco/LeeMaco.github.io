@@ -20,8 +20,13 @@
 
     <style>
         body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; -webkit-tap-highlight-color: transparent; overflow: hidden; }
+        
+        /* v-cloak: Vue 載入前隱藏內容 */
         [v-cloak] { display: none !important; }
         
+        /* 錯誤救援層: 如果 Vue 掛掉，這個會顯示 */
+        #error-rescue { display: none; position: fixed; inset: 0; z-index: 99999; background: white; padding: 20px; text-align: center; }
+
         /* 動畫特效 */
         .glass-panel { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.5); }
         .glass-dark { background: rgba(15, 23, 42, 0.85); backdrop-filter: blur(20px); border: 1px solid rgba(255,255,255,0.1); }
@@ -32,11 +37,17 @@
         .btn-press { transition: all 0.1s; }
         .btn-press:active { transform: scale(0.95); }
         
-        /* 標示這是測試環境的浮水印 */
         .dev-badge { position: fixed; bottom: 10px; right: 10px; background: #f59e0b; color: white; padding: 4px 12px; border-radius: 99px; font-size: 10px; font-weight: bold; z-index: 9999; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1); pointer-events: none; }
     </style>
 </head>
 <body class="bg-slate-100 text-slate-800">
+
+<div id="error-rescue" class="flex flex-col items-center justify-center h-screen">
+    <i class="fa-solid fa-triangle-exclamation text-rose-500 text-5xl mb-4"></i>
+    <h2 class="text-xl font-bold">系統載入失敗</h2>
+    <p class="text-slate-500 mb-4">請檢查網路連線或重新整理</p>
+    <button onclick="location.reload()" class="bg-slate-800 text-white px-6 py-2 rounded-lg">重新整理</button>
+</div>
 
 <div id="app" v-cloak class="h-screen flex flex-col relative overflow-hidden">
     <div class="dev-badge">DEV MODE: members_v9</div>
@@ -263,9 +274,16 @@
 </div>
 
 <script>
+// 緊急救援：如果 Vue 沒有在 3 秒內成功移除 v-cloak，顯示錯誤訊息
+setTimeout(() => {
+    if (document.getElementById('app').hasAttribute('v-cloak')) {
+        document.getElementById('error-rescue').style.display = 'flex';
+    }
+}, 3000);
+
 const { createApp, ref, reactive, computed, onMounted, nextTick, watch } = Vue;
 
-createApp({
+const app = createApp({
     setup() {
         // --- State ---
         const config = reactive({ url: '', key: '', storeName: '' });
@@ -322,6 +340,7 @@ createApp({
                     faceapi.nets.faceLandmark68Net.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model'),
                     faceapi.nets.faceRecognitionNet.loadFromUri('https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model')
                 ]);
+                isModelLoaded.value = true;
                 loadProgress.value = 50;
                 
                 const stored = localStorage.getItem('ai_sys_config_v9_dev');
@@ -359,7 +378,14 @@ createApp({
             canvasEl = document.getElementById('aiCanvas');
             
             try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: { width: 640, height: 480 } });
+                // iPad/iOS 相容性設置
+                stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { 
+                        facingMode: 'user',
+                        width: { ideal: 640 }, 
+                        height: { ideal: 480 } 
+                    } 
+                });
                 videoEl.srcObject = stream;
                 aiCamActive.value = true;
                 
@@ -372,6 +398,7 @@ createApp({
                         if(aiState.value === 'success') return; // 暫停偵測
                         
                         aiState.value = 'scanning';
+                        // 使用 TinyFaceDetector 以提升手機效能
                         const detection = await faceapi.detectSingleFace(videoEl).withFaceLandmarks().withFaceDescriptor();
                         
                         const ctx = canvasEl.getContext('2d');
@@ -393,7 +420,7 @@ createApp({
                         }
                     }, 500); // 每 500ms 偵測一次，節省資源
                 };
-            } catch(e) { console.error(e); alert('無法啟動相機'); }
+            } catch(e) { console.error(e); alert('無法啟動相機: ' + e.message); }
         };
 
         const handleMatch = async (memberId) => {
@@ -464,7 +491,10 @@ createApp({
             isCapturing.value = true;
             await nextTick();
             const v = document.getElementById('regVideo');
-            const s = await navigator.mediaDevices.getUserMedia({ video: { width: 640 } });
+            // iPad/iOS 相容
+            const s = await navigator.mediaDevices.getUserMedia({ 
+                video: { facingMode: 'user', width: {ideal: 640}, height: {ideal: 480} } 
+            });
             v.srcObject = s;
         };
 
@@ -619,6 +649,10 @@ createApp({
         };
     }
 });
+
+// *** 修正點：加上這行掛載指令 ***
+app.mount('#app');
+
 </script>
 </body>
 </html>
