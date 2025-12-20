@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V8.8 (企業修正版)</title>
+    <title>AI 會員系統 V8.9 (iPad/大數據修正版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -104,7 +104,7 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.8</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6">系統初始化 V8.9</h2>
             <div class="space-y-4">
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
                 <div><label class="text-xs font-bold text-slate-500">Supabase Key (Anon)</label><input v-model="config.key" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -123,7 +123,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.8</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V8.9</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -132,7 +132,7 @@
                         <span>{{ totalMemberCount }} 筆</span>
                     </div>
                     <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
-                        <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/10000)*100, 100) + '%'}"></div>
+                        <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/25000)*100, 100) + '%'}"></div>
                     </div>
                 </div>
                 <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-cloud-arrow-up-down text-xl"></i></button>
@@ -369,7 +369,9 @@ const app = createApp({
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         
-        // V8.8 Fix: 嚴格時區處理
+        // V8.9: Refactor stats to ref for manual control
+        const stats = ref({ monthVisits: 0 });
+
         const getTaiwanDate = () => new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
         const todayStr = getTaiwanDate().toISOString().split('T')[0];
         
@@ -394,7 +396,7 @@ const app = createApp({
         const dateStart = ref('');
         const dateEnd = ref('');
         
-        // V8.8 Feature: 分頁控制
+        // V8.8: 分頁控制
         const currentPage = ref(0);
         const hasMore = ref(true);
         const PAGE_SIZE = 50;
@@ -441,10 +443,9 @@ const app = createApp({
             setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000);
         };
 
-        // V8.8 Fix: 嚴格時區處理 (UI 顯示)
+        // UI 顯示用 (依賴瀏覽器但只用於顯示，不影響邏輯)
         const getMemberBorder = (isoDate) => {
             if (!isoDate) return '';
-            // 將 UTC 轉為台灣時間物件
             const d = new Date(isoDate);
             const taiwanTime = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
             const h = taiwanTime.getHours();
@@ -456,7 +457,6 @@ const app = createApp({
         const formatDate = (iso, time=false) => {
             if(!iso) return '--';
             const d = new Date(iso);
-            // 強制使用 zh-TW 與 Asia/Taipei
             return d.toLocaleString('zh-TW', {
                 timeZone: 'Asia/Taipei',
                 hour12: false,
@@ -467,7 +467,7 @@ const app = createApp({
             }).replace(/\//g, '-');
         };
 
-        // V8.8 Fix: 報表統計邏輯 (修正跨日問題)
+        // V8.9 Fix: iPad/Safari 數學計算法
         const calculateRegStats = (members, selectedDate) => {
             regStats.day = { morning: 0, middle: 0, night: 0, total: 0 };
             regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
@@ -475,16 +475,18 @@ const app = createApp({
             members.forEach(m => {
                 if (!m.created_at) return;
                 
-                // 核心修正：將資料庫 UTC 時間轉為台灣時間字串，再進行判斷
+                // 使用 UTC 時間直接數學運算，避開 iPad 解析字串 Bug
                 const d = new Date(m.created_at);
-                const taiwanDate = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
+                const utcHour = d.getUTCHours();
+                const twHour = (utcHour + 8) % 24;
                 
-                const h = taiwanDate.getHours();
-                const mDateStr = taiwanDate.toISOString().split('T')[0]; // 取出台灣日期的 YYYY-MM-DD
+                // 計算台灣日期字串 (YYYY-MM-DD)
+                const twDateObj = new Date(d.getTime() + (8 * 60 * 60 * 1000));
+                const mDateStr = twDateObj.toISOString().split('T')[0];
                 
                 let shift = 'night';
-                if (h >= 8 && h < 18) shift = 'morning';
-                else if (h >= 18 && h < 23) shift = 'middle';
+                if (twHour >= 8 && twHour < 18) shift = 'morning';
+                else if (twHour >= 18 && twHour < 23) shift = 'middle';
                 
                 regStats.month[shift]++;
                 regStats.month.total++;
@@ -496,22 +498,35 @@ const app = createApp({
             });
         };
 
+        // V8.9 Fix: 分頁迴圈抓取無限資料
         const refreshReport = async () => {
             if (!supabase) return;
             isLoadingReport.value = true;
             try {
-                // V8.8 Optimize: 只抓取 created_at 欄位，大幅減少網路傳輸
                 const target = new Date(reportDate.value);
-                // 簡單處理：抓取當月所有資料 (注意：若資料量破萬需改用 Server-side aggregation)
                 const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).toISOString();
                 
-                const { data, error } = await supabase
-                    .from('members')
-                    .select('created_at')
-                    .gte('created_at', startOfMonth)
-                    .limit(10000); // 提高上限，且因為只抓一個欄位，速度很快
+                let allData = [];
+                let page = 0;
+                const pageSize = 1000;
                 
-                if (!error && data) calculateRegStats(data, reportDate.value);
+                while(true) {
+                    const { data, error } = await supabase
+                        .from('members')
+                        .select('created_at')
+                        .gte('created_at', startOfMonth)
+                        .range(page * pageSize, (page + 1) * pageSize - 1);
+                    
+                    if (error) throw error;
+                    if (!data || data.length === 0) break;
+                    
+                    allData = allData.concat(data);
+                    
+                    if (data.length < pageSize) break;
+                    page++;
+                }
+                
+                calculateRegStats(allData, reportDate.value);
             } catch (e) { showToast('報表錯誤', 'error'); }
             isLoadingReport.value = false;
         };
@@ -588,11 +603,10 @@ const app = createApp({
         };
         const capturePhoto = async () => {
             const video = document.getElementById('cameraVideo');
-            if(video.readyState !== 4) return; // 確保影像已載入
+            if(video.readyState !== 4) return;
             const canvas = document.createElement('canvas');
             const size = Math.min(video.videoWidth, video.videoHeight); canvas.width = 640; canvas.height = 640;
             const ctx = canvas.getContext('2d'); 
-            // 修正鏡像裁切計算
             ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640);
             canvas.toBlob(async (blob) => { const compressed = await processImage(blob); if(modals.register) registerForm.photo = compressed; else form.photo = compressed; closeCamera(); }, 'image/jpeg', 0.9);
         };
@@ -600,7 +614,20 @@ const app = createApp({
         const handleFileUpload = async (e) => { const file = e.target.files[0]; if (!file) return; const compressed = await processImage(file); if (modals.register) registerForm.photo = compressed; else form.photo = compressed; };
 
         const updateDbUsage = async () => { if(supabase) { const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); totalMemberCount.value = count || 0; }};
-        const fetchLogs = async () => { if(supabase) { const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50); dashboardLogs.value = data || []; }};
+        
+        // V8.9 Fix: 分離列表查詢與總數查詢
+        const fetchLogs = async () => {
+            if(!supabase) return;
+            // List (Limit 50 for UI)
+            const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50);
+            dashboardLogs.value = data || [];
+
+            // Count (Total for stats)
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const { count } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth);
+            if(count !== null) stats.value.monthVisits = count;
+        };
+
         const logVisit = async (member) => { if(supabase) await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type: 'phone', check_in_time: new Date() }); fetchLogs(); };
         
         const performVerification = async () => {
@@ -618,7 +645,6 @@ const app = createApp({
             isLoading.value = false;
         };
 
-        // V8.8 Feature: 搜尋與分頁邏輯
         const searchMembers = async (reset = false) => {
             if(!supabase) return;
             if(reset) { currentPage.value = 0; displayMembers.value = []; hasMore.value = true; }
@@ -627,8 +653,6 @@ const app = createApp({
             isLoadingList.value = true;
             try {
                 let qb = supabase.from('members').select('*');
-                
-                // 搜尋條件
                 if(searchQuery.value) {
                     const q = searchQuery.value;
                     if (q.includes('-') || q.startsWith('20')) qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`);
@@ -637,7 +661,6 @@ const app = createApp({
                 if(dateStart.value) qb = qb.gte('created_at', dateStart.value);
                 if(dateEnd.value) qb = qb.lte('created_at', dateEnd.value + 'T23:59:59');
                 
-                // 分頁
                 const from = currentPage.value * PAGE_SIZE;
                 const to = from + PAGE_SIZE - 1;
                 
@@ -679,16 +702,13 @@ const app = createApp({
             } catch(e) { showToast('匯出失敗', 'error'); } isExporting.value = false;
         };
         
-        // V8.8 Fix: 匯入防呆 (Excel 內部重複檢查 + DB 重複檢查)
         const handleImport = async (e) => {
             const f = e.target.files[0]; if(!f) return; isImporting.value = true;
             try {
                 const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.getWorksheet(1);
                 const items = []; 
-                // 先抓出 DB 已有電話 (只抓 phone 欄位減輕負載)
                 const { data: exist } = await supabase.from('members').select('phone'); 
                 const dbSet = new Set(exist?.map(x=>x.phone));
-                // 本次匯入批次的 Set，防止 Excel 內部重複
                 const batchSet = new Set();
                 
                 ws.eachRow((row, n) => {
@@ -698,7 +718,6 @@ const app = createApp({
                     let notes = row.getCell(3).text?.trim();
                     
                     if(name && phone) {
-                        // 檢查 DB 是否有，且檢查本次批次是否已加入
                         if (!dbSet.has(phone) && !batchSet.has(phone)) {
                             items.push({ 
                                 id: Date.now().toString() + Math.random().toString(36).substr(2,5), 
@@ -707,7 +726,7 @@ const app = createApp({
                                 notes, 
                                 created_at: new Date() 
                             });
-                            batchSet.add(phone); // 加入批次檢查清單
+                            batchSet.add(phone); 
                         }
                     }
                 });
@@ -736,13 +755,11 @@ const app = createApp({
              }
              const loader = document.getElementById('loading-screen');
              if(loader) loader.style.display = 'none';
-             
              window.addEventListener('keydown', handleKeyboard);
-             
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats: computed(()=>({monthVisits: dashboardLogs.value.length})), loadMore, hasMore };
+        return { config, isConfigured, saveConfig, resetConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore };
     }
 });
 app.mount('#app');
