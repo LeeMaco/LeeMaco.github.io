@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>顧客滿意度調查</title>
+    <style>
+        /* --- CSS Reset & Variables --- */
+        :root {
+            --primary-color: #D4AF37; /* 質感金 (Brand Color) */
+            --primary-hover: #b5952f;
+            --text-dark: #333333;
+            --text-light: #777777;
+            --bg-color: #ffffff;
+            --bg-secondary: #f8f9fa;
+            --border-radius: 12px;
+            --spacing-unit: 16px;
+            --transition-speed: 0.3s;
+        }
+
+        * {
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent; /* 移除手機點擊藍框 */
+        }
+
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-dark);
+            line-height: 1.5;
+            padding-bottom: 80px; /* 預留底部按鈕空間 */
+        }
+
+        /* --- Components --- */
+        
+        /* 1. Header */
+        header {
+            position: sticky;
+            top: 0;
+            background: rgba(255, 255, 255, 0.95);
+            backdrop-filter: blur(10px);
+            padding: var(--spacing-unit);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.05);
+            z-index: 100;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            height: 60px;
+        }
+
+        .header-logo {
+            height: 24px;
+            margin-right: 10px;
+            /* 假裝有 Logo */
+            width: 24px;
+            background-color: var(--text-dark); 
+            border-radius: 4px;
+        }
+
+        .header-title {
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--text-dark);
+        }
+
+        /* 2. Container & Sections */
+        .container {
+            max-width: 600px; /* 平板/桌機也不會太寬 */
+            margin: 0 auto;
+            padding: var(--spacing-unit);
+        }
+
+        .section {
+            margin-bottom: calc(var(--spacing-unit) * 2);
+            opacity: 1;
+            transition: opacity var(--transition-speed) ease, transform var(--transition-speed) ease;
+        }
+
+        .section-hidden {
+            display: none;
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        .section-visible {
+            display: block;
+            animation: slideUp 0.5s forwards;
+        }
+
+        @keyframes slideUp {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        h2 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: var(--spacing-unit);
+            text-align: center;
+        }
+
+        .subtitle {
+            font-size: 0.95rem;
+            color: var(--text-light);
+            text-align: center;
+            margin-bottom: var(--spacing-unit);
+            display: block;
+        }
+
+        /* 3. Welcome Hero */
+        .welcome-text {
+            text-align: center;
+            color: var(--text-light);
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+
+        /* 4. Stars Rating */
+        .stars-container {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        .star {
+            font-size: 40px; /* 大拇指友善 */
+            color: #e0e0e0;
+            cursor: pointer;
+            transition: color 0.2s, transform 0.1s;
+        }
+
+        .star.active {
+            color: #FFC107; /* 星星黃 */
+        }
+
+        .star:active {
+            transform: scale(0.9);
+        }
+
+        /* 5. Tags (Pills) */
+        .tags-container {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .tag {
+            padding: 8px 16px;
+            background-color: var(--bg-secondary);
+            border: 1px solid #e0e0e0;
+            border-radius: 50px;
+            font-size: 0.9rem;
+            color: var(--text-dark);
+            cursor: pointer;
+            transition: all 0.2s;
+            user-select: none;
+        }
+
+        .tag.selected {
+            background-color: var(--primary-color);
+            color: white;
+            border-color: var(--primary-color);
+            box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+        }
+
+        /* 6. Staff Scroll */
+        .staff-scroll-view {
+            display: flex;
+            overflow-x: auto;
+            gap: 15px;
+            padding: 10px 5px; /* 上下留空給陰影 */
+            scroll-snap-type: x mandatory;
+            -webkit-overflow-scrolling: touch;
+            scrollbar-width: none; /* Firefox hide scrollbar */
+        }
+        .staff-scroll-view::-webkit-scrollbar {
+            display: none; /* Chrome hide scrollbar */
+        }
+
+        .staff-card {
+            flex: 0 0 auto;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            width: 80px;
+            cursor: pointer;
+            scroll-snap-align: center;
+            opacity: 0.6;
+            transition: opacity 0.2s, transform 0.2s;
+        }
+
+        .staff-card.selected {
+            opacity: 1;
+            transform: scale(1.05);
+        }
+
+        .staff-avatar {
+            width: 60px;
+            height: 60px;
+            border-radius: 50%;
+            background-color: #eee;
+            margin-bottom: 8px;
+            overflow: hidden;
+            border: 2px solid transparent;
+            transition: border-color 0.2s;
+        }
+        
+        .staff-card.selected .staff-avatar {
+            border-color: var(--primary-color);
+        }
+
+        .staff-avatar img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        .staff-name {
+            font-size: 0.8rem;
+            text-align: center;
+            font-weight: 500;
+        }
+
+        /* 7. Textarea */
+        textarea {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #e0e0e0;
+            border-radius: var(--border-radius);
+            font-family: inherit;
+            font-size: 1rem;
+            resize: none;
+            background-color: var(--bg-secondary);
+        }
+        textarea:focus {
+            outline: none;
+            border-color: var(--primary-color);
+            background-color: #fff;
+        }
+
+        /* 8. Submit Button */
+        .submit-container {
+            position: fixed;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: var(--spacing-unit);
+            background: rgba(255,255,255,0.9);
+            backdrop-filter: blur(5px);
+            border-top: 1px solid #eee;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 16px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: var(--border-radius);
+            font-size: 1.1rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+        }
+
+        .btn-submit:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        .btn-submit:active:not(:disabled) {
+            transform: scale(0.98);
+        }
+
+        /* Success State */
+        .success-view {
+            display: none;
+            height: 100vh;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 20px;
+            animation: fadeIn 0.5s;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: white;
+            z-index: 200;
+        }
+
+        .success-icon {
+            font-size: 80px;
+            color: #4CAF50;
+            margin-bottom: 20px;
+            animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            100% { transform: scale(1); }
+        }
+
+        /* Error Banner */
+        .error-banner {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: white;
+            z-index: 999;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="errorBanner" class="error-banner">
+        <h2>⚠️ 無法識別包廂</h2>
+        <p>請重新掃描桌上的 QR Code</p>
+    </div>
+
+    <div id="successView" class="success-view">
+        <div class="success-icon">✅</div>
+        <h2>感謝您的回饋！</h2>
+        <p class="subtitle">您的聲音是我們進步最大的動力。<br>期待您再次光臨 <span id="successRoomName"></span>。</p>
+        <button class="tag" style="margin-top:20px; background:#fff; border:1px solid #ccc;" onclick="window.close()">關閉頁面</button>
+    </div>
+
+    <div id="mainForm">
+        <header>
+            <div class="header-logo"></div> <div class="header-title" id="headerTitle">包廂載入中...</div>
+        </header>
+
+        <div class="container">
+            <div class="welcome-text">
+                感謝您今日的光臨。為了提供更好的體驗，耽誤您 30 秒時間，希望能聽聽您的真實感受。
+            </div>
+
+            <div class="section">
+                <h2>您滿意今天的整體體驗嗎？</h2>
+                <div class="stars-container" id="starRating">
+                    <span class="star" data-value="1">★</span>
+                    <span class="star" data-value="2">★</span>
+                    <span class="star" data-value="3">★</span>
+                    <span class="star" data-value="4">★</span>
+                    <span class="star" data-value="5">★</span>
+                </div>
+            </div>
+
+            <div id="expandedContent" class="section-hidden">
+                
+                <div class="section">
+                    <span class="subtitle" id="tagSubtitle">請選擇標籤</span>
+                    <div class="tags-container" id="tagCloud">
+                        </div>
+                </div>
+
+                <div class="section">
+                    <span class="subtitle">有沒有哪位夥伴讓您印象深刻？</span>
+                    <div class="staff-scroll-view" id="staffScroll">
+                        </div>
+                </div>
+
+                <div class="section">
+                    <span class="subtitle">還有其他想跟我們說的話嗎？ (選填)</span>
+                    <textarea id="commentBox" rows="3" placeholder="歡迎許願..."></textarea>
+                </div>
+
+                <div style="height: 60px;"></div>
+            </div>
+        </div>
+
+        <div class="submit-container">
+            <button id="submitBtn" class="btn-submit" disabled>送出評價</button>
+        </div>
+    </div>
+
+    <script>
+        // --- 1. 配置與資料 (Configuration) ---
+        const CONFIG = {
+            tags_good: [
+                "👍 服務親切", "🚀 上餐迅速", "🧹 環境整潔", "🎵 氛圍很好", "🤫 隱私性佳"
+            ],
+            tags_bad: [
+                "🐢 動作太慢", "😐 態度冷淡", "🧹 整潔待加強", "🗣️ 隔音不好", "❄️ 空調問題"
+            ],
+            // 模擬員工資料 (未來可接 API)
+            staff: [
+                { id: 0, name: "沒特別注意", avatar: "https://ui-avatars.com/api/?name=-&background=eee&color=999" }, // 預設選項
+                { id: 1, name: "Andy", avatar: "https://ui-avatars.com/api/?name=Andy&background=random" },
+                { id: 2, name: "Bella", avatar: "https://ui-avatars.com/api/?name=Bella&background=random" },
+                { id: 3, name: "Chris", avatar: "https://ui-avatars.com/api/?name=Chris&background=random" },
+                { id: 4, name: "Diana", avatar: "https://ui-avatars.com/api/?name=Diana&background=random" }
+            ]
+        };
+
+        // --- 2. 狀態管理 (State) ---
+        let state = {
+            roomId: null,
+            rating: 0,
+            selectedTags: [],
+            selectedStaffId: 0 // 預設 0
+        };
+
+        // --- 3. 初始化 (Init) ---
+        document.addEventListener('DOMContentLoaded', () => {
+            // 解析 URL 參數
+            const urlParams = new URLSearchParams(window.location.search);
+            state.roomId = urlParams.get('room_id');
+
+            // 錯誤處理：如果沒有 room_id
+            if (!state.roomId) {
+                // 為了演示方便，如果沒參數預設給一個 V01 (正式上線請把下面這行註解掉)
+                 state.roomId = "V01 (Demo)";
+                
+                // 正式邏輯：取消註解下方代碼
+                // document.getElementById('errorBanner').style.display = 'flex';
+                // document.getElementById('mainForm').style.display = 'none';
+                // return; 
+            }
+
+            // 更新 UI 標題
+            document.getElementById('headerTitle').textContent = `${state.roomId} 專屬意見卡`;
+            document.getElementById('successRoomName').textContent = state.roomId;
+
+            initStaffList();
+            setupEventListeners();
+        });
+
+        // --- 4. 渲染邏輯 (Rendering) ---
+
+        // 渲染員工列表
+        function initStaffList() {
+            const container = document.getElementById('staffScroll');
+            CONFIG.staff.forEach(person => {
+                const el = document.createElement('div');
+                el.className = `staff-card ${person.id === 0 ? 'selected' : ''}`;
+                el.onclick = () => selectStaff(person.id, el);
+                el.innerHTML = `
+                    <div class="staff-avatar"><img src="${person.avatar}" alt="${person.name}"></div>
+                    <div class="staff-name">${person.name}</div>
+                `;
+                container.appendChild(el);
+            });
+        }
+
+        // 渲染標籤雲 (根據評分)
+        function renderTags(isGood) {
+            const container = document.getElementById('tagCloud');
+            const subtitle = document.getElementById('tagSubtitle');
+            const placeholder = document.getElementById('commentBox');
+            
+            container.innerHTML = ''; // 清空
+            state.selectedTags = []; // 重置選擇
+
+            // 更新文案
+            if (isGood) {
+                subtitle.innerText = "太棒了！請問您覺得哪裡最棒？（可複選）";
+                placeholder.placeholder = "歡迎許願，告訴我們如何做得更好...";
+                CONFIG.tags_good.forEach(tagText => createTagElement(tagText, container));
+            } else {
+                subtitle.innerText = "很抱歉。請問我們哪裡需要改進？（可複選）";
+                placeholder.placeholder = "請告訴我們具體情況，我們會立即處理...";
+                CONFIG.tags_bad.forEach(tagText => createTagElement(tagText, container));
+            }
+        }
+
+        function createTagElement(text, container) {
+            const btn = document.createElement('button');
+            btn.className = 'tag';
+            btn.textContent = text;
+            btn.onclick = () => {
+                btn.classList.toggle('selected');
+                // 更新 State
+                if (state.selectedTags.includes(text)) {
+                    state.selectedTags = state.selectedTags.filter(t => t !== text);
+                } else {
+                    state.selectedTags.push(text);
+                }
+            };
+            container.appendChild(btn);
+        }
+
+        // --- 5. 互動邏輯 (Interactions) ---
+
+        function setupEventListeners() {
+            // 星星點擊
+            const stars = document.querySelectorAll('.star');
+            stars.forEach(star => {
+                star.addEventListener('click', () => {
+                    const value = parseInt(star.dataset.value);
+                    state.rating = value;
+                    updateStarsUI(value);
+                    
+                    // 第一次點擊時，展開下方內容
+                    const expandedSection = document.getElementById('expandedContent');
+                    if(expandedSection.classList.contains('section-hidden')) {
+                        expandedSection.classList.remove('section-hidden');
+                        expandedSection.classList.add('section-visible');
+                    }
+
+                    // 啟用送出按鈕
+                    document.getElementById('submitBtn').disabled = false;
+
+                    // 判斷好評/負評並重新渲染標籤
+                    renderTags(value >= 4);
+                });
+            });
+
+            // 送出按鈕
+            document.getElementById('submitBtn').addEventListener('click', handleSubmit);
+        }
+
+        function updateStarsUI(value) {
+            document.querySelectorAll('.star').forEach(s => {
+                const sVal = parseInt(s.dataset.value);
+                if (sVal <= value) {
+                    s.classList.add('active');
+                } else {
+                    s.classList.remove('active');
+                }
+            });
+        }
+
+        function selectStaff(id, element) {
+            state.selectedStaffId = id;
+            // UI 更新
+            document.querySelectorAll('.staff-card').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+
+        // --- 6. 送出處理 (Submit) ---
+        function handleSubmit() {
+            const btn = document.getElementById('submitBtn');
+            btn.innerText = "傳送中...";
+            btn.disabled = true;
+
+            // 收集最終資料
+            const finalData = {
+                room_id: state.roomId,
+                rating: state.rating,
+                tags: state.selectedTags,
+                staff_id: state.selectedStaffId,
+                comment: document.getElementById('commentBox').value,
+                timestamp: new Date().toISOString()
+            };
+
+            console.log("送出資料:", finalData);
+
+            // 模擬 API 延遲 (500ms)
+            setTimeout(() => {
+                // 隱藏表單，顯示成功畫面
+                document.getElementById('mainForm').style.display = 'none';
+                document.getElementById('successView').style.display = 'flex';
+                
+                // 這裡可以加入 fetch() 發送資料到後端
+            }, 500);
+        }
+
+    </script>
+</body>
+</html>
