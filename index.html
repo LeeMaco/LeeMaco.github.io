@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V9.2 (可自訂班別時段)</title>
+    <title>AI 會員系統 V9.3 (精準時段+防重紀錄)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -41,6 +41,9 @@
         .mirror-x { transform: scaleX(-1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         input:focus, textarea:focus { font-size: 16px; } 
+        
+        /* Time Input Styling */
+        input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0.5); }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -96,31 +99,25 @@
 
     <div v-if="!isConfigured" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 系統後台設定 V9.2</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 系統後台設定 V9.3</h2>
             <div class="space-y-4">
                 <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
-                    <h4 class="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-clock mr-2 text-indigo-500"></i>班別時段定義 (起始整點)</h4>
-                    <div class="grid grid-cols-3 gap-3 text-center">
-                        <div>
-                            <label class="text-xs font-bold text-orange-500 block mb-1">早班 (Morning)</label>
-                            <select v-model.number="config.shifts.morning" class="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white">
-                                <option v-for="n in 24" :value="n-1">{{ (n-1).toString().padStart(2,'0') }}:00</option>
-                            </select>
+                    <h4 class="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-clock mr-2 text-indigo-500"></i>班別時段定義 (HH:mm)</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-orange-500"><i class="fa-solid fa-sun mr-1"></i>早班起始</label>
+                            <input type="time" v-model="config.shifts.morning" class="p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white w-32 text-center">
                         </div>
-                        <div>
-                            <label class="text-xs font-bold text-emerald-500 block mb-1">中班 (Middle)</label>
-                            <select v-model.number="config.shifts.middle" class="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white">
-                                <option v-for="n in 24" :value="n-1">{{ (n-1).toString().padStart(2,'0') }}:00</option>
-                            </select>
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-emerald-500"><i class="fa-solid fa-moon mr-1"></i>中班起始</label>
+                            <input type="time" v-model="config.shifts.middle" class="p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white w-32 text-center">
                         </div>
-                        <div>
-                            <label class="text-xs font-bold text-purple-500 block mb-1">晚班 (Night)</label>
-                            <select v-model.number="config.shifts.night" class="w-full p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white">
-                                <option v-for="n in 24" :value="n-1">{{ (n-1).toString().padStart(2,'0') }}:00</option>
-                            </select>
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-purple-500"><i class="fa-solid fa-star mr-1"></i>晚班起始</label>
+                            <input type="time" v-model="config.shifts.night" class="p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white w-32 text-center">
                         </div>
                     </div>
-                    <p class="text-[10px] text-slate-400 mt-2">* 晚班時段自動包含「跨日」至隔日早班起始時間前</p>
+                    <p class="text-[10px] text-slate-400 mt-3">* 晚班時段自動包含「跨日」至隔日早班起始時間前</p>
                 </div>
 
                 <div><label class="text-xs font-bold text-slate-500">Supabase URL</label><input v-model="config.url" class="w-full border-2 border-slate-200 p-3 rounded-xl focus:border-indigo-500 outline-none"></div>
@@ -137,7 +134,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.2</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.3</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -350,7 +347,7 @@
                             <div class="flex justify-between items-center">
                                 <span class="font-bold text-slate-500 flex items-center flex-col items-start">
                                     <span><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班 (跨日)</span>
-                                    <span class="text-[10px] text-slate-300 ml-6">{{config.shifts.night}}:00 ~ 隔日 {{config.shifts.morning}}:00</span>
+                                    <span class="text-[10px] text-slate-300 ml-6">{{config.shifts.night}} ~ 隔日 {{config.shifts.morning}}</span>
                                 </span>
                                 <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.night }}</span>
                             </div>
@@ -389,14 +386,14 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 
 const app = createApp({
     setup() {
-        // V9.2: 新增 shifts 預設值
+        // V9.3: shifts 改為 HH:mm 格式
         const config = reactive({ 
             url: '', 
             key: '', 
             adminPwd: '', 
             storeName: '', 
             volume: 0.5,
-            shifts: { morning: 8, middle: 18, night: 23 } 
+            shifts: { morning: "08:00", middle: "18:00", night: "23:00" } 
         });
         const isConfigured = ref(false);
         const displayMembers = ref([]); 
@@ -475,16 +472,27 @@ const app = createApp({
             setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000);
         };
 
+        // Helper: 將 HH:mm 轉換為分鐘數
+        const timeToMinutes = (timeStr) => {
+            if(!timeStr) return 0;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
+        };
+
+        // V9.3: 使用分鐘數判斷邊框顏色
         const getMemberBorder = (isoDate) => {
             if (!isoDate) return '';
             const d = new Date(isoDate);
             const taiwanTime = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
-            const h = taiwanTime.getHours();
+            const currentMins = taiwanTime.getHours() * 60 + taiwanTime.getMinutes();
             
-            // 使用 config 設定的邊框顏色判斷
             const S = config.shifts;
-            if (h >= S.morning && h < S.middle) return 'border-time-day'; 
-            if (h >= S.middle && h < S.night) return 'border-time-night'; 
+            const morningMins = timeToMinutes(S.morning);
+            const middleMins = timeToMinutes(S.middle);
+            const nightMins = timeToMinutes(S.night);
+
+            if (currentMins >= morningMins && currentMins < middleMins) return 'border-time-day'; 
+            if (currentMins >= middleMins && currentMins < nightMins) return 'border-time-night'; 
             return 'border-time-late'; 
         };
 
@@ -501,7 +509,7 @@ const app = createApp({
             }).replace(/\//g, '-');
         };
 
-        // V9.2 修正：動態讀取 config.shifts 計算班別
+        // V9.3: 使用分鐘數精確計算統計
         const calculateRegStats = (members, selectedDateStr) => {
             regStats.day = { morning: 0, middle: 0, night: 0, total: 0 };
             regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
@@ -515,7 +523,11 @@ const app = createApp({
             
             let skippedCount = 0;
             const selectedMonthPrefix = selectedDateStr.substring(0, 7); 
-            const S = config.shifts; // 讀取設定
+            const S = config.shifts;
+            
+            const morningMins = timeToMinutes(S.morning);
+            const middleMins = timeToMinutes(S.middle);
+            const nightMins = timeToMinutes(S.night);
 
             members.forEach(m => {
                 if (!m.created_at) return;
@@ -526,21 +538,21 @@ const app = createApp({
                 const twTimeVal = rawTime + twOffset;
                 const twDateObj = new Date(twTimeVal);
                 
-                const hour = twDateObj.getUTCHours(); 
+                const currentMins = twDateObj.getUTCHours() * 60 + twDateObj.getUTCMinutes();
                 const dateStr = twDateObj.toISOString().split('T')[0]; 
 
                 let shift = '';
                 let businessDate = dateStr; 
 
-                // 動態判斷
-                if (hour >= S.morning && hour < S.middle) {
+                // 精確判斷
+                if (currentMins >= morningMins && currentMins < middleMins) {
                     shift = 'morning'; 
-                } else if (hour >= S.middle && hour < S.night) {
+                } else if (currentMins >= middleMins && currentMins < nightMins) {
                     shift = 'middle'; 
                 } else {
                     shift = 'night';   
                     // 跨日判斷：只要小於早班起始，就屬於前一天
-                    if (hour < S.morning) {
+                    if (currentMins < morningMins) {
                         const prevDayObj = new Date(twTimeVal - (24 * 60 * 60 * 1000));
                         businessDate = prevDayObj.toISOString().split('T')[0];
                     }
@@ -582,13 +594,10 @@ const app = createApp({
                     
                     if (error) throw error;
                     if (!data || data.length === 0) break;
-                    
                     allData = allData.concat(data);
-                    
                     if (data.length < pageSize) break;
                     page++;
                 }
-                
                 calculateRegStats(allData, reportDate.value);
             } catch (e) { console.error(e); showToast('報表錯誤', 'error'); }
             isLoadingReport.value = false;
@@ -680,16 +689,52 @@ const app = createApp({
         
         const fetchLogs = async () => {
             if(!supabase) return;
-            // 列表
             const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50);
             dashboardLogs.value = data || [];
-            // 總數
             const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
             const { count, error } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth);
             if(!error && count !== null) stats.value.monthVisits = count;
         };
 
-        const logVisit = async (member) => { if(supabase) await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type: 'phone', check_in_time: new Date() }); fetchLogs(); };
+        // V9.3: 3小時防重複邏輯
+        const logVisit = async (member) => { 
+            if(!supabase) return;
+            
+            // 1. 查詢該會員最後一次的 check_in_time
+            const { data: lastLogs, error } = await supabase
+                .from('visit_logs')
+                .select('check_in_time')
+                .eq('member_id', member.id)
+                .order('check_in_time', { ascending: false })
+                .limit(1);
+
+            let shouldLog = true;
+
+            if (lastLogs && lastLogs.length > 0) {
+                const lastTime = new Date(lastLogs[0].check_in_time).getTime();
+                const nowTime = new Date().getTime();
+                const diffHours = (nowTime - lastTime) / (1000 * 60 * 60);
+                
+                // 如果小於 3 小時，則不寫入
+                if (diffHours < 3) {
+                    shouldLog = false;
+                    console.log(`[Visit] ${member.name} skipped log (Last visit: ${diffHours.toFixed(1)} hrs ago)`);
+                }
+            }
+
+            // 2. 只有符合條件才寫入
+            if (shouldLog) {
+                await supabase.from('visit_logs').insert({ 
+                    member_id: member.id, 
+                    name: member.name, 
+                    phone: member.phone, 
+                    type: 'phone', 
+                    check_in_time: new Date() 
+                });
+                // 3. 只有寫入新紀錄才刷新列表
+                fetchLogs(); 
+            }
+        };
         
         const performVerification = async () => {
             const val = selfServiceInput.value.trim();
@@ -747,10 +792,9 @@ const app = createApp({
         const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); updateDbUsage(); searchMembers(true); };
         const deletePhoto = () => { if(modals.register) registerForm.photo = null; else form.photo = null; };
         const saveConfig = () => { localStorage.setItem('supabase_config_v7', JSON.stringify(config)); location.reload(); };
-        // V9.2: 改為編輯模式而非重置
         const editConfigSecure = () => { 
             if(prompt('請輸入管理員密碼以進入後台設定') === config.adminPwd) {
-                isConfigured.value = false; // 顯示設定視窗
+                isConfigured.value = false; 
             } else {
                 showToast('密碼錯誤', 'error');
             }
@@ -816,10 +860,15 @@ const app = createApp({
              if(s) {
                  const parsed = JSON.parse(s);
                  Object.assign(config, parsed);
-                 // 兼容舊版：如果沒有設定 shifts，則寫入預設值
-                 if (!config.shifts) {
-                     config.shifts = { morning: 8, middle: 18, night: 23 };
+                 
+                 // V9.3 自動遷移：如果發現舊版設定是數字，轉為 HH:00 字串
+                 if (typeof config.shifts.morning === 'number') {
+                     config.shifts.morning = config.shifts.morning.toString().padStart(2,'0') + ':00';
+                     config.shifts.middle = config.shifts.middle.toString().padStart(2,'0') + ':00';
+                     config.shifts.night = config.shifts.night.toString().padStart(2,'0') + ':00';
                  }
+                 // 若無設定則初始化
+                 if (!config.shifts.morning) config.shifts = { morning: "08:00", middle: "18:00", night: "23:00" };
              }
              if(config.url) {
                  supabase = window.supabase.createClient(config.url, config.key);
