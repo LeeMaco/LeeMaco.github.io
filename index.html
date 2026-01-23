@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.5 (互動升級版)</title>
+    <title>E書漫 AI 會員系統 V9.6 (體驗優化版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -149,7 +149,7 @@
 
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.5</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.6</h2>
             <div class="space-y-4">
                 
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -191,7 +191,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.5</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.6</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -503,7 +503,6 @@ const app = createApp({
             } 
         });
 
-        // --- V9.5 升級：排行榜邏輯 ---
         const rankingList = ref([]);
         const rankingTitle = ref('');
         const isLoadingRanking = ref(false);
@@ -515,7 +514,6 @@ const app = createApp({
             tags: []
         });
         
-        // 預設標籤庫
         const defaultTags = ["靠窗", "安靜區", "無菸", "需統編", "飲料去冰", "不加糖", "冷氣強", "拒絕推銷", "老客戶"];
         const currentTags = computed(() => cloudConfig.tags.length > 0 ? cloudConfig.tags : defaultTags);
 
@@ -608,13 +606,14 @@ const app = createApp({
 
         const appendLock = (n) => { if(staffLock.input.length < 6) staffLock.input += n; };
         
-        // --- V9.5 修改：解鎖後自動跳轉接待櫃台 ---
+        // --- V9.6 修正：解鎖後需標記 isConfigured 為 true ---
         const unlockSystem = () => {
             const targetPwd = cloudConfig.lockPwd || staffLock.defaultPwd;
             if (staffLock.input === targetPwd) {
                 localStorage.setItem('device_authorized', 'true');
                 staffLock.show = false;
-                currentTab.value = 'self_service'; // ★ 自動跳轉
+                isConfigured.value = true; // ★ 關鍵修正：告訴系統設定已完成，隱藏後台視窗
+                currentTab.value = 'self_service';
                 showToast('解除鎖定', 'success');
             } else {
                 showToast('密碼錯誤', 'error');
@@ -638,7 +637,6 @@ const app = createApp({
                         }
                     });
                 }
-                // ★ V9.5 修復：若雲端無標籤，則自動填入預設值到輸入框，方便管理者查看
                 if(!cloudConfig.tagsInput) cloudConfig.tagsInput = defaultTags.join(',');
             } catch (e) { console.warn('Cloud config error', e); }
         };
@@ -656,7 +654,6 @@ const app = createApp({
             } catch (e) { showToast('更新失敗', 'error'); }
         };
 
-        // --- V9.5 新增：排行榜查詢邏輯 ---
         const showRanking = async (type) => {
             if(!supabase) return;
             modals.ranking = true;
@@ -667,14 +664,12 @@ const app = createApp({
                 if (type === 'month') {
                     rankingTitle.value = '本月來客排行榜 Top 30';
                     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-                    // 撈取本月紀錄，依照月次數排序
                     const { data } = await supabase.from('visit_logs')
                         .select('member_id, name, phone, month_count')
                         .gte('check_in_time', startOfMonth)
                         .order('month_count', { ascending: false })
-                        .limit(150); // 多撈一點來過濾重複
+                        .limit(150);
                     
-                    // 前端去重 (每個會員只取最高的一次紀錄)
                     const uniqueMap = new Map();
                     (data || []).forEach(log => {
                         if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.month_count, type: 'month' });
@@ -683,7 +678,6 @@ const app = createApp({
                     
                 } else {
                     rankingTitle.value = '總累計 VIP 排行榜 Top 30';
-                    // 撈取所有紀錄，依照總次數排序
                     const { data } = await supabase.from('visit_logs')
                         .select('member_id, name, phone, total_count')
                         .order('total_count', { ascending: false })
@@ -699,19 +693,15 @@ const app = createApp({
             isLoadingRanking.value = false;
         };
 
-        // --- V9.5 新增：從 Log 快速開啟會員編輯 ---
         const openMemberFromLog = async (log) => {
             if(!supabase) return;
-            // 先顯示 Loading
             const toastId = Date.now();
             toasts.value.push({ id: toastId, msg: '讀取會員資料中...', type: 'warning', title: '請稍候' });
             
             try {
                 const { data, error } = await supabase.from('members').select('*').eq('id', log.member_id).single();
                 if(error) throw error;
-                // 關閉 Toast
                 toasts.value = toasts.value.filter(t => t.id !== toastId);
-                // 開啟編輯視窗
                 editMember(data);
             } catch(e) {
                 toasts.value = toasts.value.filter(t => t.id !== toastId);
@@ -985,7 +975,6 @@ const app = createApp({
                      const isAuth = localStorage.getItem('device_authorized');
                      if (isAuth === 'true') {
                          isConfigured.value = true;
-                         // V9.5 邏輯：有授權也自動跳櫃台
                          currentTab.value = 'self_service';
                          updateDbUsage(); fetchLogs(); searchMembers(true);
                      } else { staffLock.show = true; }
