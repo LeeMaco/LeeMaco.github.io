@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>AI 會員系統 V9.3 (精準時段+防重紀錄)</title>
+    <title>E書漫 AI 會員系統 V9.3</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -386,15 +386,31 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 
 const app = createApp({
     setup() {
-        // V9.3: shifts 改為 HH:mm 格式
+        // --- 核心設定區塊 (已內建所有連線資料) ---
         const config = reactive({ 
-            url: '', 
-            key: '', 
-            adminPwd: '', 
-            storeName: '', 
+            // 1. Supabase 網址
+            url: 'https://xxbovxeahbmehyrizdxj.supabase.co', 
+            
+            // 2. Supabase Anon Key
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Ym92eGVhaGJtZWh5cml6ZHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzMyMjIsImV4cCI6MjA4MDI0OTIyMn0.DP692V8YTBpSQy8e8MMxlYLn4D-VWUJFXUwuWQkMvJA', 
+            
+            // 3. 管理員密碼 (進入後台或修改設定時使用)
+            adminPwd: '0211', 
+            
+            // 4. 商店顯示名稱
+            storeName: 'E書漫', 
+            
+            // 5. 音效音量 (0.0 ~ 1.0)
             volume: 0.5,
-            shifts: { morning: "08:00", middle: "18:00", night: "23:00" } 
+            
+            // 6. 班別時段定義 (依照您圖片中的設定)
+            shifts: { 
+                morning: "07:50", 
+                middle: "17:50", 
+                night: "22:50" 
+            } 
         });
+
         const isConfigured = ref(false);
         const displayMembers = ref([]); 
         const totalMemberCount = ref(0); 
@@ -856,27 +872,38 @@ const app = createApp({
         };
 
         onMounted(async () => {
+             // 嘗試讀取 localStorage (如果以後您手動改過設定，這裡會優先讀取)
              const s = localStorage.getItem('supabase_config_v7');
              if(s) {
-                 const parsed = JSON.parse(s);
-                 Object.assign(config, parsed);
-                 
-                 // V9.3 自動遷移：如果發現舊版設定是數字，轉為 HH:00 字串
-                 if (typeof config.shifts.morning === 'number') {
-                     config.shifts.morning = config.shifts.morning.toString().padStart(2,'0') + ':00';
-                     config.shifts.middle = config.shifts.middle.toString().padStart(2,'0') + ':00';
-                     config.shifts.night = config.shifts.night.toString().padStart(2,'0') + ':00';
+                 try {
+                     const parsed = JSON.parse(s);
+                     Object.assign(config, parsed);
+                     // V9.3 自動遷移：針對舊資料的相容性處理
+                     if (typeof config.shifts.morning === 'number') {
+                         config.shifts.morning = config.shifts.morning.toString().padStart(2,'0') + ':00';
+                         config.shifts.middle = config.shifts.middle.toString().padStart(2,'0') + ':00';
+                         config.shifts.night = config.shifts.night.toString().padStart(2,'0') + ':00';
+                     }
+                 } catch(e) {}
+             }
+
+             // ★★★ 核心邏輯：只要 config 裡有網址和 Key (現在已經內建了)，就直接啟動 ★★★
+             if(config.url && config.key) {
+                 try {
+                     supabase = window.supabase.createClient(config.url, config.key);
+                     isConfigured.value = true; // 直接進入主畫面，不顯示設定頁
+                     updateDbUsage();
+                     fetchLogs();
+                     searchMembers(true);
+                 } catch (e) {
+                     console.error("Auto login error:", e);
+                     alert("內建連線設定有誤，請檢查代碼");
+                     isConfigured.value = false;
                  }
-                 // 若無設定則初始化
-                 if (!config.shifts.morning) config.shifts = { morning: "08:00", middle: "18:00", night: "23:00" };
+             } else {
+                 isConfigured.value = false;
              }
-             if(config.url) {
-                 supabase = window.supabase.createClient(config.url, config.key);
-                 isConfigured.value = true;
-                 updateDbUsage();
-                 fetchLogs();
-                 searchMembers(true);
-             }
+
              const loader = document.getElementById('loading-screen');
              if(loader) loader.style.display = 'none';
              window.addEventListener('keydown', handleKeyboard);
