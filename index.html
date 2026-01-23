@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.6 (體驗優化版)</title>
+    <title>E書漫 AI 會員系統 V9.7 (紀錄查詢版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -147,9 +147,52 @@
         </div>
     </div>
 
+    <div v-if="modals.history" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[260] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="px-6 py-5 flex justify-between items-center bg-emerald-50 rounded-t-[2rem] border-b border-emerald-100">
+                <div class="flex flex-col">
+                    <h3 class="font-black text-xl text-emerald-900 flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-500"></i> 來客歷史紀錄
+                    </h3>
+                    <p class="text-xs text-emerald-600 font-bold ml-1">{{ activeForm.name }} ({{ activeForm.phone }})</p>
+                </div>
+                <button @click="modals.history = false" class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 flex items-center justify-center transition shadow-sm"><i class="fa-solid fa-times"></i></button>
+            </div>
+            
+            <div v-if="isLoadingHistory" class="p-12 text-center text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-emerald-300"></i>
+                <p class="font-bold text-sm">讀取紀錄中...</p>
+            </div>
+            
+            <div v-else class="overflow-y-auto p-0 bg-white">
+                <ul v-if="memberHistoryLogs.length > 0" class="divide-y divide-slate-100">
+                    <li v-for="(log, idx) in memberHistoryLogs" :key="idx" class="p-4 hover:bg-slate-50 transition flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 text-center">
+                            <div class="text-xs font-bold text-slate-400">{{ formatDate(log.check_in_time, true).split(' ')[0].split('-').slice(1).join('/') }}</div>
+                            <div class="text-lg font-black text-slate-700">{{ formatDate(log.check_in_time, true).split(' ')[1] }}</div>
+                        </div>
+                        <div class="flex-1 border-l-2 border-emerald-100 pl-4">
+                            <div class="flex gap-2 mb-1">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">第 {{ log.total_count }} 次來店</span>
+                            </div>
+                            <div v-if="log.memo_snapshot" class="text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded-lg inline-block">
+                                <i class="fa-solid fa-note-sticky mr-1 opacity-50"></i>{{ log.memo_snapshot }}
+                            </div>
+                            <div v-else class="text-xs text-slate-300 font-bold italic">無備註紀錄</div>
+                        </div>
+                    </li>
+                </ul>
+                <div v-else class="text-center p-12 text-slate-400 font-bold flex flex-col items-center">
+                    <i class="fa-regular fa-folder-open text-4xl mb-2 opacity-30"></i>
+                    查無歷史紀錄
+                </div>
+            </div>
+        </div>
+    </div>
+
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.6</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.7</h2>
             <div class="space-y-4">
                 
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -191,7 +234,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.6</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.7</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -392,7 +435,10 @@
                 </div>
             </div>
             <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
-                <button v-if="modals.form" @click="deleteMember" class="px-5 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
+                <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center">
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄
+                </button>
+                <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
             </div>
         </div>
@@ -523,6 +569,10 @@ const app = createApp({
         const dashboardLogs = ref([]);
         const stats = ref({ monthVisits: 0 });
 
+        // --- V9.7 新增：個人歷史紀錄相關變數 ---
+        const memberHistoryLogs = ref([]);
+        const isLoadingHistory = ref(false);
+
         const getTaiwanDate = () => new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
         const todayStr = getTaiwanDate().toISOString().split('T')[0];
         
@@ -552,7 +602,7 @@ const app = createApp({
         const hasMore = ref(true);
         const PAGE_SIZE = 50;
 
-        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false });
+        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false });
         const tabs = [{id:'self_service', label:'接待櫃台', icon:'fa-solid fa-desktop'},{id:'list', label:'會員管理', icon:'fa-solid fa-users-gear'},{id:'dashboard', label:'營運分析', icon:'fa-solid fa-chart-pie'}];
 
         const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, created_at: null });
@@ -606,13 +656,12 @@ const app = createApp({
 
         const appendLock = (n) => { if(staffLock.input.length < 6) staffLock.input += n; };
         
-        // --- V9.6 修正：解鎖後需標記 isConfigured 為 true ---
         const unlockSystem = () => {
             const targetPwd = cloudConfig.lockPwd || staffLock.defaultPwd;
             if (staffLock.input === targetPwd) {
                 localStorage.setItem('device_authorized', 'true');
                 staffLock.show = false;
-                isConfigured.value = true; // ★ 關鍵修正：告訴系統設定已完成，隱藏後台視窗
+                isConfigured.value = true;
                 currentTab.value = 'self_service';
                 showToast('解除鎖定', 'success');
             } else {
@@ -707,6 +756,30 @@ const app = createApp({
                 toasts.value = toasts.value.filter(t => t.id !== toastId);
                 showToast('無法讀取會員資料', 'error');
             }
+        };
+
+        // --- V9.7 新增：開啟個人歷史紀錄查詢 ---
+        const openMemberHistory = async (member) => {
+            if(!member.id) return;
+            modals.history = true;
+            isLoadingHistory.value = true;
+            memberHistoryLogs.value = [];
+
+            try {
+                // 查詢該會員所有紀錄 (限制最新100筆，避免跑太久)
+                const { data, error } = await supabase.from('visit_logs')
+                    .select('*')
+                    .eq('member_id', member.id)
+                    .order('check_in_time', { ascending: false })
+                    .limit(100);
+                
+                if(error) throw error;
+                memberHistoryLogs.value = data || [];
+            } catch(e) {
+                console.error(e);
+                showToast('讀取紀錄失敗', 'error');
+            }
+            isLoadingHistory.value = false;
         };
 
         const timeToMinutes = (timeStr) => {
@@ -929,7 +1002,7 @@ const app = createApp({
         const clearInput = () => selfServiceInput.value = '';
         const openSelfRegister = () => modals.privacy = true;
         const confirmPrivacy = () => { modals.privacy = false; modals.register = true; };
-        const closeModals = () => { modals.form=false; modals.register=false; modals.privacy=false; modals.io=false; modals.camera=false; modals.report=false; modals.ranking=false; };
+        const closeModals = () => { modals.form=false; modals.register=false; modals.privacy=false; modals.io=false; modals.camera=false; modals.report=false; modals.ranking=false; modals.history=false; };
         const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; };
         const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); updateDbUsage(); searchMembers(true); };
         const deletePhoto = () => { if(modals.register) registerForm.photo = null; else form.photo = null; };
@@ -987,7 +1060,7 @@ const app = createApp({
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog };
+        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory };
     }
 });
 app.mount('#app');
