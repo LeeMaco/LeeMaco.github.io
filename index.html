@@ -3,77 +3,99 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.9.3 (CDN強固版)</title>
+    <title>E書漫 AI 會員系統 V9.9.5 (架構師展開版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
+    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js" crossorigin="anonymous"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    <script src="https://unpkg.com/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous"></script>
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
 
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            const errorBox = document.getElementById('error-display');
-            if (errorBox) {
-                errorBox.style.display = 'block';
-                errorBox.innerHTML = `
-                    <div style="background:white; color:red; padding:20px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-width:90%;">
-                        <h3 style="margin:0 0 10px 0; font-size:20px; font-weight:bold;">⚠️ 系統發生錯誤</h3>
-                        <p style="font-family:monospace; background:#eee; padding:10px; border-radius:5px;">${msg}</p>
-                        <p style="font-size:12px; color:#666;">Line: ${line} | URL: ${url}</p>
-                        <button onclick="location.reload()" style="margin-top:15px; padding:10px 20px; bg:blue; color:black; border:1px solid #ccc; border-radius:5px; cursor:pointer;">重新整理</button>
+            const loader = document.getElementById('loading-screen');
+            if(loader) {
+                loader.innerHTML = `
+                    <div style="color:red; padding:20px; text-align:center; max-width:90%;">
+                        <h3 style="font-size:24px; font-weight:bold; margin-bottom:10px;">🛑 系統啟動失敗</h3>
+                        <div style="background:#fff; border:2px solid red; padding:15px; border-radius:10px; font-family:monospace; text-align:left; word-break:break-all; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+                            <strong>Error:</strong> ${msg}<br>
+                            <strong>Line:</strong> ${line}<br>
+                            <strong>URL:</strong> ${url || 'Inline Script'}
+                        </div>
+                        <button onclick="location.reload()" style="margin-top:20px; padding:15px 30px; background:#4f46e5; color:white; border:none; border-radius:10px; font-size:18px; cursor:pointer;">重新整理</button>
+                        <br><br>
+                        <button onclick="if(confirm('確定清除快取?')) { localStorage.clear(); location.reload(); }" style="color:#999; text-decoration:underline; background:none; border:none; cursor:pointer;">清除快取並重置</button>
                     </div>
                 `;
             }
-            // 隱藏 Loading
-            const loader = document.getElementById('loading-screen');
-            if(loader) loader.style.background = 'rgba(248,250,252,0.8)';
             return false; 
         };
     </script>
 
     <style>
-        body { font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
+        body { 
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f8fafc; 
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none; 
+        }
+        
         [v-cloak] { display: none !important; }
-        #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
-        #error-display { position: fixed; inset: 0; z-index: 10000; display: none; background: rgba(0,0,0,0.5); padding: 20px; display: flex; justify-content: center; align-items: center; display: none; }
+        
+        #loading-screen { 
+            position: fixed; inset: 0; background: #f8fafc; z-index: 9999; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        }
+
         .no-zoom { touch-action: manipulation; user-select: none; }
-        .numpad-btn { transition: transform 0.05s, background 0.1s; position: relative; overflow: hidden; }
-        .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
+        
+        .numpad-btn { 
+            transition: transform 0.05s, background 0.1s; 
+            position: relative; overflow: hidden; 
+        }
+        .numpad-btn:active { 
+            transform: scale(0.92); 
+            background-color: #e2e8f0; 
+        }
+        
         .cute-toast-enter-active { animation: bounceIn 0.4s; }
         .cute-toast-leave-active { transition: all 0.3s; opacity: 0; transform: scale(0.8); }
-        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+        @keyframes bounceIn { 
+            0% { transform: scale(0.3); opacity: 0; } 
+            50% { transform: scale(1.05); } 
+            100% { transform: scale(1); opacity: 1; } 
+        }
+        
         .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.3s ease; }
         .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
+
         .border-time-day { border-color: #f97316; background-color: #fff7ed; }
         .border-time-night { border-color: #10b981; background-color: #ecfdf5; }
         .border-time-late { border-color: #8b5cf6; background-color: #f5f3ff; }
+        
         .mirror-x { transform: scaleX(-1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
+        
         input:focus, textarea:focus { font-size: 16px; } 
         input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0.5); }
     </style>
 </head>
 <body class="bg-slate-50">
 
-<div id="error-display" style="display:none;"></div>
-
 <div id="loading-screen">
     <div class="text-center text-indigo-400">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
         <p class="font-bold">System Loading...</p>
-        <p id="loading-text" class="text-xs text-slate-400 mt-2">Initializing...</p>
+        <p class="text-xs text-slate-300 mt-2">V9.9.5 Checking Resources...</p>
     </div>
-    <button onclick="localStorage.clear();location.reload()" class="mt-8 text-xs text-slate-300 underline hover:text-rose-500">
-        重置系統設定
-    </button>
 </div>
 
 <div id="app" v-cloak class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
@@ -97,6 +119,9 @@
                 </div>
                 <div v-else-if="fullscreenMsg.type === 'warning'" class="mt-4 px-4">
                     <p class="text-xl font-bold text-slate-600 leading-relaxed">{{ fullscreenMsg.sub }}</p>
+                </div>
+                <div v-else class="mt-4">
+                    <p class="text-2xl font-bold text-slate-500">此號碼 <span class="text-rose-500 underline">{{ fullscreenMsg.sub }}</span> 尚未註冊</p>
                 </div>
             </div>
         </div>
@@ -249,7 +274,7 @@
 
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.3</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.5</h2>
             <div class="space-y-4">
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                     <h4 class="font-bold text-indigo-700 mb-3 border-b border-indigo-200 pb-2"><i class="fa-solid fa-cloud mr-2"></i>雲端同步設定</h4>
@@ -285,7 +310,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9.3</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9.5</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -325,10 +350,14 @@
                         </button>
                     </div>
                 </div>
+                
                 <div class="w-full md:w-[65%] p-4 md:p-8 flex flex-col justify-center bg-slate-50/50 relative">
                     <div class="mb-4 text-center">
                         <div class="bg-amber-100 border border-amber-200 rounded-xl p-3 mb-4 inline-block shadow-sm mx-4">
-                            <p class="text-amber-800 text-sm font-bold leading-relaxed"><i class="fa-solid fa-triangle-exclamation mr-1"></i>會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。</p>
+                            <p class="text-amber-800 text-sm font-bold leading-relaxed">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                                會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。
+                            </p>
                         </div>
                         <label class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 block">Member Phone Login</label>
                         <div class="h-20 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-slate-200 mx-auto max-w-md w-full relative">
@@ -438,6 +467,7 @@
             <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
                 <div class="space-y-4">
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
+                    
                     <div v-if="modals.register">
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">性別</label>
                         <div class="flex gap-3 mt-1">
@@ -445,6 +475,7 @@
                             <button @click="activeForm.gender = '小姐'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '小姐' ? 'bg-pink-100 border-pink-500 text-pink-700' : 'bg-white border-slate-200 text-slate-400'">小姐</button>
                         </div>
                     </div>
+
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">備註 / 喜好</label>
@@ -512,14 +543,14 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 const app = createApp({
     setup() {
         const config = reactive({ 
-            // Supabase 連線設定
+            // 核心連線資料 (已內建)
             url: 'https://xxbovxeahbmehyrizdxj.supabase.co', 
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Ym92eGVhaGJtZWh5cml6ZHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzMyMjIsImV4cCI6MjA4MDI0OTIyMn0.DP692V8YTBpSQy8e8MMxlYLn4D-VWUJFXUwuWQkMvJA', 
             adminPwd: '0211', 
             storeName: 'E書漫', 
             volume: 0.5,
             shifts: { morning: "07:50", middle: "17:50", night: "22:50" },
-            // V9.9: 使用真實包廂圖片
+            // 包廂圖片 (Imgur 真實連結)
             seatTypes: [
                 { id: 'A', name: '開放式靠窗對坐沙發', img: 'https://i.imgur.com/8Qe5Q5K.jpg' }, 
                 { id: 'B', name: '靠窗拉門看書沙發', img: 'https://i.imgur.com/L2Z5Z8p.jpg' }, 
@@ -529,15 +560,12 @@ const app = createApp({
             ]
         });
 
-        // 狀態變數定義
         const tempGuest = reactive({ phone: '', lastName: '', name: '', member_id: null, notes: '' });
         const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false, guest: false, seat: false });
-
         const staffLock = reactive({ show: false, input: '', defaultPwd: '1688' });
         const cloudConfig = reactive({ tagsInput: '', lockPwd: '', tags: [] });
         const defaultTags = ["靠窗", "安靜區", "無菸", "需統編", "飲料去冰", "不加糖", "冷氣強", "拒絕推銷", "老客戶"];
         const currentTags = computed(() => cloudConfig.tags.length > 0 ? cloudConfig.tags : defaultTags);
-
         const isConfigured = ref(false);
         const displayMembers = ref([]); 
         const totalMemberCount = ref(0); 
@@ -548,10 +576,8 @@ const app = createApp({
         const rankingList = ref([]);
         const rankingTitle = ref('');
         const isLoadingRanking = ref(false);
-
         const getTaiwanDate = () => new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
         const todayStr = getTaiwanDate().toISOString().split('T')[0];
-        
         const reportDate = ref(todayStr); 
         const bulkCount = ref(0);
         const regStats = reactive({ day: { morning: 0, middle: 0, night: 0, total: 0 }, month: { morning: 0, middle: 0, night: 0, total: 0 } });
@@ -580,8 +606,6 @@ const app = createApp({
         let videoStream = null;
 
         const initAudioContext = () => { if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); };
-        
-        // 音效播放函式
         const playSound = (type) => { 
             if (!audioContext) initAudioContext(); 
             if (audioContext.state === 'suspended') audioContext.resume(); 
@@ -624,45 +648,29 @@ const app = createApp({
             setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000); 
         };
 
-        // --- V9.9 核心邏輯 ---
-        
-        // 1. 現場客確認 (輸入姓氏後) -> 跳轉選包廂
         const confirmGuest = (title) => {
             tempGuest.name = `${tempGuest.lastName}${title}`; 
             modals.guest = false; 
             modals.seat = true; 
         };
 
-        // 2. 包廂選擇 (最後一步)
         const selectSeat = (seat) => {
             modals.seat = false;
             const seatNote = `${seat.id}區-${seat.name}`;
             const existingNote = tempGuest.notes || '';
             const finalNote = existingNote.includes(seat.id+'區') ? existingNote : (existingNote ? `${existingNote}, ${seatNote}` : seatNote);
-            
-            const finalMember = {
-                id: tempGuest.member_id, 
-                name: tempGuest.name,
-                phone: tempGuest.phone,
-                notes: finalNote, 
-                photo: tempGuest.photo
-            };
-
+            const finalMember = { id: tempGuest.member_id, name: tempGuest.name, phone: tempGuest.phone, notes: finalNote, photo: tempGuest.photo };
             showFullscreen(`歡迎入場`, finalMember.name, 'success', seatNote, finalMember.photo);
             logVisit(finalMember);
         };
 
-        // 3. 查詢邏輯 (分流)
         const performVerification = async () => {
             const val = selfServiceInput.value.trim();
             if(!val) return;
             isLoading.value = true;
             try {
-                // 先查是不是會員
                 const { data } = await supabase.from('members').select('*').eq('phone', val).single();
-                
                 if(data) {
-                    // A. 是會員 -> 存入暫存 -> 跳轉選包廂
                     tempGuest.member_id = data.id;
                     tempGuest.name = data.name;
                     tempGuest.phone = data.phone;
@@ -670,7 +678,6 @@ const app = createApp({
                     tempGuest.photo = data.photo;
                     modals.seat = true; 
                 } else {
-                    // B. 是現場客 -> 開啟輸入姓氏視窗
                     tempGuest.member_id = null;
                     tempGuest.phone = val;
                     tempGuest.lastName = '';
@@ -682,7 +689,6 @@ const app = createApp({
             isLoading.value = false;
         };
 
-        // 4. 寫入邏輯
         const logVisit = async (member) => { 
             if(!supabase) return;
             
@@ -706,7 +712,6 @@ const app = createApp({
                 totalQ = totalQ.eq('member_id', member.id);
                 monthQ = monthQ.eq('member_id', member.id).gte('check_in_time', startOfMonth);
             } else {
-                // 現場客：用電話統計
                 totalQ = totalQ.eq('phone', member.phone);
                 monthQ = monthQ.eq('phone', member.phone).gte('check_in_time', startOfMonth);
             }
@@ -717,7 +722,7 @@ const app = createApp({
             const shortMemo = member.notes ? member.notes.substring(0, 30) : '';
 
             await supabase.from('visit_logs').insert({ 
-                member_id: member.id, // 現場客會是 null
+                member_id: member.id, 
                 name: member.name, 
                 phone: member.phone, 
                 type: 'phone', 
@@ -1158,6 +1163,7 @@ const app = createApp({
                      fetchCloudConfig();
                  } catch (e) { 
                      console.error("Auto login error:", e); 
+                     // 即使報錯，也要把 Loading 關掉，讓使用者看到錯誤訊息，而不是卡死
                      alert("連線設定錯誤: " + e.message);
                  }
              } else { isConfigured.value = false; }
