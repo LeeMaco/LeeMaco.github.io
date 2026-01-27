@@ -3,42 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.9.5 (架構師展開版)</title>
+    <title>E書漫 AI 會員系統 V9.9.5 (核心重構版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <script src="https://unpkg.com/vue@3.3.4/dist/vue.global.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js" crossorigin="anonymous"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
     <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
-
-    <script>
-        window.onerror = function(msg, url, line, col, error) {
-            const loader = document.getElementById('loading-screen');
-            if(loader) {
-                loader.innerHTML = `
-                    <div style="color:red; padding:20px; text-align:center; max-width:90%;">
-                        <h3 style="font-size:24px; font-weight:bold; margin-bottom:10px;">🛑 系統啟動失敗</h3>
-                        <div style="background:#fff; border:2px solid red; padding:15px; border-radius:10px; font-family:monospace; text-align:left; word-break:break-all; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
-                            <strong>Error:</strong> ${msg}<br>
-                            <strong>Line:</strong> ${line}<br>
-                            <strong>URL:</strong> ${url || 'Inline Script'}
-                        </div>
-                        <button onclick="location.reload()" style="margin-top:20px; padding:15px 30px; background:#4f46e5; color:white; border:none; border-radius:10px; font-size:18px; cursor:pointer;">重新整理</button>
-                        <br><br>
-                        <button onclick="if(confirm('確定清除快取?')) { localStorage.clear(); location.reload(); }" style="color:#999; text-decoration:underline; background:none; border:none; cursor:pointer;">清除快取並重置</button>
-                    </div>
-                `;
-            }
-            return false; 
-        };
-    </script>
 
     <style>
         body { 
@@ -47,32 +25,28 @@
             -webkit-tap-highlight-color: transparent; 
             overscroll-behavior-y: none; 
         }
-        
         [v-cloak] { display: none !important; }
         
+        /* Loading Screen 樣式 */
         #loading-screen { 
             position: fixed; inset: 0; background: #f8fafc; z-index: 9999; 
             display: flex; flex-direction: column; justify-content: center; align-items: center; 
         }
+        .status-dot {
+            height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px;
+        }
+        .status-box {
+            margin-top: 20px; font-size: 12px; color: #64748b; text-align: left;
+            background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0;
+        }
 
         .no-zoom { touch-action: manipulation; user-select: none; }
-        
-        .numpad-btn { 
-            transition: transform 0.05s, background 0.1s; 
-            position: relative; overflow: hidden; 
-        }
-        .numpad-btn:active { 
-            transform: scale(0.92); 
-            background-color: #e2e8f0; 
-        }
+        .numpad-btn { transition: transform 0.05s, background 0.1s; position: relative; overflow: hidden; }
+        .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
         
         .cute-toast-enter-active { animation: bounceIn 0.4s; }
         .cute-toast-leave-active { transition: all 0.3s; opacity: 0; transform: scale(0.8); }
-        @keyframes bounceIn { 
-            0% { transform: scale(0.3); opacity: 0; } 
-            50% { transform: scale(1.05); } 
-            100% { transform: scale(1); opacity: 1; } 
-        }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
         
         .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.3s ease; }
         .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
@@ -80,12 +54,9 @@
         .border-time-day { border-color: #f97316; background-color: #fff7ed; }
         .border-time-night { border-color: #10b981; background-color: #ecfdf5; }
         .border-time-late { border-color: #8b5cf6; background-color: #f5f3ff; }
-        
         .mirror-x { transform: scaleX(-1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
-        
         input:focus, textarea:focus { font-size: 16px; } 
-        input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0.5); }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -93,10 +64,46 @@
 <div id="loading-screen">
     <div class="text-center text-indigo-400">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
-        <p class="font-bold">System Loading...</p>
-        <p class="text-xs text-slate-300 mt-2">V9.9.5 Checking Resources...</p>
+        <p class="font-bold text-lg">System Loading...</p>
+    </div>
+    
+    <div class="status-box">
+        <div id="status-vue"><span class="status-dot bg-slate-300"></span>Vue.js Loading...</div>
+        <div id="status-supabase"><span class="status-dot bg-slate-300"></span>Supabase Loading...</div>
+        <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
+            <button onclick="localStorage.clear();location.reload()" class="text-rose-500 underline font-bold">
+                如果卡住超過5秒，請點此重置
+            </button>
+        </div>
     </div>
 </div>
+
+<script>
+    // 檢查函式庫是否載入成功
+    window.onload = function() {
+        const v = document.getElementById('status-vue');
+        const s = document.getElementById('status-supabase');
+        
+        if (typeof Vue !== 'undefined') {
+            v.innerHTML = '<span class="status-dot bg-emerald-500"></span>Vue.js Ready';
+        } else {
+            v.innerHTML = '<span class="status-dot bg-rose-500"></span>Vue.js Failed (Check Network)';
+        }
+
+        if (typeof supabase !== 'undefined') {
+            s.innerHTML = '<span class="status-dot bg-emerald-500"></span>Supabase Ready';
+        } else {
+            s.innerHTML = '<span class="status-dot bg-rose-500"></span>Supabase Failed (Check Network)';
+        }
+    };
+
+    window.onerror = function(msg, url, line, col, error) {
+        alert("系統發生錯誤，請截圖:\n" + msg + "\nLine: " + line);
+        // 強制關閉 Loading 讓用戶還能嘗試操作
+        document.getElementById('loading-screen').style.display = 'none';
+        return false;
+    };
+</script>
 
 <div id="app" v-cloak class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
     
@@ -164,14 +171,17 @@
             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
             <h2 class="text-2xl font-black text-slate-800 mb-2">歡迎光臨 (現場客)</h2>
             <p class="text-slate-400 font-bold mb-6">請輸入姓氏以完成入場</p>
+            
             <div class="mb-6">
                 <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">貴賓電話</label>
                 <div class="text-3xl font-black text-slate-700 font-mono tracking-wider">{{ tempGuest.phone }}</div>
             </div>
+
             <div class="mb-8">
                 <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">請問貴姓？</label>
                 <input v-model="tempGuest.lastName" type="text" placeholder="例如：林" class="w-full text-center text-4xl font-bold border-b-4 border-slate-200 py-2 outline-none focus:border-indigo-500 bg-transparent text-slate-800 placeholder-slate-200">
             </div>
+
             <div class="grid grid-cols-2 gap-4">
                 <button @click="confirmGuest('先生')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition disabled:opacity-30">先生</button>
                 <button @click="confirmGuest('小姐')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-pink-50 hover:border-pink-200 hover:text-pink-600 transition disabled:opacity-30">小姐</button>
@@ -189,6 +199,7 @@
                 </div>
                 <button @click="modals.seat = false" class="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition"><i class="fa-solid fa-times text-xl"></i></button>
             </div>
+            
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-safe">
                 <div v-for="seat in config.seatTypes" :key="seat.id" @click="selectSeat(seat)" class="bg-white rounded-3xl overflow-hidden cursor-pointer transform transition hover:scale-[1.02] active:scale-95 group shadow-2xl relative">
                     <div class="aspect-[4/3] bg-slate-200 relative overflow-hidden">
@@ -221,12 +232,17 @@
             </div>
             <div v-else class="overflow-y-auto p-4 space-y-2 bg-white">
                 <div v-for="(rank, idx) in rankingList" :key="idx" class="flex items-center gap-4 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition">
-                    <div class="w-8 h-8 flex items-center justify-center font-black text-lg" :class="idx===0?'text-amber-500':(idx===1?'text-slate-400':(idx===2?'text-amber-700':'text-slate-300'))">{{ idx + 1 }}</div>
+                    <div class="w-8 h-8 flex items-center justify-center font-black text-lg" 
+                         :class="idx===0?'text-amber-500':(idx===1?'text-slate-400':(idx===2?'text-amber-700':'text-slate-300'))">
+                        {{ idx + 1 }}
+                    </div>
                     <div class="flex-1">
                         <div class="font-bold text-slate-800">{{ rank.name }}</div>
                         <div class="text-xs text-slate-400">{{ rank.phone }}</div>
                     </div>
-                    <div class="px-3 py-1 rounded-lg font-black text-sm" :class="rank.type==='month'?'bg-purple-100 text-purple-600':'bg-emerald-100 text-emerald-600'">{{ rank.count }} 次</div>
+                    <div class="px-3 py-1 rounded-lg font-black text-sm" :class="rank.type==='month'?'bg-purple-100 text-purple-600':'bg-emerald-100 text-emerald-600'">
+                        {{ rank.count }} 次
+                    </div>
                 </div>
             </div>
         </div>
@@ -276,14 +292,19 @@
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
             <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.5</h2>
             <div class="space-y-4">
+                
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                     <h4 class="font-bold text-indigo-700 mb-3 border-b border-indigo-200 pb-2"><i class="fa-solid fa-cloud mr-2"></i>雲端同步設定</h4>
+                    
                     <label class="text-xs font-bold text-slate-500 block mb-1">員工鎖密碼 (Staff Lock)</label>
                     <input v-model="cloudConfig.lockPwd" type="text" class="w-full border-2 border-indigo-100 p-2 rounded-lg mb-3 font-bold text-center tracking-widest text-indigo-600 bg-white" maxlength="6">
+
                     <label class="text-xs font-bold text-slate-500 block mb-1">喜好標籤庫 (用逗號分隔)</label>
                     <textarea v-model="cloudConfig.tagsInput" rows="3" class="w-full border-2 border-indigo-100 p-2 rounded-lg font-bold text-sm text-slate-600 bg-white" placeholder="例如: 靠窗, 無糖, 需統編"></textarea>
+                    
                     <button @click="saveCloudConfig" class="w-full mt-2 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition text-sm"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>更新雲端設定</button>
                 </div>
+
                 <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
                     <h4 class="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-clock mr-2 text-indigo-500"></i>班別時段定義 (HH:mm)</h4>
                     <div class="space-y-3">
@@ -301,6 +322,7 @@
                         </div>
                     </div>
                 </div>
+
                 <button @click="saveConfig" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-700 transition">儲存本機設定並返回</button>
             </div>
         </div>
@@ -467,7 +489,6 @@
             <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
                 <div class="space-y-4">
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
-                    
                     <div v-if="modals.register">
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">性別</label>
                         <div class="flex gap-3 mt-1">
@@ -475,7 +496,6 @@
                             <button @click="activeForm.gender = '小姐'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '小姐' ? 'bg-pink-100 border-pink-500 text-pink-700' : 'bg-white border-slate-200 text-slate-400'">小姐</button>
                         </div>
                     </div>
-
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">備註 / 喜好</label>
@@ -543,14 +563,12 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 const app = createApp({
     setup() {
         const config = reactive({ 
-            // 核心連線資料 (已內建)
             url: 'https://xxbovxeahbmehyrizdxj.supabase.co', 
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Ym92eGVhaGJtZWh5cml6ZHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzMyMjIsImV4cCI6MjA4MDI0OTIyMn0.DP692V8YTBpSQy8e8MMxlYLn4D-VWUJFXUwuWQkMvJA', 
             adminPwd: '0211', 
             storeName: 'E書漫', 
             volume: 0.5,
             shifts: { morning: "07:50", middle: "17:50", night: "22:50" },
-            // 包廂圖片 (Imgur 真實連結)
             seatTypes: [
                 { id: 'A', name: '開放式靠窗對坐沙發', img: 'https://i.imgur.com/8Qe5Q5K.jpg' }, 
                 { id: 'B', name: '靠窗拉門看書沙發', img: 'https://i.imgur.com/L2Z5Z8p.jpg' }, 
@@ -606,6 +624,7 @@ const app = createApp({
         let videoStream = null;
 
         const initAudioContext = () => { if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); };
+        
         const playSound = (type) => { 
             if (!audioContext) initAudioContext(); 
             if (audioContext.state === 'suspended') audioContext.resume(); 
@@ -659,7 +678,15 @@ const app = createApp({
             const seatNote = `${seat.id}區-${seat.name}`;
             const existingNote = tempGuest.notes || '';
             const finalNote = existingNote.includes(seat.id+'區') ? existingNote : (existingNote ? `${existingNote}, ${seatNote}` : seatNote);
-            const finalMember = { id: tempGuest.member_id, name: tempGuest.name, phone: tempGuest.phone, notes: finalNote, photo: tempGuest.photo };
+            
+            const finalMember = {
+                id: tempGuest.member_id, 
+                name: tempGuest.name,
+                phone: tempGuest.phone,
+                notes: finalNote, 
+                photo: tempGuest.photo
+            };
+
             showFullscreen(`歡迎入場`, finalMember.name, 'success', seatNote, finalMember.photo);
             logVisit(finalMember);
         };
@@ -669,8 +696,11 @@ const app = createApp({
             if(!val) return;
             isLoading.value = true;
             try {
+                // 先查是不是會員
                 const { data } = await supabase.from('members').select('*').eq('phone', val).single();
+                
                 if(data) {
+                    // A. 是會員 -> 存入暫存 -> 跳轉選包廂
                     tempGuest.member_id = data.id;
                     tempGuest.name = data.name;
                     tempGuest.phone = data.phone;
@@ -678,6 +708,7 @@ const app = createApp({
                     tempGuest.photo = data.photo;
                     modals.seat = true; 
                 } else {
+                    // B. 是現場客 -> 開啟輸入姓氏視窗
                     tempGuest.member_id = null;
                     tempGuest.phone = val;
                     tempGuest.lastName = '';
