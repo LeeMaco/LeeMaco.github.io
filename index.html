@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.9.2 (架構師修復版)</title>
+    <title>E書漫 AI 會員系統 V9.9.3 (CDN強固版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/vue/3.3.4/vue.global.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
@@ -20,31 +20,30 @@
 
     <script>
         window.onerror = function(msg, url, line, col, error) {
-            var extra = !col ? '' : '\ncolumn: ' + col;
-            extra += !error ? '' : '\nerror: ' + error;
-            alert("系統發生嚴重錯誤，請截圖給工程師:\n\n" + msg + "\nurl: " + url + "\nline: " + line + extra);
-            // 嘗試強制關閉 Loading
-            document.getElementById('loading-screen').innerHTML = 
-                '<div style="text-align:center; color:red; padding:20px;">' +
-                '<h3>系統啟動失敗</h3><p>'+msg+'</p>' +
-                '<button onclick="localStorage.clear();location.reload()" style="margin-top:20px; padding:10px 20px; background:red; color:white; border:none; border-radius:5px;">重置系統設定 (清除快取)</button>' +
-                '</div>';
-            return true;
+            const errorBox = document.getElementById('error-display');
+            if (errorBox) {
+                errorBox.style.display = 'block';
+                errorBox.innerHTML = `
+                    <div style="background:white; color:red; padding:20px; border-radius:10px; box-shadow:0 10px 25px rgba(0,0,0,0.2); max-width:90%;">
+                        <h3 style="margin:0 0 10px 0; font-size:20px; font-weight:bold;">⚠️ 系統發生錯誤</h3>
+                        <p style="font-family:monospace; background:#eee; padding:10px; border-radius:5px;">${msg}</p>
+                        <p style="font-size:12px; color:#666;">Line: ${line} | URL: ${url}</p>
+                        <button onclick="location.reload()" style="margin-top:15px; padding:10px 20px; bg:blue; color:black; border:1px solid #ccc; border-radius:5px; cursor:pointer;">重新整理</button>
+                    </div>
+                `;
+            }
+            // 隱藏 Loading
+            const loader = document.getElementById('loading-screen');
+            if(loader) loader.style.background = 'rgba(248,250,252,0.8)';
+            return false; 
         };
     </script>
 
     <style>
-        body { 
-            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #f8fafc; 
-            -webkit-tap-highlight-color: transparent; 
-            overscroll-behavior-y: none; 
-        }
+        body { font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
         [v-cloak] { display: none !important; }
-        #loading-screen { 
-            position: fixed; inset: 0; background: #f8fafc; z-index: 9999; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-        }
+        #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; flex-direction: column; justify-content: center; align-items: center; }
+        #error-display { position: fixed; inset: 0; z-index: 10000; display: none; background: rgba(0,0,0,0.5); padding: 20px; display: flex; justify-content: center; align-items: center; display: none; }
         .no-zoom { touch-action: manipulation; user-select: none; }
         .numpad-btn { transition: transform 0.05s, background 0.1s; position: relative; overflow: hidden; }
         .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
@@ -64,13 +63,16 @@
 </head>
 <body class="bg-slate-50">
 
+<div id="error-display" style="display:none;"></div>
+
 <div id="loading-screen">
     <div class="text-center text-indigo-400">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
         <p class="font-bold">System Loading...</p>
+        <p id="loading-text" class="text-xs text-slate-400 mt-2">Initializing...</p>
     </div>
-    <button onclick="if(confirm('確定要重置所有本機設定嗎？')) { localStorage.clear(); location.reload(); }" class="mt-8 text-xs text-slate-300 underline hover:text-rose-500">
-        如卡住請點此重置
+    <button onclick="localStorage.clear();location.reload()" class="mt-8 text-xs text-slate-300 underline hover:text-rose-500">
+        重置系統設定
     </button>
 </div>
 
@@ -95,9 +97,6 @@
                 </div>
                 <div v-else-if="fullscreenMsg.type === 'warning'" class="mt-4 px-4">
                     <p class="text-xl font-bold text-slate-600 leading-relaxed">{{ fullscreenMsg.sub }}</p>
-                </div>
-                <div v-else class="mt-4">
-                    <p class="text-2xl font-bold text-slate-500">此號碼 <span class="text-rose-500 underline">{{ fullscreenMsg.sub }}</span> 尚未註冊</p>
                 </div>
             </div>
         </div>
@@ -146,7 +145,7 @@
             </div>
             <div class="mb-8">
                 <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">請問貴姓？</label>
-                <input v-model="tempGuest.lastName" ref="guestNameInput" type="text" placeholder="例如：林" class="w-full text-center text-4xl font-bold border-b-4 border-slate-200 py-2 outline-none focus:border-indigo-500 bg-transparent text-slate-800 placeholder-slate-200">
+                <input v-model="tempGuest.lastName" type="text" placeholder="例如：林" class="w-full text-center text-4xl font-bold border-b-4 border-slate-200 py-2 outline-none focus:border-indigo-500 bg-transparent text-slate-800 placeholder-slate-200">
             </div>
             <div class="grid grid-cols-2 gap-4">
                 <button @click="confirmGuest('先生')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition disabled:opacity-30">先生</button>
@@ -250,7 +249,7 @@
 
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.2</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.3</h2>
             <div class="space-y-4">
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                     <h4 class="font-bold text-indigo-700 mb-3 border-b border-indigo-200 pb-2"><i class="fa-solid fa-cloud mr-2"></i>雲端同步設定</h4>
@@ -286,7 +285,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9.2</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9.3</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -326,14 +325,10 @@
                         </button>
                     </div>
                 </div>
-                
                 <div class="w-full md:w-[65%] p-4 md:p-8 flex flex-col justify-center bg-slate-50/50 relative">
                     <div class="mb-4 text-center">
                         <div class="bg-amber-100 border border-amber-200 rounded-xl p-3 mb-4 inline-block shadow-sm mx-4">
-                            <p class="text-amber-800 text-sm font-bold leading-relaxed">
-                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
-                                會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。
-                            </p>
+                            <p class="text-amber-800 text-sm font-bold leading-relaxed"><i class="fa-solid fa-triangle-exclamation mr-1"></i>會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。</p>
                         </div>
                         <label class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 block">Member Phone Login</label>
                         <div class="h-20 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-slate-200 mx-auto max-w-md w-full relative">
@@ -343,10 +338,10 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full">
-                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @touchstart.prevent="appendNumber(n)" @mousedown.prevent="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
-                        <button @touchstart.prevent="backspace" @mousedown.prevent="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
-                        <button @touchstart.prevent="appendNumber(0)" @mousedown.prevent="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
-                        <button @touchstart.prevent="performVerification" @mousedown.prevent="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
+                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @click="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
+                        <button @click="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
+                        <button @click="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
+                        <button @click="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -434,18 +429,6 @@
         </div>
     </main>
 
-    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
-            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
-            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
-                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
-                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
-                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
-                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
-            </div>
-        </div>
-    </div>
-
     <div v-if="modals.register || modals.form" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
@@ -455,7 +438,6 @@
             <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
                 <div class="space-y-4">
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
-                    
                     <div v-if="modals.register">
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">性別</label>
                         <div class="flex gap-3 mt-1">
@@ -463,7 +445,6 @@
                             <button @click="activeForm.gender = '小姐'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '小姐' ? 'bg-pink-100 border-pink-500 text-pink-700' : 'bg-white border-slate-200 text-slate-400'">小姐</button>
                         </div>
                     </div>
-
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">備註 / 喜好</label>
@@ -490,6 +471,18 @@
                 <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄</button>
                 <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
+            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
+                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
+                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
+                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
+                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
             </div>
         </div>
     </div>
@@ -526,7 +519,7 @@ const app = createApp({
             storeName: 'E書漫', 
             volume: 0.5,
             shifts: { morning: "07:50", middle: "17:50", night: "22:50" },
-            // V9.9: 使用真實包廂圖片 (Imgur 範例)
+            // V9.9: 使用真實包廂圖片
             seatTypes: [
                 { id: 'A', name: '開放式靠窗對坐沙發', img: 'https://i.imgur.com/8Qe5Q5K.jpg' }, 
                 { id: 'B', name: '靠窗拉門看書沙發', img: 'https://i.imgur.com/L2Z5Z8p.jpg' }, 
@@ -1165,7 +1158,6 @@ const app = createApp({
                      fetchCloudConfig();
                  } catch (e) { 
                      console.error("Auto login error:", e); 
-                     // 即使報錯，也要把 Loading 關掉，讓使用者看到錯誤訊息，而不是卡死
                      alert("連線設定錯誤: " + e.message);
                  }
              } else { isConfigured.value = false; }
