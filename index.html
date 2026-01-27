@@ -1,0 +1,1215 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>E書漫 AI 會員系統 V9.9.5 (核心重構版)</title>
+    
+    <meta name="theme-color" content="#4f46e5">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    
+    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+    
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
+
+    <style>
+        body { 
+            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
+            background-color: #f8fafc; 
+            -webkit-tap-highlight-color: transparent; 
+            overscroll-behavior-y: none; 
+        }
+        [v-cloak] { display: none !important; }
+        
+        /* Loading Screen 樣式 */
+        #loading-screen { 
+            position: fixed; inset: 0; background: #f8fafc; z-index: 9999; 
+            display: flex; flex-direction: column; justify-content: center; align-items: center; 
+        }
+        .status-dot {
+            height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px;
+        }
+        .status-box {
+            margin-top: 20px; font-size: 12px; color: #64748b; text-align: left;
+            background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0;
+        }
+
+        .no-zoom { touch-action: manipulation; user-select: none; }
+        .numpad-btn { transition: transform 0.05s, background 0.1s; position: relative; overflow: hidden; }
+        .numpad-btn:active { transform: scale(0.92); background-color: #e2e8f0; }
+        
+        .cute-toast-enter-active { animation: bounceIn 0.4s; }
+        .cute-toast-leave-active { transition: all 0.3s; opacity: 0; transform: scale(0.8); }
+        @keyframes bounceIn { 0% { transform: scale(0.3); opacity: 0; } 50% { transform: scale(1.05); } 100% { transform: scale(1); opacity: 1; } }
+        
+        .fullscreen-overlay-enter-active, .fullscreen-overlay-leave-active { transition: opacity 0.3s ease; }
+        .fullscreen-overlay-enter-from, .fullscreen-overlay-leave-to { opacity: 0; }
+
+        .border-time-day { border-color: #f97316; background-color: #fff7ed; }
+        .border-time-night { border-color: #10b981; background-color: #ecfdf5; }
+        .border-time-late { border-color: #8b5cf6; background-color: #f5f3ff; }
+        .mirror-x { transform: scaleX(-1); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        input:focus, textarea:focus { font-size: 16px; } 
+    </style>
+</head>
+<body class="bg-slate-50">
+
+<div id="loading-screen">
+    <div class="text-center text-indigo-400">
+        <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
+        <p class="font-bold text-lg">System Loading...</p>
+    </div>
+    
+    <div class="status-box">
+        <div id="status-vue"><span class="status-dot bg-slate-300"></span>Vue.js Loading...</div>
+        <div id="status-supabase"><span class="status-dot bg-slate-300"></span>Supabase Loading...</div>
+        <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
+            <button onclick="localStorage.clear();location.reload()" class="text-rose-500 underline font-bold">
+                如果卡住超過5秒，請點此重置
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+    // 檢查函式庫是否載入成功
+    window.onload = function() {
+        const v = document.getElementById('status-vue');
+        const s = document.getElementById('status-supabase');
+        
+        if (typeof Vue !== 'undefined') {
+            v.innerHTML = '<span class="status-dot bg-emerald-500"></span>Vue.js Ready';
+        } else {
+            v.innerHTML = '<span class="status-dot bg-rose-500"></span>Vue.js Failed (Check Network)';
+        }
+
+        if (typeof supabase !== 'undefined') {
+            s.innerHTML = '<span class="status-dot bg-emerald-500"></span>Supabase Ready';
+        } else {
+            s.innerHTML = '<span class="status-dot bg-rose-500"></span>Supabase Failed (Check Network)';
+        }
+    };
+
+    window.onerror = function(msg, url, line, col, error) {
+        alert("系統發生錯誤，請截圖:\n" + msg + "\nLine: " + line);
+        // 強制關閉 Loading 讓用戶還能嘗試操作
+        document.getElementById('loading-screen').style.display = 'none';
+        return false;
+    };
+</script>
+
+<div id="app" v-cloak class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
+    
+    <transition name="fullscreen-overlay">
+        <div v-if="fullscreenMsg.show" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl" @click="closeFullscreen">
+            <div class="transform scale-110 text-center p-8 max-w-lg w-full">
+                <div v-if="fullscreenMsg.photo" class="mb-6 mx-auto animate-bounce">
+                    <img :src="fullscreenMsg.photo" class="w-48 h-48 rounded-full object-cover border-8 border-white shadow-2xl mx-auto bg-gray-100">
+                </div>
+                <div v-else class="w-32 h-32 rounded-full flex items-center justify-center text-6xl mb-6 mx-auto animate-bounce shadow-2xl"
+                     :class="fullscreenMsg.type==='success' ? 'bg-emerald-100 text-emerald-500 ring-4 ring-emerald-50' : (fullscreenMsg.type==='warning' ? 'bg-amber-100 text-amber-500 ring-4 ring-amber-50' : 'bg-rose-100 text-rose-500 ring-4 ring-rose-50')">
+                    <i class="fa-solid" :class="fullscreenMsg.type==='success' ? 'fa-check' : (fullscreenMsg.type==='warning' ? 'fa-id-card' : 'fa-times')"></i>
+                </div>
+                <h1 class="text-4xl font-black text-slate-800 mb-2 tracking-tight">{{ fullscreenMsg.title }}</h1>
+                <div v-if="fullscreenMsg.type === 'success'" class="space-y-4 mt-4 animate-fade-in-up">
+                    <p class="text-4xl font-black text-indigo-600">{{ fullscreenMsg.sub }}</p>
+                    <p v-if="fullscreenMsg.note" class="text-2xl text-slate-600 bg-slate-100 px-6 py-3 rounded-2xl inline-block font-bold shadow-sm border border-slate-200">
+                        <i class="fa-solid fa-note-sticky mr-2 text-amber-400"></i> {{ fullscreenMsg.note }}
+                    </p>
+                </div>
+                <div v-else-if="fullscreenMsg.type === 'warning'" class="mt-4 px-4">
+                    <p class="text-xl font-bold text-slate-600 leading-relaxed">{{ fullscreenMsg.sub }}</p>
+                </div>
+                <div v-else class="mt-4">
+                    <p class="text-2xl font-bold text-slate-500">此號碼 <span class="text-rose-500 underline">{{ fullscreenMsg.sub }}</span> 尚未註冊</p>
+                </div>
+            </div>
+        </div>
+    </transition>
+
+    <div v-if="staffLock.show" class="fixed inset-0 z-[300] bg-slate-900 flex flex-col items-center justify-center p-4">
+        <div class="bg-white w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl">
+            <div class="w-20 h-20 rounded-full bg-rose-100 text-rose-500 flex items-center justify-center text-3xl mx-auto mb-6">
+                <i class="fa-solid fa-lock"></i>
+            </div>
+            <h2 class="text-2xl font-black text-slate-800 mb-2">系統已鎖定</h2>
+            <p class="text-slate-500 font-bold mb-6">請輸入員工密碼以解鎖裝置</p>
+            <div class="flex gap-2 justify-center mb-6">
+                <div v-for="i in 4" :key="i" class="w-4 h-4 rounded-full border-2 border-slate-300" :class="{'bg-rose-500 border-rose-500': staffLock.input.length >= i}"></div>
+            </div>
+            <div class="grid grid-cols-3 gap-3">
+                <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @click="appendLock(n)" class="h-16 rounded-xl bg-slate-50 text-2xl font-bold text-slate-700 active:bg-slate-200 transition">{{ n }}</button>
+                <button @click="staffLock.input = ''" class="h-16 rounded-xl bg-rose-50 text-rose-500 text-xl active:bg-rose-100"><i class="fa-solid fa-trash"></i></button>
+                <button @click="appendLock(0)" class="h-16 rounded-xl bg-slate-50 text-2xl font-bold text-slate-700 active:bg-slate-200">0</button>
+                <button @click="unlockSystem" class="h-16 rounded-xl bg-indigo-600 text-white text-xl active:bg-indigo-700 font-bold"><i class="fa-solid fa-arrow-right"></i></button>
+            </div>
+        </div>
+    </div>
+
+    <div class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-[100] flex flex-col gap-4 pointer-events-none w-full max-w-sm px-4">
+        <transition-group name="cute-toast">
+            <div v-for="toast in toasts" :key="toast.id" class="pointer-events-auto bg-white/95 backdrop-blur-md rounded-3xl shadow-2xl border-4 p-6 flex flex-col items-center gap-3 text-center" 
+                 :class="toast.type==='success' ? 'border-emerald-400 shadow-emerald-200' : (toast.type==='error'?'border-rose-400 shadow-rose-200':'border-amber-400')">
+                <div class="w-16 h-16 rounded-full flex items-center justify-center text-3xl mb-1" :class="toast.type==='success'?'bg-emerald-100 text-emerald-500':'bg-rose-100 text-rose-500'">
+                    <i class="fa-solid" :class="toast.type==='success'?'fa-check':'fa-exclamation'"></i>
+                </div>
+                <h4 class="font-black text-2xl text-slate-800">{{ toast.title }}</h4>
+                <p class="text-base text-slate-500 font-bold">{{ toast.msg }}</p>
+            </div>
+        </transition-group>
+    </div>
+
+    <div v-if="modals.guest" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[210] flex items-center justify-center p-4">
+        <div class="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
+            <h2 class="text-2xl font-black text-slate-800 mb-2">歡迎光臨 (現場客)</h2>
+            <p class="text-slate-400 font-bold mb-6">請輸入姓氏以完成入場</p>
+            
+            <div class="mb-6">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">貴賓電話</label>
+                <div class="text-3xl font-black text-slate-700 font-mono tracking-wider">{{ tempGuest.phone }}</div>
+            </div>
+
+            <div class="mb-8">
+                <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">請問貴姓？</label>
+                <input v-model="tempGuest.lastName" type="text" placeholder="例如：林" class="w-full text-center text-4xl font-bold border-b-4 border-slate-200 py-2 outline-none focus:border-indigo-500 bg-transparent text-slate-800 placeholder-slate-200">
+            </div>
+
+            <div class="grid grid-cols-2 gap-4">
+                <button @click="confirmGuest('先生')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition disabled:opacity-30">先生</button>
+                <button @click="confirmGuest('小姐')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-pink-50 hover:border-pink-200 hover:text-pink-600 transition disabled:opacity-30">小姐</button>
+            </div>
+            <button @click="modals.guest = false" class="mt-6 text-slate-300 font-bold w-full py-2 hover:text-slate-500">取消</button>
+        </div>
+    </div>
+
+    <div v-if="modals.seat" class="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[220] flex flex-col p-4 overflow-y-auto">
+        <div class="max-w-5xl mx-auto w-full flex-1 flex flex-col">
+            <div class="flex justify-between items-center py-6">
+                <div>
+                    <h2 class="text-3xl font-black text-white mb-1">請選擇包廂樣式</h2>
+                    <p class="text-indigo-200 font-bold">{{ tempGuest.name }}，您好！</p>
+                </div>
+                <button @click="modals.seat = false" class="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition"><i class="fa-solid fa-times text-xl"></i></button>
+            </div>
+            
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-safe">
+                <div v-for="seat in config.seatTypes" :key="seat.id" @click="selectSeat(seat)" class="bg-white rounded-3xl overflow-hidden cursor-pointer transform transition hover:scale-[1.02] active:scale-95 group shadow-2xl relative">
+                    <div class="aspect-[4/3] bg-slate-200 relative overflow-hidden">
+                        <img :src="seat.img" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
+                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
+                            <h3 class="text-2xl font-black text-white tracking-wide">{{ seat.name }}</h3>
+                        </div>
+                        <div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-bold border border-white/30">{{ seat.id }}</div>
+                    </div>
+                    <div class="p-4 bg-white flex justify-between items-center">
+                        <span class="text-slate-400 font-bold text-sm">點擊選擇此座位</span>
+                        <i class="fa-solid fa-arrow-right text-indigo-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition"></i>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.ranking" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[250] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="px-6 py-5 flex justify-between items-center bg-indigo-50 rounded-t-[2rem] border-b border-indigo-100">
+                <h3 class="font-black text-xl text-indigo-900 flex items-center gap-2">
+                    <i class="fa-solid fa-trophy text-amber-400"></i> {{ rankingTitle }}
+                </h3>
+                <button @click="modals.ranking = false" class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 flex items-center justify-center transition shadow-sm"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div v-if="isLoadingRanking" class="p-12 text-center text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-indigo-300"></i>
+                <p class="font-bold text-sm">數據統計中...</p>
+            </div>
+            <div v-else class="overflow-y-auto p-4 space-y-2 bg-white">
+                <div v-for="(rank, idx) in rankingList" :key="idx" class="flex items-center gap-4 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition">
+                    <div class="w-8 h-8 flex items-center justify-center font-black text-lg" 
+                         :class="idx===0?'text-amber-500':(idx===1?'text-slate-400':(idx===2?'text-amber-700':'text-slate-300'))">
+                        {{ idx + 1 }}
+                    </div>
+                    <div class="flex-1">
+                        <div class="font-bold text-slate-800">{{ rank.name }}</div>
+                        <div class="text-xs text-slate-400">{{ rank.phone }}</div>
+                    </div>
+                    <div class="px-3 py-1 rounded-lg font-black text-sm" :class="rank.type==='month'?'bg-purple-100 text-purple-600':'bg-emerald-100 text-emerald-600'">
+                        {{ rank.count }} 次
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.history" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[260] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh]">
+            <div class="px-6 py-5 flex justify-between items-center bg-emerald-50 rounded-t-[2rem] border-b border-emerald-100">
+                <div class="flex flex-col">
+                    <h3 class="font-black text-xl text-emerald-900 flex items-center gap-2">
+                        <i class="fa-solid fa-clock-rotate-left text-emerald-500"></i> 來客歷史紀錄
+                    </h3>
+                    <p class="text-xs text-emerald-600 font-bold ml-1">{{ activeForm.name }} ({{ activeForm.phone }})</p>
+                </div>
+                <button @click="modals.history = false" class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 flex items-center justify-center transition shadow-sm"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div v-if="isLoadingHistory" class="p-12 text-center text-slate-400">
+                <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-emerald-300"></i>
+                <p class="font-bold text-sm">讀取紀錄中...</p>
+            </div>
+            <div v-else class="overflow-y-auto p-0 bg-white">
+                <ul v-if="memberHistoryLogs.length > 0" class="divide-y divide-slate-100">
+                    <li v-for="(log, idx) in memberHistoryLogs" :key="idx" class="p-4 hover:bg-slate-50 transition flex items-start gap-4">
+                        <div class="flex-shrink-0 w-12 text-center">
+                            <div class="text-xs font-bold text-slate-400">{{ formatDate(log.check_in_time, true).split(' ')[0].split('-').slice(1).join('/') }}</div>
+                            <div class="text-lg font-black text-slate-700">{{ formatDate(log.check_in_time, true).split(' ')[1] }}</div>
+                        </div>
+                        <div class="flex-1 border-l-2 border-emerald-100 pl-4">
+                            <div class="flex gap-2 mb-1">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-500">第 {{ log.total_count }} 次來店</span>
+                            </div>
+                            <div v-if="log.memo_snapshot" class="text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded-lg inline-block">
+                                <i class="fa-solid fa-note-sticky mr-1 opacity-50"></i>{{ log.memo_snapshot }}
+                            </div>
+                        </div>
+                    </li>
+                </ul>
+                <div v-else class="text-center p-12 text-slate-400 font-bold flex flex-col items-center">
+                    <i class="fa-regular fa-folder-open text-4xl mb-2 opacity-30"></i>
+                    查無歷史紀錄
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
+        <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.5</h2>
+            <div class="space-y-4">
+                
+                <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
+                    <h4 class="font-bold text-indigo-700 mb-3 border-b border-indigo-200 pb-2"><i class="fa-solid fa-cloud mr-2"></i>雲端同步設定</h4>
+                    
+                    <label class="text-xs font-bold text-slate-500 block mb-1">員工鎖密碼 (Staff Lock)</label>
+                    <input v-model="cloudConfig.lockPwd" type="text" class="w-full border-2 border-indigo-100 p-2 rounded-lg mb-3 font-bold text-center tracking-widest text-indigo-600 bg-white" maxlength="6">
+
+                    <label class="text-xs font-bold text-slate-500 block mb-1">喜好標籤庫 (用逗號分隔)</label>
+                    <textarea v-model="cloudConfig.tagsInput" rows="3" class="w-full border-2 border-indigo-100 p-2 rounded-lg font-bold text-sm text-slate-600 bg-white" placeholder="例如: 靠窗, 無糖, 需統編"></textarea>
+                    
+                    <button @click="saveCloudConfig" class="w-full mt-2 bg-indigo-600 text-white py-2 rounded-lg font-bold hover:bg-indigo-700 transition text-sm"><i class="fa-solid fa-cloud-arrow-up mr-1"></i>更新雲端設定</button>
+                </div>
+
+                <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                    <h4 class="font-bold text-slate-700 mb-3 border-b border-slate-200 pb-2"><i class="fa-solid fa-clock mr-2 text-indigo-500"></i>班別時段定義 (HH:mm)</h4>
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-orange-500"><i class="fa-solid fa-sun mr-1"></i>早班起始</label>
+                            <input type="time" v-model="config.shifts.morning" class="p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white w-32 text-center">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-emerald-500"><i class="fa-solid fa-moon mr-1"></i>中班起始</label>
+                            <input type="time" v-model="config.shifts.middle" class="p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white w-32 text-center">
+                        </div>
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm font-bold text-purple-500"><i class="fa-solid fa-star mr-1"></i>晚班起始</label>
+                            <input type="time" v-model="config.shifts.night" class="p-2 rounded-lg border-2 border-slate-200 font-bold text-slate-700 bg-white w-32 text-center">
+                        </div>
+                    </div>
+                </div>
+
+                <button @click="saveConfig" class="w-full bg-slate-800 text-white py-3 rounded-xl font-bold hover:bg-slate-700 transition">儲存本機設定並返回</button>
+            </div>
+        </div>
+    </div>
+
+    <header class="bg-white shadow-sm sticky top-0 z-40">
+        <div class="px-5 py-3 flex justify-between items-center">
+            <h1 class="text-xl font-bold text-slate-800 flex items-center">
+                <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9.5</span>
+            </h1>
+            <div class="flex gap-4 items-center">
+                <div class="hidden md:flex flex-col items-end w-36">
+                    <div class="flex justify-between w-full text-[10px] font-bold text-slate-400 mb-1">
+                        <span>Database</span>
+                        <span>{{ totalMemberCount }} 筆</span>
+                    </div>
+                    <div class="w-full h-2 bg-slate-100 rounded-full overflow-hidden">
+                        <div class="h-full bg-gradient-to-r from-emerald-400 to-indigo-500 transition-all duration-1000" :style="{width: Math.min((totalMemberCount/30000)*100, 100) + '%'}"></div>
+                    </div>
+                </div>
+                <button @click="checkAdmin(() => modals.io = true)" class="text-slate-400 hover:text-indigo-600 transition p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-cloud-arrow-up-down text-xl"></i></button>
+                <button @click="editConfigSecure" class="text-slate-300 hover:text-slate-500 p-2 rounded-full hover:bg-slate-100"><i class="fa-solid fa-gear"></i></button>
+            </div>
+        </div>
+        <div class="flex bg-white px-4 border-b border-gray-100 overflow-x-auto no-scrollbar">
+            <button v-for="tab in tabs" :key="tab.id" @click="currentTab = tab.id" :class="{'border-b-4 border-indigo-600 text-indigo-600': currentTab === tab.id, 'text-gray-400': currentTab !== tab.id}" class="px-6 py-3 text-base font-bold flex items-center gap-2 transition-all whitespace-nowrap">
+                <i :class="tab.icon"></i> {{ tab.label }}
+            </button>
+        </div>
+    </header>
+
+    <main class="flex-grow p-4 overflow-y-auto">
+        <div v-show="currentTab === 'self_service'" class="w-full max-w-6xl mx-auto h-[82vh] flex items-center justify-center">
+            <div class="bg-white w-full h-full md:h-auto md:aspect-[16/10] rounded-[2rem] shadow-2xl overflow-hidden flex flex-col md:flex-row border border-slate-100">
+                <div class="w-full md:w-[35%] p-6 md:p-8 flex flex-col justify-between border-r border-slate-100 bg-white relative">
+                    <div class="absolute top-0 right-0 w-40 h-40 bg-pink-50 rounded-full translate-x-1/2 -translate-y-1/2 opacity-60 pointer-events-none"></div>
+                    <div class="mt-2 text-center md:text-left z-10">
+                        <div class="inline-flex w-20 h-20 bg-gradient-to-br from-indigo-100 to-purple-100 rounded-3xl items-center justify-center text-indigo-600 mb-4 shadow-sm transform rotate-3"><i class="fa-solid fa-robot text-4xl animate-bounce"></i></div>
+                        <h2 class="text-3xl font-black text-slate-800 tracking-tight">{{ config.storeName || '智能櫃台' }}</h2>
+                        <p class="text-slate-400 font-bold mt-1">請輸入電話或註冊</p>
+                    </div>
+                    <div class="flex flex-col gap-4 mt-6 z-10">
+                        <button @click="openSelfRegister" class="w-full py-6 bg-gradient-to-r from-indigo-500 to-purple-600 text-white rounded-2xl shadow-xl hover:shadow-2xl hover:scale-[1.02] transition transform active:scale-95 group relative overflow-hidden no-zoom">
+                            <div class="absolute inset-0 bg-white/20 opacity-0 group-hover:opacity-100 transition"></div>
+                            <div class="flex items-center justify-center gap-3"><i class="fa-solid fa-user-plus text-3xl"></i><div class="text-left"><span class="block text-2xl font-black tracking-wide">新會員註冊</span><span class="block text-xs text-indigo-100 font-bold">加入我們 享專屬優惠</span></div></div>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="w-full md:w-[65%] p-4 md:p-8 flex flex-col justify-center bg-slate-50/50 relative">
+                    <div class="mb-4 text-center">
+                        <div class="bg-amber-100 border border-amber-200 rounded-xl p-3 mb-4 inline-block shadow-sm mx-4">
+                            <p class="text-amber-800 text-sm font-bold leading-relaxed">
+                                <i class="fa-solid fa-triangle-exclamation mr-1"></i>
+                                會員優惠限本人使用，請輸入電話後出示證件或更新會員資料上傳照片供店員核對。
+                            </p>
+                        </div>
+                        <label class="text-xs font-bold text-slate-400 tracking-widest uppercase mb-2 block">Member Phone Login</label>
+                        <div class="h-20 flex items-center justify-center bg-white rounded-2xl shadow-inner border border-slate-200 mx-auto max-w-md w-full relative">
+                            <span v-if="selfServiceInput" class="text-5xl font-black text-slate-800 tracking-widest">{{ selfServiceInput }}</span>
+                            <span v-else class="text-4xl font-bold text-slate-200 tracking-widest">09XX...</span>
+                            <button v-if="selfServiceInput" @click="clearInput" class="absolute right-4 text-slate-300 hover:text-rose-400 text-xl w-12 h-12 flex items-center justify-center"><i class="fa-solid fa-circle-xmark"></i></button>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full">
+                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @click="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
+                        <button @click="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
+                        <button @click="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
+                        <button @click="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div v-show="currentTab === 'list'" class="space-y-4 max-w-6xl mx-auto animate-fade-in-up pb-20">
+             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-100 flex flex-col md:flex-row gap-3">
+                 <div class="relative flex-1 group"><i class="fa-solid fa-magnifying-glass absolute left-4 top-1/2 -translate-y-1/2 text-slate-400"></i><input v-model="searchQuery" @keyup.enter="searchMembers(true)" type="text" placeholder="搜尋：姓名、電話、註冊日..." class="w-full pl-10 pr-4 py-3 border-2 border-slate-100 rounded-xl focus:border-indigo-500 outline-none font-bold"></div>
+                 <div class="flex items-center gap-2 bg-slate-50 px-3 rounded-xl border-2 border-slate-100"><span class="text-xs font-bold text-slate-400">註冊區間</span><input v-model="dateStart" type="date" class="bg-transparent outline-none font-bold text-slate-600"><span class="text-slate-300">~</span><input v-model="dateEnd" type="date" class="bg-transparent outline-none font-bold text-slate-600"></div>
+                 <button @click="searchMembers(true)" class="bg-indigo-600 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-indigo-700 transition">搜尋</button>
+                 <button @click="openRegReport" class="bg-pink-500 text-white px-6 py-2 rounded-xl text-sm font-bold shadow hover:bg-pink-600 transition flex items-center"><i class="fa-solid fa-chart-bar mr-2"></i>註冊報表</button>
+             </div>
+             
+             <div v-if="isLoadingList && displayMembers.length === 0" class="py-20 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-indigo-300"></i><p class="font-bold">資料讀取中...</p></div>
+             <div v-else>
+                 <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 mb-6">
+                     <div v-for="m in displayMembers" :key="m.id" @click="editMember(m)" class="bg-white p-5 rounded-3xl shadow-sm hover:shadow-xl hover:-translate-y-1 transition border-l-8 cursor-pointer relative group" :class="getMemberBorder(m.created_at)">
+                         <div class="flex items-start gap-4">
+                             <div v-if="m.photo" class="w-16 h-16 rounded-2xl bg-slate-100 flex-shrink-0 overflow-hidden border border-slate-200"><img :src="m.photo" class="w-full h-full object-cover"></div>
+                             <div v-else class="w-16 h-16 rounded-2xl bg-slate-100 flex items-center justify-center text-slate-400 font-black text-2xl flex-shrink-0">{{ m.name ? m.name.charAt(0) : '?' }}</div>
+                             <div class="flex-1 overflow-hidden">
+                                 <b class="truncate block text-xl text-slate-800 mb-1">{{m.name}}</b>
+                                 <p class="text-base text-slate-500 font-bold tracking-wider mb-2">{{m.phone}}</p>
+                                 <div class="bg-slate-50 p-2 rounded-lg border border-slate-100 mb-2"><span class="text-xs text-slate-400 font-bold block uppercase">Created At</span><span class="text-sm text-indigo-600 font-bold">{{ formatDate(m.created_at, true) }}</span></div>
+                                 <div v-if="m.notes" class="bg-amber-50 p-2 rounded-lg border border-amber-100"><p class="text-sm text-amber-700 font-bold truncate">{{m.notes}}</p></div>
+                             </div>
+                         </div>
+                     </div>
+                 </div>
+                 <div v-if="hasMore" class="text-center pb-8">
+                     <button @click="loadMore" :disabled="isLoadingList" class="bg-white text-indigo-600 border-2 border-indigo-100 px-8 py-3 rounded-xl font-bold hover:bg-indigo-50 transition shadow-sm disabled:opacity-50">
+                         <i v-if="isLoadingList" class="fa-solid fa-circle-notch fa-spin mr-2"></i>
+                         {{ isLoadingList ? '載入中...' : '載入更多資料' }}
+                     </button>
+                 </div>
+             </div>
+        </div>
+
+        <div v-show="currentTab === 'dashboard'" class="max-w-4xl mx-auto animate-fade-in-up pb-20">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                <div @click="showRanking('month')" class="bg-gradient-to-br from-indigo-500 to-purple-600 p-6 rounded-3xl shadow-lg text-white cursor-pointer hover:scale-[1.02] transition active:scale-95 group">
+                    <h3 class="text-indigo-100 font-bold mb-2 flex justify-between items-center">本月來客總數 <i class="fa-solid fa-trophy text-amber-300 opacity-0 group-hover:opacity-100 transition"></i></h3>
+                    <span class="text-5xl font-black">{{ stats.monthVisits }}</span>
+                    <p class="text-[10px] text-indigo-200 mt-2 font-bold text-right">點擊查看排行榜 Top 30</p>
+                </div>
+                <div @click="showRanking('total')" class="bg-white p-6 rounded-3xl shadow-sm border border-slate-100 cursor-pointer hover:border-indigo-200 transition active:scale-95 group">
+                    <h3 class="text-slate-400 font-bold mb-2 flex justify-between items-center">資料庫會員 <i class="fa-solid fa-crown text-amber-400 opacity-0 group-hover:opacity-100 transition"></i></h3>
+                    <span class="text-5xl font-black text-slate-800">{{ totalMemberCount }}</span>
+                    <p class="text-[10px] text-slate-300 mt-2 font-bold text-right">點擊查看 VIP 排行榜 Top 30</p>
+                </div>
+            </div>
+            <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
+                <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50"><h3 class="font-bold text-slate-800 text-lg">即時來客紀錄</h3><button @click="fetchLogs" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold"><i class="fa-solid fa-sync mr-1"></i>重新整理</button></div>
+                <ul v-if="dashboardLogs.length > 0" class="divide-y divide-slate-100">
+                    <li v-for="log in dashboardLogs" :key="log.id" class="p-5 flex justify-between items-start hover:bg-slate-50 transition gap-4">
+                        <div @click="log.member_id ? openMemberFromLog(log) : null" class="flex items-start gap-4 cursor-pointer group" :class="{'pointer-events-none': !log.member_id}">
+                            <div class="w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center text-white font-bold mt-1 transition"
+                                 :class="log.member_id ? 'bg-indigo-400 group-hover:bg-indigo-500' : 'bg-slate-300'">
+                                <i :class="log.member_id ? 'fa-solid fa-pen-to-square' : 'fa-solid fa-user-clock'"></i>
+                            </div>
+                            <div class="flex flex-col gap-1">
+                                <div class="flex items-baseline gap-2">
+                                    <span class="font-black text-slate-800 text-lg transition" :class="log.member_id ? 'group-hover:text-indigo-600' : ''">{{ log.name }}</span>
+                                    <span class="text-sm text-slate-400 font-bold tracking-wider">{{ log.phone }}</span>
+                                </div>
+                                <div class="flex gap-2">
+                                    <span class="px-2 py-0.5 rounded-md bg-rose-50 text-rose-500 text-xs font-bold border border-rose-100">本月 {{ log.month_count || 1 }}</span>
+                                    <span class="px-2 py-0.5 rounded-md bg-indigo-50 text-indigo-500 text-xs font-bold border border-indigo-100">累計 {{ log.total_count || 1 }}</span>
+                                </div>
+                                <div v-if="log.memo_snapshot" class="mt-1">
+                                    <p class="text-xs font-bold text-emerald-600 bg-emerald-50 px-2 py-1 rounded-lg inline-block border border-emerald-100">
+                                        <i class="fa-solid fa-note-sticky mr-1"></i>{{ log.memo_snapshot }}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="text-right flex-shrink-0">
+                            <div class="text-sm font-bold text-slate-500">{{ formatDate(log.check_in_time, true).split(' ')[1] }}</div>
+                            <div class="text-[10px] text-slate-300 font-bold">{{ formatDate(log.check_in_time, true).split(' ')[0] }}</div>
+                        </div>
+                    </li>
+                </ul>
+                <div v-else class="p-16 text-center text-slate-400"><p class="font-bold">尚無紀錄</p></div>
+            </div>
+        </div>
+    </main>
+
+    <div v-if="modals.register || modals.form" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
+            <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
+                <h3 class="font-black text-xl tracking-wide">{{ modals.register ? 'Welcome! 新會員' : '編輯資料' }}</h3>
+                <button @click="closeModals" class="w-8 h-8 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
+                <div class="space-y-4">
+                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
+                    <div v-if="modals.register">
+                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">性別</label>
+                        <div class="flex gap-3 mt-1">
+                            <button @click="activeForm.gender = '先生'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '先生' ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-400'">先生</button>
+                            <button @click="activeForm.gender = '小姐'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '小姐' ? 'bg-pink-100 border-pink-500 text-pink-700' : 'bg-white border-slate-200 text-slate-400'">小姐</button>
+                        </div>
+                    </div>
+                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">備註 / 喜好</label>
+                        <textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700 mb-2"></textarea>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-for="tag in currentTags" :key="tag" @click="toggleTag(tag)" class="px-3 py-1 rounded-full text-xs font-bold border transition select-none" :class="(activeForm.notes || '').includes(tag) ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'"><i v-if="(activeForm.notes || '').includes(tag)" class="fa-solid fa-check mr-1"></i>{{ tag }}</button>
+                        </div>
+                    </div>
+                    <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
+                        <div v-if="activePhoto" class="relative">
+                            <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
+                            <button @click="deletePhoto" class="absolute -top-2 -right-2 w-6 h-6 bg-rose-500 text-white rounded-full text-xs shadow-md"><i class="fa-solid fa-trash"></i></button>
+                        </div>
+                        <div v-else class="w-20 h-20 bg-slate-100 rounded-xl flex items-center justify-center text-slate-400 border-2 border-dashed border-slate-200"><i class="fa-solid fa-image text-2xl"></i></div>
+                        <div class="flex-1 flex flex-col gap-2">
+                            <input type="file" ref="fileInput" accept="image/*" class="hidden" @change="handleFileUpload">
+                            <button @click="$refs.fileInput.click()" class="w-full py-2 bg-slate-100 text-slate-600 rounded-xl font-bold border border-slate-200 hover:bg-slate-200 transition text-sm"><i class="fa-solid fa-upload mr-1"></i>上傳照片</button>
+                            <button @click="openCamera" class="w-full py-2 bg-indigo-50 text-indigo-600 rounded-xl font-bold border border-indigo-100 hover:bg-indigo-100 transition text-sm"><i class="fa-solid fa-camera mr-1"></i>開啟相機</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
+                <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄</button>
+                <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
+                <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
+            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
+                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
+                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
+                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
+                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.io" class="fixed inset-0 bg-slate-900/80 z-[90] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-sm rounded-2xl p-6 text-center shadow-2xl">
+            <h3 class="font-black text-xl mb-4 text-slate-800">資料庫管理</h3>
+            <div class="space-y-4">
+                <button @click="exportAllMembers" :disabled="isExporting" class="w-full py-4 bg-white text-indigo-600 rounded-xl font-bold border-2 border-indigo-100 hover:bg-indigo-50 transition shadow-sm flex items-center justify-center gap-2"><i v-if="!isExporting" class="fa-solid fa-file-export"></i>{{ isExporting ? '處理中...' : '匯出所有會員' }}</button>
+                <div class="relative w-full py-4 bg-indigo-600 text-white rounded-xl font-bold hover:bg-indigo-700 transition shadow-lg cursor-pointer flex items-center justify-center gap-2">
+                    <i v-if="!isImporting" class="fa-solid fa-file-import"></i>{{ isImporting ? '處理中...' : '匯入會員資料' }}
+                    <input type="file" accept=".xlsx, .xls" @change="handleImport" class="absolute inset-0 opacity-0 cursor-pointer" :disabled="isImporting">
+                </div>
+                <div class="text-xs text-slate-400">
+                    <p>Excel 格式: A欄=姓名, B欄=電話, C欄=備註</p>
+                </div>
+            </div>
+            <button @click="modals.io=false" class="mt-6 text-slate-400 font-bold hover:text-slate-600">關閉</button>
+        </div>
+    </div>
+
+</div>
+
+<script>
+const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
+
+const app = createApp({
+    setup() {
+        const config = reactive({ 
+            url: 'https://xxbovxeahbmehyrizdxj.supabase.co', 
+            key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Ym92eGVhaGJtZWh5cml6ZHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzMyMjIsImV4cCI6MjA4MDI0OTIyMn0.DP692V8YTBpSQy8e8MMxlYLn4D-VWUJFXUwuWQkMvJA', 
+            adminPwd: '0211', 
+            storeName: 'E書漫', 
+            volume: 0.5,
+            shifts: { morning: "07:50", middle: "17:50", night: "22:50" },
+            seatTypes: [
+                { id: 'A', name: '開放式靠窗對坐沙發', img: 'https://i.imgur.com/8Qe5Q5K.jpg' }, 
+                { id: 'B', name: '靠窗拉門看書沙發', img: 'https://i.imgur.com/L2Z5Z8p.jpg' }, 
+                { id: 'C', name: '拉門看書包廂', img: 'https://i.imgur.com/0z5Q5Qn.jpg' },
+                { id: 'D', name: '拉門上網包廂', img: 'https://i.imgur.com/4Qe5Q5K.jpg' }, 
+                { id: 'E', name: '和室上網包廂', img: 'https://i.imgur.com/9Qe5Q5K.jpg' } 
+            ]
+        });
+
+        const tempGuest = reactive({ phone: '', lastName: '', name: '', member_id: null, notes: '' });
+        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false, guest: false, seat: false });
+        const staffLock = reactive({ show: false, input: '', defaultPwd: '1688' });
+        const cloudConfig = reactive({ tagsInput: '', lockPwd: '', tags: [] });
+        const defaultTags = ["靠窗", "安靜區", "無菸", "需統編", "飲料去冰", "不加糖", "冷氣強", "拒絕推銷", "老客戶"];
+        const currentTags = computed(() => cloudConfig.tags.length > 0 ? cloudConfig.tags : defaultTags);
+        const isConfigured = ref(false);
+        const displayMembers = ref([]); 
+        const totalMemberCount = ref(0); 
+        const dashboardLogs = ref([]);
+        const stats = ref({ monthVisits: 0 });
+        const memberHistoryLogs = ref([]);
+        const isLoadingHistory = ref(false);
+        const rankingList = ref([]);
+        const rankingTitle = ref('');
+        const isLoadingRanking = ref(false);
+        const getTaiwanDate = () => new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
+        const todayStr = getTaiwanDate().toISOString().split('T')[0];
+        const reportDate = ref(todayStr); 
+        const bulkCount = ref(0);
+        const regStats = reactive({ day: { morning: 0, middle: 0, night: 0, total: 0 }, month: { morning: 0, middle: 0, night: 0, total: 0 } });
+        const toasts = ref([]);
+        const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '', photo: null });
+        const isLoading = ref(false);
+        const isLoadingList = ref(false);
+        const isLoadingPhoto = ref(false);
+        const isLoadingReport = ref(false);
+        const isImporting = ref(false);
+        const isExporting = ref(false);
+        const currentTab = ref('self_service');
+        const searchQuery = ref('');
+        const dateStart = ref('');
+        const dateEnd = ref('');
+        const currentPage = ref(0);
+        const hasMore = ref(true);
+        const PAGE_SIZE = 50;
+        const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, created_at: null });
+        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, gender: '' }); 
+        const activeForm = computed(() => modals.register ? registerForm : form);
+        const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
+        const selfServiceInput = ref('');
+        let supabase = null;
+        let audioContext = null;
+        let videoStream = null;
+
+        const initAudioContext = () => { if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); };
+        
+        const playSound = (type) => { 
+            if (!audioContext) initAudioContext(); 
+            if (audioContext.state === 'suspended') audioContext.resume(); 
+            const gainNode = audioContext.createGain(); 
+            gainNode.connect(audioContext.destination); 
+            gainNode.gain.value = config.volume; 
+            const now = audioContext.currentTime; 
+            const playOsc = (freq, time, type='sine') => { 
+                const osc = audioContext.createOscillator(); 
+                osc.type = type; 
+                osc.frequency.value = freq; 
+                osc.connect(gainNode); 
+                osc.start(time); 
+                osc.stop(time + 0.15); 
+            }; 
+            if (type === 'success') { 
+                playOsc(523.25, now); playOsc(659.25, now + 0.1); playOsc(783.99, now + 0.2); playOsc(1046.50, now + 0.3); 
+            } else if (type === 'warning') { 
+                playOsc(440, now, 'triangle'); playOsc(440, now + 0.2, 'triangle'); 
+            } else { 
+                playOsc(150, now, 'sawtooth'); playOsc(100, now + 0.2, 'sawtooth'); 
+            } 
+        };
+
+        const showToast = (msg, type='success', title='提示') => { 
+            const id = Date.now(); 
+            toasts.value.push({ id, msg, type, title: type==='success'?'太棒了':(type==='warning'?'注意':'哎呀') }); 
+            playSound(type); 
+            setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 2500); 
+        };
+
+        const showFullscreen = (title, sub, type='success', note='', photo=null) => { 
+            fullscreenMsg.title = title; 
+            fullscreenMsg.sub = sub; 
+            fullscreenMsg.type = type; 
+            fullscreenMsg.note = note; 
+            fullscreenMsg.photo = photo; 
+            fullscreenMsg.show = true; 
+            playSound(type); 
+            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000); 
+        };
+
+        const confirmGuest = (title) => {
+            tempGuest.name = `${tempGuest.lastName}${title}`; 
+            modals.guest = false; 
+            modals.seat = true; 
+        };
+
+        const selectSeat = (seat) => {
+            modals.seat = false;
+            const seatNote = `${seat.id}區-${seat.name}`;
+            const existingNote = tempGuest.notes || '';
+            const finalNote = existingNote.includes(seat.id+'區') ? existingNote : (existingNote ? `${existingNote}, ${seatNote}` : seatNote);
+            
+            const finalMember = {
+                id: tempGuest.member_id, 
+                name: tempGuest.name,
+                phone: tempGuest.phone,
+                notes: finalNote, 
+                photo: tempGuest.photo
+            };
+
+            showFullscreen(`歡迎入場`, finalMember.name, 'success', seatNote, finalMember.photo);
+            logVisit(finalMember);
+        };
+
+        const performVerification = async () => {
+            const val = selfServiceInput.value.trim();
+            if(!val) return;
+            isLoading.value = true;
+            try {
+                // 先查是不是會員
+                const { data } = await supabase.from('members').select('*').eq('phone', val).single();
+                
+                if(data) {
+                    // A. 是會員 -> 存入暫存 -> 跳轉選包廂
+                    tempGuest.member_id = data.id;
+                    tempGuest.name = data.name;
+                    tempGuest.phone = data.phone;
+                    tempGuest.notes = data.notes;
+                    tempGuest.photo = data.photo;
+                    modals.seat = true; 
+                } else {
+                    // B. 是現場客 -> 開啟輸入姓氏視窗
+                    tempGuest.member_id = null;
+                    tempGuest.phone = val;
+                    tempGuest.lastName = '';
+                    tempGuest.notes = '現場客'; 
+                    tempGuest.photo = null;
+                    modals.guest = true;
+                }
+            } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
+            isLoading.value = false;
+        };
+
+        const logVisit = async (member) => { 
+            if(!supabase) return;
+            
+            let query = supabase.from('visit_logs').select('check_in_time').order('check_in_time', { ascending: false }).limit(1);
+            if(member.id) query = query.eq('member_id', member.id);
+            else query = query.eq('phone', member.phone); 
+
+            const { data: lastLogs } = await query;
+
+            if (lastLogs && lastLogs.length > 0) {
+                const lastTime = new Date(lastLogs[0].check_in_time).getTime();
+                const diffHours = (new Date().getTime() - lastTime) / (1000 * 60 * 60);
+                if (diffHours < 3) { console.log('Skipped duplicate visit'); return; }
+            }
+
+            let totalQ = supabase.from('visit_logs').select('*', { count: 'exact', head: true });
+            let monthQ = supabase.from('visit_logs').select('*', { count: 'exact', head: true });
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+
+            if (member.id) {
+                totalQ = totalQ.eq('member_id', member.id);
+                monthQ = monthQ.eq('member_id', member.id).gte('check_in_time', startOfMonth);
+            } else {
+                totalQ = totalQ.eq('phone', member.phone);
+                monthQ = monthQ.eq('phone', member.phone).gte('check_in_time', startOfMonth);
+            }
+
+            const { count: totalCount } = await totalQ;
+            const { count: monthCount } = await monthQ;
+
+            const shortMemo = member.notes ? member.notes.substring(0, 30) : '';
+
+            await supabase.from('visit_logs').insert({ 
+                member_id: member.id, 
+                name: member.name, 
+                phone: member.phone, 
+                type: 'phone', 
+                check_in_time: new Date(),
+                month_count: (monthCount || 0) + 1,
+                total_count: (totalCount || 0) + 1,
+                memo_snapshot: shortMemo
+            });
+            fetchLogs(); 
+        };
+
+        const toggleTag = (tag) => { 
+            let current = activeForm.value.notes || ''; 
+            if (current.includes(tag)) {
+                activeForm.value.notes = current.replace(tag, '').replace('  ', ' ').trim();
+            } else {
+                const prefix = current.length > 0 ? ' ' : '';
+                activeForm.value.notes = current + prefix + tag; 
+            }
+        };
+        
+        const appendLock = (n) => { 
+            if(staffLock.input.length < 6) staffLock.input += n; 
+        };
+        
+        const unlockSystem = () => { 
+            const targetPwd = cloudConfig.lockPwd || staffLock.defaultPwd; 
+            if (staffLock.input === targetPwd) { 
+                localStorage.setItem('device_authorized', 'true'); 
+                staffLock.show = false; 
+                isConfigured.value = true; 
+                currentTab.value = 'self_service'; 
+                showToast('解除鎖定', 'success'); 
+            } else { 
+                showToast('密碼錯誤', 'error'); 
+                staffLock.input = ''; 
+            } 
+        };
+        
+        const fetchCloudConfig = async () => { 
+            if (!supabase) return; 
+            try { 
+                const { data, error } = await supabase.from('store_config').select('*'); 
+                if (data) { 
+                    data.forEach(item => { 
+                        if (item.key === 'tags') { cloudConfig.tags = item.value; cloudConfig.tagsInput = item.value.join(','); } 
+                        if (item.key === 'staff_lock_pwd') { cloudConfig.lockPwd = item.value; } 
+                    }); 
+                } 
+                if(!cloudConfig.tagsInput) cloudConfig.tagsInput = defaultTags.join(','); 
+            } catch (e) {
+                console.warn('Config fetch error', e);
+            } 
+        };
+        
+        const saveCloudConfig = async () => { 
+            if (!supabase) return; 
+            try { 
+                const tagsArray = cloudConfig.tagsInput.split(',').map(t => t.trim()).filter(t => t); 
+                const upsertTags = { key: 'tags', value: tagsArray }; 
+                const upsertPwd = { key: 'staff_lock_pwd', value: cloudConfig.lockPwd || '1688' }; 
+                await supabase.from('store_config').upsert([upsertTags, upsertPwd]); 
+                cloudConfig.tags = tagsArray; 
+                showToast('雲端設定已更新', 'success'); 
+            } catch (e) { showToast('更新失敗', 'error'); } 
+        };
+        
+        const showRanking = async (type) => { 
+            if(!supabase) return; 
+            modals.ranking = true; 
+            isLoadingRanking.value = true; 
+            rankingList.value = []; 
+            try { 
+                if (type === 'month') { 
+                    rankingTitle.value = '本月來客排行榜 Top 30'; 
+                    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(); 
+                    const { data } = await supabase.from('visit_logs').select('member_id, name, phone, month_count').gte('check_in_time', startOfMonth).order('month_count', { ascending: false }).limit(150); 
+                    const uniqueMap = new Map(); 
+                    (data || []).forEach(log => { if (!uniqueMap.has(log.member_id) && log.member_id) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.month_count, type: 'month' }); }); 
+                    rankingList.value = Array.from(uniqueMap.values()).slice(0, 30); 
+                } else { 
+                    rankingTitle.value = '總累計 VIP 排行榜 Top 30'; 
+                    const { data } = await supabase.from('visit_logs').select('member_id, name, phone, total_count').order('total_count', { ascending: false }).limit(150); 
+                    const uniqueMap = new Map(); 
+                    (data || []).forEach(log => { if (!uniqueMap.has(log.member_id) && log.member_id) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.total_count, type: 'total' }); }); 
+                    rankingList.value = Array.from(uniqueMap.values()).slice(0, 30); 
+                } 
+            } catch(e) { console.error(e); } 
+            isLoadingRanking.value = false; 
+        };
+        
+        const openMemberFromLog = async (log) => { 
+            if(!supabase) return; 
+            const toastId = Date.now(); 
+            toasts.value.push({ id: toastId, msg: '讀取中...', type: 'warning' }); 
+            try { 
+                const { data } = await supabase.from('members').select('*').eq('id', log.member_id).single(); 
+                toasts.value = toasts.value.filter(t => t.id !== toastId); 
+                editMember(data); 
+            } catch(e) { toasts.value = toasts.value.filter(t => t.id !== toastId); } 
+        };
+        
+        const openMemberHistory = async (member) => { 
+            if(!member.id) return; 
+            modals.history = true; 
+            isLoadingHistory.value = true; 
+            memberHistoryLogs.value = []; 
+            try { 
+                const { data } = await supabase.from('visit_logs').select('*').eq('member_id', member.id).order('check_in_time', { ascending: false }).limit(100); 
+                memberHistoryLogs.value = data || []; 
+            } catch(e) {} 
+            isLoadingHistory.value = false; 
+        };
+        
+        const timeToMinutes = (timeStr) => { 
+            if(!timeStr) return 0; 
+            const [h, m] = timeStr.split(':').map(Number); 
+            return h * 60 + m; 
+        };
+        
+        const getMemberBorder = (isoDate) => { 
+            if (!isoDate) return ''; 
+            const d = new Date(isoDate); 
+            const taiwanTime = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"})); 
+            const currentMins = taiwanTime.getHours() * 60 + taiwanTime.getMinutes(); 
+            const S = config.shifts; 
+            const morningMins = timeToMinutes(S.morning); 
+            const middleMins = timeToMinutes(S.middle); 
+            const nightMins = timeToMinutes(S.night); 
+            if (currentMins >= morningMins && currentMins < middleMins) return 'border-time-day'; 
+            if (currentMins >= middleMins && currentMins < nightMins) return 'border-time-night'; 
+            return 'border-time-late'; 
+        };
+        
+        const formatDate = (iso, time=false) => { 
+            if(!iso) return '--'; 
+            const d = new Date(iso); 
+            return d.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', ...(time && { hour: '2-digit', minute: '2-digit' }) }).replace(/\//g, '-'); 
+        };
+        
+        const calculateRegStats = (members, selectedDateStr) => { 
+            regStats.day = { morning: 0, middle: 0, night: 0, total: 0 }; 
+            regStats.month = { morning: 0, middle: 0, night: 0, total: 0 }; 
+            const timeCount = {}; 
+            members.forEach(m => { 
+                if(!m.created_at) return; 
+                const tKey = new Date(m.created_at).getTime(); 
+                timeCount[tKey] = (timeCount[tKey] || 0) + 1; 
+            }); 
+            let skippedCount = 0; 
+            const selectedMonthPrefix = selectedDateStr.substring(0, 7); 
+            const S = config.shifts; 
+            const morningMins = timeToMinutes(S.morning); 
+            const middleMins = timeToMinutes(S.middle); 
+            const nightMins = timeToMinutes(S.night); 
+            members.forEach(m => { 
+                if (!m.created_at) return; 
+                const rawTime = new Date(m.created_at).getTime(); 
+                if (timeCount[rawTime] > 3) { skippedCount++; return; } 
+                const twOffset = 8 * 60 * 60 * 1000; 
+                const twTimeVal = rawTime + twOffset; 
+                const twDateObj = new Date(twTimeVal); 
+                const currentMins = twDateObj.getUTCHours() * 60 + twDateObj.getUTCMinutes(); 
+                const dateStr = twDateObj.toISOString().split('T')[0]; 
+                let shift = ''; 
+                let businessDate = dateStr; 
+                if (currentMins >= morningMins && currentMins < middleMins) { shift = 'morning'; } 
+                else if (currentMins >= middleMins && currentMins < nightMins) { shift = 'middle'; } 
+                else { shift = 'night'; if (currentMins < morningMins) { const prevDayObj = new Date(twTimeVal - (24 * 60 * 60 * 1000)); businessDate = prevDayObj.toISOString().split('T')[0]; } } 
+                if (businessDate === selectedDateStr) { regStats.day[shift]++; regStats.day.total++; } 
+                if (businessDate.startsWith(selectedMonthPrefix)) { regStats.month[shift]++; regStats.month.total++; } 
+            }); 
+            bulkCount.value = skippedCount; 
+        };
+        
+        const refreshReport = async () => { 
+            if (!supabase) return; 
+            isLoadingReport.value = true; 
+            try { 
+                const target = new Date(reportDate.value); 
+                const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).toISOString(); 
+                const endQuery = new Date(target.getFullYear(), target.getMonth() + 1, 2).toISOString(); 
+                let allData = []; 
+                let page = 0; 
+                const pageSize = 1000; 
+                while(true) { 
+                    const { data, error } = await supabase.from('members').select('created_at').gte('created_at', startOfMonth).lt('created_at', endQuery).range(page * pageSize, (page + 1) * pageSize - 1); 
+                    if (error) throw error; 
+                    if (!data || data.length === 0) break; 
+                    allData = allData.concat(data); 
+                    if (data.length < pageSize) break; 
+                    page++; 
+                } 
+                calculateRegStats(allData, reportDate.value); 
+            } catch (e) {} 
+            isLoadingReport.value = false; 
+        };
+        
+        const openRegReport = () => { modals.report = true; reportDate.value = todayStr; refreshReport(); };
+        
+        const submitForm = async () => {
+            if(!activeForm.value.name || !activeForm.value.phone) return showToast('請填寫完整', 'error');
+            isLoadingPhoto.value = true;
+            try {
+                if (modals.register && activeForm.gender) {
+                    activeForm.notes = (activeForm.notes ? activeForm.notes + ' ' : '') + activeForm.gender; 
+                }
+
+                if (modals.register) {
+                    const { data: exist } = await supabase.from('members').select('id').eq('phone', activeForm.value.phone).single();
+                    if(exist) { showFullscreen('重複註冊', '此電話已註冊過', 'warning'); isLoadingPhoto.value = false; return; }
+                    const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
+                    const { error } = await supabase.from('members').insert({ ...activeForm.value, id, created_at: new Date() });
+                    if(error) { if (error.code === '23505') showFullscreen('重複註冊', '此電話已註冊過', 'warning'); else throw error; } 
+                    else { showToast('註冊成功', 'success'); Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null, gender: '' }); }
+                } else {
+                    const { error } = await supabase.from('members').update({ name: activeForm.value.name, notes: activeForm.value.notes, photo: activeForm.value.photo, phone: activeForm.value.phone }).eq('id', activeForm.value.id);
+                    if(error) throw error; showToast('修改成功', 'success');
+                }
+                closeModals(); updateDbUsage(); searchMembers(true);
+            } catch(e) { if (e.code !== '23505') showToast('操作失敗', 'error'); } 
+            isLoadingPhoto.value = false; 
+        };
+
+        const handleKeyboard = (e) => { 
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return; 
+            const isAnyModalOpen = Object.values(modals).some(v => v); 
+            if(staffLock.show) { 
+                if(e.key >= '0' && e.key <= '9') appendLock(e.key); 
+                else if(e.key === 'Enter') unlockSystem(); 
+                else if(e.key === 'Backspace') staffLock.input = staffLock.input.slice(0, -1); 
+                return; 
+            } 
+            if (currentTab.value === 'self_service' && !isAnyModalOpen) { 
+                if(e.key >= '0' && e.key <= '9') appendNumber(e.key); 
+                else if (e.key === 'Backspace') backspace(); 
+                else if (e.key === 'Enter') performVerification(); 
+                else if (e.key === 'Escape') clearInput(); 
+            } 
+        };
+        
+        const processImage = (fileOrBlob) => { 
+            return new Promise((resolve) => { 
+                const img = new Image(); 
+                img.onload = () => { 
+                    const canvas = document.createElement('canvas'); 
+                    let width = img.width; let height = img.height; 
+                    const MAX_WIDTH = 800; 
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } 
+                    canvas.width = width; canvas.height = height; 
+                    const ctx = canvas.getContext('2d'); 
+                    ctx.drawImage(img, 0, 0, width, height); 
+                    resolve(canvas.toDataURL('image/webp', 0.6)); 
+                }; 
+                img.src = URL.createObjectURL(fileOrBlob); 
+            }); 
+        };
+        
+        const openCamera = async () => { 
+            modals.camera = true; 
+            await nextTick(); 
+            const video = document.getElementById('cameraVideo'); 
+            try { 
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }); 
+                video.srcObject = stream; 
+                videoStream = stream; 
+            } catch(e) { 
+                showToast('無法啟動相機', 'error'); 
+                modals.camera = false; 
+            } 
+        };
+        
+        const capturePhoto = async () => { 
+            const video = document.getElementById('cameraVideo'); 
+            if(video.readyState !== 4) return; 
+            const canvas = document.createElement('canvas'); 
+            const size = Math.min(video.videoWidth, video.videoHeight); 
+            canvas.width = 640; 
+            canvas.height = 640; 
+            const ctx = canvas.getContext('2d'); 
+            ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640); 
+            canvas.toBlob(async (blob) => { 
+                const compressed = await processImage(blob); 
+                if(modals.register) registerForm.photo = compressed; 
+                else form.photo = compressed; 
+                closeCamera(); 
+            }, 'image/jpeg', 0.9); 
+        };
+        
+        const closeCamera = () => { 
+            if(videoStream) videoStream.getTracks().forEach(t => t.stop()); 
+            modals.camera = false; 
+        };
+        
+        const handleFileUpload = async (e) => { 
+            const file = e.target.files[0]; 
+            if (!file) return; 
+            const compressed = await processImage(file); 
+            if (modals.register) registerForm.photo = compressed; 
+            else form.photo = compressed; 
+        };
+        
+        const updateDbUsage = async () => { 
+            if(supabase) { 
+                const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); 
+                totalMemberCount.value = count || 0; 
+            }
+        };
+        
+        const fetchLogs = async () => { 
+            if(!supabase) return; 
+            const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50); 
+            dashboardLogs.value = data || []; 
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(); 
+            const { count, error } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth); 
+            if(!error && count !== null) stats.value.monthVisits = count; 
+        };
+        
+        const searchMembers = async (reset = false) => { 
+            if(!supabase) return; 
+            if(reset) { currentPage.value = 0; displayMembers.value = []; hasMore.value = true; } 
+            if(!hasMore.value && !reset) return; 
+            isLoadingList.value = true; 
+            try { 
+                let qb = supabase.from('members').select('*'); 
+                if(searchQuery.value) { 
+                    const q = searchQuery.value; 
+                    if (q.includes('-') || q.startsWith('20')) qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`); 
+                    else qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,notes.ilike.%${q}%`); 
+                } 
+                if(dateStart.value) qb = qb.gte('created_at', dateStart.value); 
+                if(dateEnd.value) qb = qb.lte('created_at', dateEnd.value + 'T23:59:59'); 
+                const from = currentPage.value * PAGE_SIZE; 
+                const to = from + PAGE_SIZE - 1; 
+                const { data, error } = await qb.order('created_at', {ascending:false}).range(from, to); 
+                if(error) throw error; 
+                if (data.length < PAGE_SIZE) hasMore.value = false; 
+                displayMembers.value = [...displayMembers.value, ...data]; 
+                currentPage.value++; 
+            } catch(e){ showToast('搜尋失敗', 'error'); } 
+            finally { isLoadingList.value = false; } 
+        };
+        
+        const loadMore = () => searchMembers(false);
+        const appendNumber = (n) => { if (selfServiceInput.value.length < 10) selfServiceInput.value += n; };
+        const backspace = () => selfServiceInput.value = selfServiceInput.value.slice(0,-1);
+        const clearInput = () => selfServiceInput.value = '';
+        const openSelfRegister = () => modals.privacy = true;
+        const confirmPrivacy = () => { modals.privacy = false; modals.register = true; };
+        const closeModals = () => { modals.form=false; modals.register=false; modals.privacy=false; modals.io=false; modals.camera=false; modals.report=false; modals.ranking=false; modals.history=false; modals.seat=false; modals.guest=false; };
+        const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; };
+        const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); updateDbUsage(); searchMembers(true); };
+        const deletePhoto = () => { if(modals.register) registerForm.photo = null; else form.photo = null; };
+        const saveConfig = () => { localStorage.setItem('supabase_config_v7', JSON.stringify(config)); location.reload(); };
+        const editConfigSecure = () => { if(prompt('請輸入管理員密碼以進入後台設定') === config.adminPwd) { isConfigured.value = false; } else { showToast('密碼錯誤', 'error'); } };
+        const checkAdmin = (cb) => { if(prompt('Admin Pwd')===config.adminPwd) cb(); else showToast('密碼錯誤', 'error'); };
+        
+        const exportAllMembers = async () => { 
+            isExporting.value = true; 
+            try { 
+                const BATCH=1000; let page=0; let all=[]; 
+                while(true) { 
+                    const {data} = await supabase.from('members').select('*').range(page*BATCH, (page+1)*BATCH-1); 
+                    if(!data?.length) break; 
+                    all.push(...data); 
+                    page++; 
+                } 
+                const wb = new ExcelJS.Workbook(); 
+                const ws = wb.addWorksheet('Members'); 
+                ws.columns = [{header:'ID',key:'id'},{header:'Name',key:'name'},{header:'Phone',key:'phone'},{header:'Notes',key:'notes'},{header:'Date',key:'created_at'}]; 
+                all.forEach(m => ws.addRow(m)); 
+                const buf = await wb.xlsx.writeBuffer(); 
+                saveAs(new Blob([buf]), `Members_${new Date().toISOString().slice(0,10)}.xlsx`); 
+                showToast(`匯出 ${all.length} 筆`, 'success'); 
+            } catch(e) { showToast('匯出失敗', 'error'); } 
+            isExporting.value = false; 
+        };
+        
+        const handleImport = async (e) => { 
+            const f = e.target.files[0]; 
+            if(!f) return; 
+            isImporting.value = true; 
+            try { 
+                const wb = new ExcelJS.Workbook(); 
+                await wb.xlsx.load(await f.arrayBuffer()); 
+                const ws = wb.getWorksheet(1); 
+                const items = []; 
+                const { data: exist } = await supabase.from('members').select('phone'); 
+                const dbSet = new Set(exist?.map(x=>x.phone)); 
+                const batchSet = new Set(); 
+                ws.eachRow((row, n) => { 
+                    if(n===1) return; 
+                    let name = row.getCell(1).text?.trim(); 
+                    let phone = row.getCell(2).text?.trim(); 
+                    let notes = row.getCell(3).text?.trim(); 
+                    if(name && phone) { 
+                        if (!dbSet.has(phone) && !batchSet.has(phone)) { 
+                            items.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), name, phone, notes, created_at: new Date() }); 
+                            batchSet.add(phone); 
+                        } 
+                    } 
+                }); 
+                if(items.length) { 
+                    for(let i=0; i<items.length; i+=100) await supabase.from('members').insert(items.slice(i, i+100)); 
+                    showToast(`成功匯入 ${items.length} 筆`, 'success'); 
+                    updateDbUsage(); 
+                    searchMembers(true); 
+                } else { showToast('無新資料可匯入', 'warning'); } 
+                modals.io = false; 
+            } catch(e){ console.error(e); showToast('匯入失敗', 'error'); } 
+            isImporting.value = false; 
+            e.target.value = ''; 
+        };
+
+        onMounted(async () => {
+             const s = localStorage.getItem('supabase_config_v7');
+             if(s) { 
+                 try { 
+                     const parsed = JSON.parse(s); 
+                     Object.assign(config, parsed); 
+                     if (typeof config.shifts.morning === 'number') { 
+                         config.shifts.morning = config.shifts.morning.toString().padStart(2,'0') + ':00'; 
+                         config.shifts.middle = config.shifts.middle.toString().padStart(2,'0') + ':00'; 
+                         config.shifts.night = config.shifts.night.toString().padStart(2,'0') + ':00'; 
+                     } 
+                 } catch(e) {} 
+             }
+
+             if(config.url && config.key) {
+                 try {
+                     supabase = window.supabase.createClient(config.url, config.key);
+                     const isAuth = localStorage.getItem('device_authorized');
+                     if (isAuth === 'true') {
+                         isConfigured.value = true;
+                         currentTab.value = 'self_service';
+                         updateDbUsage(); fetchLogs(); searchMembers(true);
+                     } else { staffLock.show = true; }
+                     fetchCloudConfig();
+                 } catch (e) { 
+                     console.error("Auto login error:", e); 
+                     // 即使報錯，也要把 Loading 關掉，讓使用者看到錯誤訊息，而不是卡死
+                     alert("連線設定錯誤: " + e.message);
+                 }
+             } else { isConfigured.value = false; }
+
+             const loader = document.getElementById('loading-screen'); 
+             if(loader) loader.style.display = 'none';
+             
+             window.addEventListener('keydown', handleKeyboard);
+             watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
+        });
+
+        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory, tempGuest, confirmGuest, selectSeat };
+    }
+});
+app.mount('#app');
+</script>
+</body>
+</html>
