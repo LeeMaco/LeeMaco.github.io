@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.9 (完全體版本)</title>
+    <title>E書漫 AI 會員系統 V9.9.1 (穩定修復版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -565,7 +565,7 @@ const app = createApp({
             storeName: 'E書漫', 
             volume: 0.5,
             shifts: { morning: "07:50", middle: "17:50", night: "22:50" },
-            // V9.9: 使用真實包廂圖片 (Imgur 範例)
+            // V9.9: 使用真實包廂圖片
             seatTypes: [
                 { id: 'A', name: '開放式靠窗對坐沙發', img: 'https://i.imgur.com/8Qe5Q5K.jpg' }, 
                 { id: 'B', name: '靠窗拉門看書沙發', img: 'https://i.imgur.com/L2Z5Z8p.jpg' }, 
@@ -704,9 +704,11 @@ const app = createApp({
             if(!val) return;
             isLoading.value = true;
             try {
+                // 先查是不是會員
                 const { data } = await supabase.from('members').select('*').eq('phone', val).single();
                 
                 if(data) {
+                    // A. 是會員 -> 存入暫存 -> 跳轉選包廂
                     tempGuest.member_id = data.id;
                     tempGuest.name = data.name;
                     tempGuest.phone = data.phone;
@@ -714,6 +716,7 @@ const app = createApp({
                     tempGuest.photo = data.photo;
                     modals.seat = true; 
                 } else {
+                    // B. 是現場客 -> 開啟輸入姓氏視窗
                     tempGuest.member_id = null;
                     tempGuest.phone = val;
                     tempGuest.lastName = '';
@@ -749,6 +752,7 @@ const app = createApp({
                 totalQ = totalQ.eq('member_id', member.id);
                 monthQ = monthQ.eq('member_id', member.id).gte('check_in_time', startOfMonth);
             } else {
+                // 現場客：用電話統計
                 totalQ = totalQ.eq('phone', member.phone);
                 monthQ = monthQ.eq('phone', member.phone).gte('check_in_time', startOfMonth);
             }
@@ -759,7 +763,7 @@ const app = createApp({
             const shortMemo = member.notes ? member.notes.substring(0, 30) : '';
 
             await supabase.from('visit_logs').insert({ 
-                member_id: member.id, 
+                member_id: member.id, // 現場客會是 null
                 name: member.name, 
                 phone: member.phone, 
                 type: 'phone', 
@@ -773,11 +777,17 @@ const app = createApp({
 
         const toggleTag = (tag) => { 
             let current = activeForm.value.notes || ''; 
-            if (current.includes(tag)) activeForm.value.notes = current.replace(tag, '').replace('  ', ' ').trim(); 
-            else activeForm.value.notes = current + (current.length>0?' ':'') + tag; 
+            if (current.includes(tag)) {
+                activeForm.value.notes = current.replace(tag, '').replace('  ', ' ').trim();
+            } else {
+                const prefix = current.length > 0 ? ' ' : '';
+                activeForm.value.notes = current + prefix + tag; 
+            }
         };
         
-        const appendLock = (n) => { if(staffLock.input.length < 6) staffLock.input += n; };
+        const appendLock = (n) => { 
+            if(staffLock.input.length < 6) staffLock.input += n; 
+        };
         
         const unlockSystem = () => { 
             const targetPwd = cloudConfig.lockPwd || staffLock.defaultPwd; 
@@ -804,7 +814,9 @@ const app = createApp({
                     }); 
                 } 
                 if(!cloudConfig.tagsInput) cloudConfig.tagsInput = defaultTags.join(','); 
-            } catch (e) {} 
+            } catch (e) {
+                console.warn('Config fetch error', e);
+            } 
         };
         
         const saveCloudConfig = async () => { 
@@ -952,7 +964,6 @@ const app = createApp({
         
         const openRegReport = () => { modals.report = true; reportDate.value = todayStr; refreshReport(); };
         
-        // V9.9: 註冊邏輯更新 (存入性別)
         const submitForm = async () => {
             if(!activeForm.value.name || !activeForm.value.phone) return showToast('請填寫完整', 'error');
             isLoadingPhoto.value = true;
@@ -1011,12 +1022,56 @@ const app = createApp({
             }); 
         };
         
-        const openCamera = async () => { modals.camera = true; await nextTick(); const video = document.getElementById('cameraVideo'); try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }); video.srcObject = stream; videoStream = stream; } catch(e) { showToast('無法啟動相機', 'error'); modals.camera = false; } };
-        const capturePhoto = async () => { const video = document.getElementById('cameraVideo'); if(video.readyState !== 4) return; const canvas = document.createElement('canvas'); const size = Math.min(video.videoWidth, video.videoHeight); canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext('2d'); ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640); canvas.toBlob(async (blob) => { const compressed = await processImage(blob); if(modals.register) registerForm.photo = compressed; else form.photo = compressed; closeCamera(); }, 'image/jpeg', 0.9); };
-        const closeCamera = () => { if(videoStream) videoStream.getTracks().forEach(t => t.stop()); modals.camera = false; };
-        const handleFileUpload = async (e) => { const file = e.target.files[0]; if (!file) return; const compressed = await processImage(file); if (modals.register) registerForm.photo = compressed; else form.photo = compressed; };
+        const openCamera = async () => { 
+            modals.camera = true; 
+            await nextTick(); 
+            const video = document.getElementById('cameraVideo'); 
+            try { 
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }); 
+                video.srcObject = stream; 
+                videoStream = stream; 
+            } catch(e) { 
+                showToast('無法啟動相機', 'error'); 
+                modals.camera = false; 
+            } 
+        };
         
-        const updateDbUsage = async () => { if(supabase) { const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); totalMemberCount.value = count || 0; }};
+        const capturePhoto = async () => { 
+            const video = document.getElementById('cameraVideo'); 
+            if(video.readyState !== 4) return; 
+            const canvas = document.createElement('canvas'); 
+            const size = Math.min(video.videoWidth, video.videoHeight); 
+            canvas.width = 640; 
+            canvas.height = 640; 
+            const ctx = canvas.getContext('2d'); 
+            ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640); 
+            canvas.toBlob(async (blob) => { 
+                const compressed = await processImage(blob); 
+                if(modals.register) registerForm.photo = compressed; 
+                else form.photo = compressed; 
+                closeCamera(); 
+            }, 'image/jpeg', 0.9); 
+        };
+        
+        const closeCamera = () => { 
+            if(videoStream) videoStream.getTracks().forEach(t => t.stop()); 
+            modals.camera = false; 
+        };
+        
+        const handleFileUpload = async (e) => { 
+            const file = e.target.files[0]; 
+            if (!file) return; 
+            const compressed = await processImage(file); 
+            if (modals.register) registerForm.photo = compressed; 
+            else form.photo = compressed; 
+        };
+        
+        const updateDbUsage = async () => { 
+            if(supabase) { 
+                const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); 
+                totalMemberCount.value = count || 0; 
+            }
+        };
         
         const fetchLogs = async () => { 
             if(!supabase) return; 
@@ -1070,8 +1125,14 @@ const app = createApp({
             isExporting.value = true; 
             try { 
                 const BATCH=1000; let page=0; let all=[]; 
-                while(true) { const {data} = await supabase.from('members').select('*').range(page*BATCH, (page+1)*BATCH-1); if(!data?.length) break; all.push(...data); page++; } 
-                const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Members'); 
+                while(true) { 
+                    const {data} = await supabase.from('members').select('*').range(page*BATCH, (page+1)*BATCH-1); 
+                    if(!data?.length) break; 
+                    all.push(...data); 
+                    page++; 
+                } 
+                const wb = new ExcelJS.Workbook(); 
+                const ws = wb.addWorksheet('Members'); 
                 ws.columns = [{header:'ID',key:'id'},{header:'Name',key:'name'},{header:'Phone',key:'phone'},{header:'Notes',key:'notes'},{header:'Date',key:'created_at'}]; 
                 all.forEach(m => ws.addRow(m)); 
                 const buf = await wb.xlsx.writeBuffer(); 
@@ -1082,26 +1143,39 @@ const app = createApp({
         };
         
         const handleImport = async (e) => { 
-            const f = e.target.files[0]; if(!f) return; isImporting.value = true; 
+            const f = e.target.files[0]; 
+            if(!f) return; 
+            isImporting.value = true; 
             try { 
-                const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.getWorksheet(1); 
-                const items = []; const { data: exist } = await supabase.from('members').select('phone'); const dbSet = new Set(exist?.map(x=>x.phone)); const batchSet = new Set(); 
+                const wb = new ExcelJS.Workbook(); 
+                await wb.xlsx.load(await f.arrayBuffer()); 
+                const ws = wb.getWorksheet(1); 
+                const items = []; 
+                const { data: exist } = await supabase.from('members').select('phone'); 
+                const dbSet = new Set(exist?.map(x=>x.phone)); 
+                const batchSet = new Set(); 
                 ws.eachRow((row, n) => { 
                     if(n===1) return; 
-                    let name = row.getCell(1).text?.trim(); let phone = row.getCell(2).text?.trim(); let notes = row.getCell(3).text?.trim(); 
+                    let name = row.getCell(1).text?.trim(); 
+                    let phone = row.getCell(2).text?.trim(); 
+                    let notes = row.getCell(3).text?.trim(); 
                     if(name && phone) { 
                         if (!dbSet.has(phone) && !batchSet.has(phone)) { 
-                            items.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), name, phone, notes, created_at: new Date() }); batchSet.add(phone); 
+                            items.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), name, phone, notes, created_at: new Date() }); 
+                            batchSet.add(phone); 
                         } 
                     } 
                 }); 
                 if(items.length) { 
                     for(let i=0; i<items.length; i+=100) await supabase.from('members').insert(items.slice(i, i+100)); 
-                    showToast(`成功匯入 ${items.length} 筆`, 'success'); updateDbUsage(); searchMembers(true); 
+                    showToast(`成功匯入 ${items.length} 筆`, 'success'); 
+                    updateDbUsage(); 
+                    searchMembers(true); 
                 } else { showToast('無新資料可匯入', 'warning'); } 
                 modals.io = false; 
             } catch(e){ console.error(e); showToast('匯入失敗', 'error'); } 
-            isImporting.value = false; e.target.value = ''; 
+            isImporting.value = false; 
+            e.target.value = ''; 
         };
 
         onMounted(async () => {
@@ -1128,10 +1202,16 @@ const app = createApp({
                          updateDbUsage(); fetchLogs(); searchMembers(true);
                      } else { staffLock.show = true; }
                      fetchCloudConfig();
-                 } catch (e) { console.error("Auto login error:", e); alert("連線設定錯誤"); }
+                 } catch (e) { 
+                     console.error("Auto login error:", e); 
+                     // 即使報錯，也要把 Loading 關掉，讓使用者看到錯誤訊息，而不是卡死
+                     alert("連線設定錯誤: " + e.message);
+                 }
              } else { isConfigured.value = false; }
 
-             const loader = document.getElementById('loading-screen'); if(loader) loader.style.display = 'none';
+             const loader = document.getElementById('loading-screen'); 
+             if(loader) loader.style.display = 'none';
+             
              window.addEventListener('keydown', handleKeyboard);
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
