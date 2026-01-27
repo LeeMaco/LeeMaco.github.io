@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.8 (現場客升級版)</title>
+    <title>E書漫 AI 會員系統 V9.9 (行銷導流版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -58,7 +58,7 @@
 <div id="app" v-cloak class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
     
     <transition name="fullscreen-overlay">
-        <div v-if="fullscreenMsg.show" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl" @click="closeFullscreen">
+        <div v-if="fullscreenMsg.show" class="fixed inset-0 z-[200] flex flex-col items-center justify-center bg-white/95 backdrop-blur-xl" @click.self="closeFullscreen">
             <div class="transform scale-110 text-center p-8 max-w-lg w-full">
                 <div v-if="fullscreenMsg.photo" class="mb-6 mx-auto animate-bounce">
                     <img :src="fullscreenMsg.photo" class="w-48 h-48 rounded-full object-cover border-8 border-white shadow-2xl mx-auto bg-gray-100">
@@ -67,19 +67,35 @@
                      :class="fullscreenMsg.type==='success' ? 'bg-emerald-100 text-emerald-500 ring-4 ring-emerald-50' : (fullscreenMsg.type==='warning' ? 'bg-amber-100 text-amber-500 ring-4 ring-amber-50' : 'bg-rose-100 text-rose-500 ring-4 ring-rose-50')">
                     <i class="fa-solid" :class="fullscreenMsg.type==='success' ? 'fa-check' : (fullscreenMsg.type==='warning' ? 'fa-id-card' : 'fa-times')"></i>
                 </div>
+                
                 <h1 class="text-4xl font-black text-slate-800 mb-2 tracking-tight">{{ fullscreenMsg.title }}</h1>
+                
                 <div v-if="fullscreenMsg.type === 'success'" class="space-y-4 mt-4 animate-fade-in-up">
                     <p class="text-4xl font-black text-indigo-600">{{ fullscreenMsg.sub }}</p>
+                    
                     <p v-if="fullscreenMsg.note" class="text-2xl text-slate-600 bg-slate-100 px-6 py-3 rounded-2xl inline-block font-bold shadow-sm border border-slate-200">
                         <i class="fa-solid fa-note-sticky mr-2 text-amber-400"></i> {{ fullscreenMsg.note }}
                     </p>
+
+                    <div v-if="fullscreenMsg.interactive && !fullscreenMsg.genderUpdated" class="mt-6 p-4 bg-indigo-50 rounded-2xl border-2 border-indigo-100 animate-pulse-slow">
+                        <p class="text-indigo-800 font-bold mb-3"><i class="fa-solid fa-circle-question mr-1"></i>請問您的稱謂是？</p>
+                        <div class="flex gap-4 justify-center">
+                            <button @click.stop="updateGenderFromWelcome('male')" class="px-6 py-3 bg-white text-indigo-600 rounded-xl font-black shadow-sm border-b-4 border-indigo-200 active:border-b-0 active:translate-y-1 transition">我是先生</button>
+                            <button @click.stop="updateGenderFromWelcome('female')" class="px-6 py-3 bg-white text-pink-500 rounded-xl font-black shadow-sm border-b-4 border-pink-200 active:border-b-0 active:translate-y-1 transition">我是小姐</button>
+                        </div>
+                    </div>
                 </div>
+
                 <div v-else-if="fullscreenMsg.type === 'warning'" class="mt-4 px-4">
                     <p class="text-xl font-bold text-slate-600 leading-relaxed">{{ fullscreenMsg.sub }}</p>
                 </div>
                 <div v-else class="mt-4">
                     <p class="text-2xl font-bold text-slate-500">此號碼 <span class="text-rose-500 underline">{{ fullscreenMsg.sub }}</span> 尚未建立資料</p>
                 </div>
+
+                <button @click="closeFullscreen" class="mt-8 px-8 py-3 bg-slate-200 text-slate-500 rounded-full font-bold hover:bg-slate-300 transition">
+                    <i class="fa-solid fa-xmark mr-1"></i> 關閉
+                </button>
             </div>
         </div>
     </transition>
@@ -135,46 +151,31 @@
             
             <div v-else class="overflow-y-auto bg-white relative px-6 py-4">
                 <div class="absolute left-[2.85rem] top-4 bottom-4 w-0.5 bg-slate-100"></div>
-
                 <ul v-if="memberHistoryLogs.length > 0" class="space-y-6">
                     <li v-for="(log, idx) in memberHistoryLogs" :key="idx" class="relative flex gap-4 animate-fade-in-up" :style="{animationDelay: idx * 50 + 'ms'}">
                         <div class="flex flex-col items-center w-14 flex-shrink-0 z-10 bg-white pt-1">
-                            <span class="text-xs font-bold text-slate-400 font-mono">
-                                {{ formatDate(log.check_in_time, true).split(' ')[0].substring(5) }}
-                            </span>
-                            <span class="text-lg font-black text-slate-700 leading-none">
-                                {{ formatDate(log.check_in_time, true).split(' ')[1] }}
-                            </span>
+                            <span class="text-xs font-bold text-slate-400 font-mono">{{ formatDate(log.check_in_time, true).split(' ')[0].substring(5) }}</span>
+                            <span class="text-lg font-black text-slate-700 leading-none">{{ formatDate(log.check_in_time, true).split(' ')[1] }}</span>
                         </div>
-                        <div class="absolute left-[2.6rem] top-3 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10"
-                             :class="idx === 0 ? 'bg-emerald-500 ring-4 ring-emerald-50' : 'bg-slate-300'">
-                        </div>
+                        <div class="absolute left-[2.6rem] top-3 w-3 h-3 rounded-full border-2 border-white shadow-sm z-10" :class="idx === 0 ? 'bg-emerald-500 ring-4 ring-emerald-50' : 'bg-slate-300'"></div>
                         <div class="flex-1 bg-white p-3 rounded-xl border border-slate-100 shadow-sm hover:shadow-md transition group">
                             <div class="flex justify-between items-center mb-1">
-                                <span class="text-xs font-bold px-2 py-0.5 rounded text-slate-500 bg-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition">
-                                    <i class="fa-solid fa-hashtag mr-1"></i>第 {{ log.total_count }} 次來店
-                                </span>
+                                <span class="text-xs font-bold px-2 py-0.5 rounded text-slate-500 bg-slate-100 group-hover:bg-indigo-50 group-hover:text-indigo-600 transition"><i class="fa-solid fa-hashtag mr-1"></i>第 {{ log.total_count }} 次來店</span>
+                                <span v-if="log.type==='guest' || (rankingList.find(r=>r.member_id===log.member_id)?.type==='guest')" class="text-[10px] bg-gray-100 text-gray-500 font-bold px-1 rounded ml-1">現場</span>
                                 <span v-if="idx===0" class="text-[10px] text-emerald-500 font-bold border border-emerald-200 px-1 rounded">LATEST</span>
                             </div>
-                            <div v-if="log.memo_snapshot" class="mt-2 text-sm font-bold text-slate-600 flex items-start">
-                                <i class="fa-solid fa-quote-left text-slate-200 mr-2 text-xs mt-1"></i>
-                                {{ log.memo_snapshot }}
-                            </div>
+                            <div v-if="log.memo_snapshot" class="mt-2 text-sm font-bold text-slate-600 flex items-start"><i class="fa-solid fa-quote-left text-slate-200 mr-2 text-xs mt-1"></i>{{ log.memo_snapshot }}</div>
                         </div>
                     </li>
                 </ul>
-                
-                <div v-else class="text-center p-12 text-slate-400 font-bold flex flex-col items-center">
-                    <i class="fa-regular fa-calendar-xmark text-4xl mb-2 opacity-30"></i>
-                    查無歷史紀錄
-                </div>
+                <div v-else class="text-center p-12 text-slate-400 font-bold flex flex-col items-center"><i class="fa-regular fa-calendar-xmark text-4xl mb-2 opacity-30"></i>查無歷史紀錄</div>
             </div>
         </div>
     </div>
 
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.8</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9</h2>
             <div class="space-y-4">
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                     <h4 class="font-bold text-indigo-700 mb-3 border-b border-indigo-200 pb-2"><i class="fa-solid fa-cloud mr-2"></i>雲端同步設定</h4>
@@ -201,7 +202,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.8</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -285,7 +286,7 @@
                              <div class="flex-1 overflow-hidden">
                                  <b class="truncate block text-xl text-slate-800 mb-1 flex items-center">
                                      {{ getDisplayName(m) }}
-                                     <span v-if="m.type==='guest'" class="ml-2 text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full font-bold">現場</span>
+                                     <span v-if="m.type==='guest'" class="ml-2 text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded-full font-bold border border-gray-200">現場</span>
                                      <span v-else class="ml-2 text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded-full font-bold">會員</span>
                                  </b>
                                  <p class="text-base text-slate-500 font-bold tracking-wider mb-2">{{m.phone}}</p>
@@ -329,6 +330,7 @@
                             <div class="flex flex-col gap-1">
                                 <div class="flex items-baseline gap-2">
                                     <span class="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition">{{ getDisplayName(log) }}</span>
+                                    <span v-if="log.type==='guest'" class="text-[10px] bg-gray-100 text-gray-500 font-bold px-1 rounded">現場</span>
                                     <span class="text-sm text-slate-400 font-bold tracking-wider">{{ log.phone }}</span>
                                 </div>
                                 <div class="flex gap-2">
@@ -357,17 +359,14 @@
         <div class="bg-white w-full max-w-sm rounded-[2rem] shadow-2xl p-6">
             <h3 class="text-xl font-black text-slate-800 mb-2">歡迎光臨 E書漫</h3>
             <p class="text-slate-500 text-sm font-bold mb-4">初次來訪請輸入基本資料</p>
-            
             <div class="mb-4">
                 <label class="text-xs font-bold text-slate-400 uppercase">您的電話</label>
                 <div class="text-2xl font-black text-slate-700 tracking-wider">{{ selfServiceInput }}</div>
             </div>
-
             <div class="mb-4">
                 <label class="text-xs font-bold text-slate-400 uppercase">您的姓氏</label>
                 <input v-model="guestForm.surname" type="text" placeholder="例如：陳" class="w-full text-2xl font-black text-slate-800 border-b-2 border-slate-200 py-2 focus:border-indigo-500 outline-none text-center">
             </div>
-
             <div class="mb-6">
                 <label class="text-xs font-bold text-slate-400 uppercase block mb-2">稱謂</label>
                 <div class="flex gap-3">
@@ -375,7 +374,6 @@
                     <button @click="guestForm.gender='female'" :class="guestForm.gender==='female'?'bg-pink-500 text-white shadow-lg scale-105':'bg-slate-100 text-slate-400'" class="flex-1 py-3 rounded-xl font-bold transition">小姐</button>
                 </div>
             </div>
-
             <button @click="submitGuest" :disabled="!guestForm.surname || !guestForm.gender" class="w-full py-4 bg-slate-800 text-white rounded-xl font-black shadow-lg disabled:opacity-50 disabled:shadow-none transition">
                 確認入場 <i class="fa-solid fa-arrow-right ml-1"></i>
             </button>
@@ -383,35 +381,54 @@
         </div>
     </div>
 
-    <div v-if="modals.promo" class="fixed inset-0 bg-slate-900/90 z-[250] flex items-center justify-center p-6 animate-fade-in-up" @click="modals.promo=false">
-        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 text-center relative overflow-hidden">
+    <div v-if="modals.guestPromo" class="fixed inset-0 bg-slate-900/90 z-[250] flex items-center justify-center p-6 animate-fade-in-up">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 text-center relative overflow-hidden shadow-2xl">
             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-pink-500"></div>
+            
             <div class="mb-4 w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-3xl text-indigo-600 animate-bounce">
                 <i class="fa-solid fa-gift"></i>
             </div>
-            <h2 class="text-2xl font-black text-slate-800 mb-2">歡迎加入 E書漫！</h2>
-            <p class="text-slate-500 font-bold mb-6">您現在已享有現場客專屬優惠</p>
+            
+            <h2 class="text-2xl font-black text-slate-800 mb-2">歡迎您光臨 E書漫</h2>
+            <p class="text-slate-500 font-bold mb-6">邀請您加入會員 立即享有優惠</p>
             
             <div class="space-y-3 mb-8">
                 <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-left flex items-center gap-3">
                     <div class="text-indigo-600 text-xl font-black">9折</div>
                     <div class="flex-1">
-                        <div class="font-bold text-slate-700">計時消費優惠</div>
-                        <div class="text-xs text-indigo-400 font-bold">自動折扣無須操作</div>
+                        <div class="font-bold text-slate-700">會員計時優惠</div>
+                        <div class="text-xs text-indigo-400 font-bold">現辦現折</div>
                     </div>
-                    <i class="fa-solid fa-check-circle text-indigo-300"></i>
                 </div>
                 <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 text-left flex items-center gap-3">
                     <div class="text-pink-600 text-xl font-black">包時</div>
                     <div class="flex-1">
-                        <div class="font-bold text-slate-700">超值包時方案</div>
+                        <div class="font-bold text-slate-700">超省折扣方案 (3/6/9hr)</div>
                         <div class="text-xs text-pink-400 font-bold">21:00 ～ 翌日 11:59 入場適用</div>
                     </div>
-                    <i class="fa-solid fa-moon text-pink-300"></i>
                 </div>
             </div>
             
-            <button class="w-full py-4 bg-gradient-to-r from-indigo-600 to-pink-600 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] transition">我知道了</button>
+            <div class="space-y-3">
+                <button @click="handleGuestPromoAction('join')" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-pink-600 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] transition">
+                    馬上申請加入會員 <i class="fa-solid fa-arrow-right ml-1"></i>
+                </button>
+                <button @click="handleGuestPromoAction('next')" class="w-full py-3 text-slate-400 font-bold hover:text-slate-600">
+                    下次再考量
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div v-if="modals.promo" class="fixed inset-0 bg-slate-900/90 z-[250] flex items-center justify-center p-6 animate-fade-in-up" @click="modals.promo=false">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 text-center relative overflow-hidden">
+             <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-pink-500"></div>
+             <div class="mb-4 w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-3xl text-indigo-600 animate-bounce">
+                 <i class="fa-solid fa-check"></i>
+             </div>
+             <h2 class="text-2xl font-black text-slate-800 mb-2">已成功建檔</h2>
+             <p class="text-slate-500 font-bold mb-6">您現在已享有現場客專屬優惠</p>
+             <button class="w-full py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] transition">我知道了</button>
         </div>
     </div>
 
@@ -424,7 +441,6 @@
             <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
                 <div class="space-y-4">
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名 (全名)</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
-                    
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">性別 (稱謂)</label>
                         <div class="flex gap-3 mt-1">
@@ -432,23 +448,14 @@
                             <button @click="activeForm.gender='female'" :class="activeForm.gender==='female'?'bg-pink-500 text-white border-pink-500':'bg-white text-slate-400 border-slate-200'" class="flex-1 py-2 rounded-xl font-bold border-2 transition">小姐</button>
                         </div>
                     </div>
-
-                    <div>
-                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label>
-                        <input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700">
-                    </div>
-                    
+                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">備註 / 喜好</label>
                         <textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700 mb-2"></textarea>
                         <div class="flex flex-wrap gap-2">
-                            <button v-for="tag in currentTags" :key="tag" @click="toggleTag(tag)" class="px-3 py-1 rounded-full text-xs font-bold border transition select-none"
-                                :class="(activeForm.notes || '').includes(tag) ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'">
-                                <i v-if="(activeForm.notes || '').includes(tag)" class="fa-solid fa-check mr-1"></i>{{ tag }}
-                            </button>
+                            <button v-for="tag in currentTags" :key="tag" @click="toggleTag(tag)" class="px-3 py-1 rounded-full text-xs font-bold border transition select-none" :class="(activeForm.notes || '').includes(tag) ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'"><i v-if="(activeForm.notes || '').includes(tag)" class="fa-solid fa-check mr-1"></i>{{ tag }}</button>
                         </div>
                     </div>
-                    
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
                         <div v-if="activePhoto" class="relative">
                             <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
@@ -464,9 +471,7 @@
                 </div>
             </div>
             <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
-                <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center">
-                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄
-                </button>
+                <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄</button>
                 <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
             </div>
@@ -498,32 +503,19 @@
             <button @click="modals.io=false" class="mt-6 text-slate-400 font-bold hover:text-slate-600">關閉</button>
         </div>
     </div>
-    
+
     <div v-if="modals.ranking" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[250] flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh]">
             <div class="px-6 py-5 flex justify-between items-center bg-indigo-50 rounded-t-[2rem] border-b border-indigo-100">
-                <h3 class="font-black text-xl text-indigo-900 flex items-center gap-2">
-                    <i class="fa-solid fa-trophy text-amber-400"></i> {{ rankingTitle }}
-                </h3>
+                <h3 class="font-black text-xl text-indigo-900 flex items-center gap-2"><i class="fa-solid fa-trophy text-amber-400"></i> {{ rankingTitle }}</h3>
                 <button @click="modals.ranking = false" class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 flex items-center justify-center transition shadow-sm"><i class="fa-solid fa-times"></i></button>
             </div>
-            <div v-if="isLoadingRanking" class="p-12 text-center text-slate-400">
-                <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-indigo-300"></i>
-                <p class="font-bold text-sm">數據統計中...</p>
-            </div>
+            <div v-if="isLoadingRanking" class="p-12 text-center text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-indigo-300"></i><p class="font-bold text-sm">數據統計中...</p></div>
             <div v-else class="overflow-y-auto p-4 space-y-2 bg-white">
                 <div v-for="(rank, idx) in rankingList" :key="idx" class="flex items-center gap-4 p-3 rounded-xl border border-slate-100 hover:bg-slate-50 transition">
-                    <div class="w-8 h-8 flex items-center justify-center font-black text-lg" 
-                         :class="idx===0?'text-amber-500':(idx===1?'text-slate-400':(idx===2?'text-amber-700':'text-slate-300'))">
-                        {{ idx + 1 }}
-                    </div>
-                    <div class="flex-1">
-                        <div class="font-bold text-slate-800">{{ getDisplayName(rank) }}</div>
-                        <div class="text-xs text-slate-400">{{ rank.phone }}</div>
-                    </div>
-                    <div class="px-3 py-1 rounded-lg font-black text-sm" :class="rank.type==='month'?'bg-purple-100 text-purple-600':'bg-emerald-100 text-emerald-600'">
-                        {{ rank.count }} 次
-                    </div>
+                    <div class="w-8 h-8 flex items-center justify-center font-black text-lg" :class="idx===0?'text-amber-500':(idx===1?'text-slate-400':(idx===2?'text-amber-700':'text-slate-300'))">{{ idx + 1 }}</div>
+                    <div class="flex-1"><div class="font-bold text-slate-800">{{ getDisplayName(rank) }}</div><div class="text-xs text-slate-400">{{ rank.phone }}</div></div>
+                    <div class="px-3 py-1 rounded-lg font-black text-sm" :class="rank.type==='month'?'bg-purple-100 text-purple-600':'bg-emerald-100 text-emerald-600'">{{ rank.count }} 次</div>
                 </div>
             </div>
         </div>
@@ -543,10 +535,7 @@
             <div v-else class="p-8 overflow-y-auto space-y-8 bg-slate-50">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                     <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
-                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
-                            <h4 class="font-black text-slate-700 text-lg">{{ reportDate }} 新增</h4>
-                            <span class="text-4xl font-black text-pink-500">{{ regStats.day.total }}</span>
-                        </div>
+                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2"><h4 class="font-black text-slate-700 text-lg">{{ reportDate }} 新增</h4><span class="text-4xl font-black text-pink-500">{{ regStats.day.total }}</span></div>
                         <div class="space-y-4">
                             <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班</span><span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.morning }}</span></div>
                             <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班</span><span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.middle }}</span></div>
@@ -567,7 +556,6 @@
             <button @click="capturePhoto" class="w-20 h-20 rounded-full border-4 border-white bg-transparent flex items-center justify-center active:scale-95 transition"><div class="w-16 h-16 rounded-full bg-white"></div></button>
         </div>
     </div>
-
 </div>
 
 <script>
@@ -613,7 +601,8 @@ const app = createApp({
         });
         
         const toasts = ref([]);
-        const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '', photo: null });
+        // V9.9 Feature: 增加 interactive 與 genderUpdated 狀態
+        const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '', photo: null, interactive: false, memberId: null, genderUpdated: false });
         
         const isLoading = ref(false);
         const isLoadingList = ref(false);
@@ -631,14 +620,15 @@ const app = createApp({
         const hasMore = ref(true);
         const PAGE_SIZE = 50;
 
-        // 新增 guest 和 promo modal
-        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false, guest: false, promo: false });
+        // V9.9: 新增 guestPromo
+        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false, guest: false, promo: false, guestPromo: false });
         const tabs = [{id:'self_service', label:'接待櫃台', icon:'fa-solid fa-desktop'},{id:'list', label:'會員管理', icon:'fa-solid fa-users-gear'},{id:'dashboard', label:'營運分析', icon:'fa-solid fa-chart-pie'}];
 
-        // 表單增加 gender 欄位
         const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, created_at: null, gender: '', type: 'regular' });
         const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, gender: '', type: 'regular' });
         const guestForm = reactive({ surname: '', gender: '' });
+        // V9.9: 暫存現場客資料以便紀錄
+        const tempGuestData = ref(null);
 
         const activeForm = computed(() => modals.register ? registerForm : form);
         const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
@@ -671,13 +661,50 @@ const app = createApp({
             setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 2500);
         };
 
-        const showFullscreen = (title, sub, type='success', note='', photo=null) => {
-            fullscreenMsg.title = title; fullscreenMsg.sub = sub; fullscreenMsg.type = type; fullscreenMsg.note = note; fullscreenMsg.photo = photo; fullscreenMsg.show = true;
+        const showFullscreen = (title, sub, type='success', note='', photo=null, interactive=false, memberId=null) => {
+            fullscreenMsg.title = title; fullscreenMsg.sub = sub; fullscreenMsg.type = type; 
+            fullscreenMsg.note = note; fullscreenMsg.photo = photo; 
+            fullscreenMsg.interactive = interactive; fullscreenMsg.memberId = memberId;
+            fullscreenMsg.genderUpdated = false; // Reset status
+            fullscreenMsg.show = true;
             playSound(type);
-            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000);
+            // 如果不是互動模式，才自動關閉
+            if (!interactive) {
+                setTimeout(() => { 
+                    fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; 
+                }, 3000); // 延長到3秒讓畫面更清楚
+            }
         };
 
-        // --- 核心：實名制隱私顯示邏輯 ---
+        const closeFullscreen = () => {
+            fullscreenMsg.show = false;
+            selfServiceInput.value = '';
+            fullscreenMsg.photo = null;
+            fullscreenMsg.interactive = false;
+        };
+
+        // V9.9 Feature: 舊會員互動補全
+        const updateGenderFromWelcome = async (gender) => {
+            if(!fullscreenMsg.memberId) return;
+            try {
+                // 更新 DB
+                const { error } = await supabase.from('members').update({ gender: gender }).eq('id', fullscreenMsg.memberId);
+                if(error) throw error;
+                
+                // 即時更新 UI
+                fullscreenMsg.genderUpdated = true;
+                const namePart = fullscreenMsg.sub.split(' ')[0]; // 假設原本是 "陳大文"
+                const title = gender === 'male' ? '先生' : '小姐';
+                fullscreenMsg.sub = `${namePart.charAt(0)} ${title}`;
+                
+                showToast('資料更新成功', 'success');
+                // 延遲關閉
+                setTimeout(() => closeFullscreen(), 1500);
+            } catch(e) {
+                showToast('更新失敗', 'error');
+            }
+        };
+
         const getDisplayName = (member) => {
             if (!member || !member.name) return '未知顧客';
             const firstChar = member.name.charAt(0);
@@ -685,8 +712,9 @@ const app = createApp({
             
             if (gender === 'male') return `${firstChar} 先生`;
             if (gender === 'female') return `${firstChar} 小姐`;
-            // 舊資料相容或未選擇性別
-            return `${firstChar} 貴賓`;
+            // 如果是舊會員(無gender)且在列表顯示，回傳全名方便辨識
+            // 但為了隱私，若非管理列表情境可考慮只顯示姓。這裡維持 V9.8 邏輯
+            return `${firstChar} 貴賓`; 
         };
 
         const toggleTag = (tag) => {
@@ -751,26 +779,26 @@ const app = createApp({
                     rankingTitle.value = '本月來客排行榜 Top 30';
                     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
                     const { data } = await supabase.from('visit_logs')
-                        .select('member_id, name, phone, month_count, gender') // 增加 gender
+                        .select('member_id, name, phone, month_count, gender, type') // V9.9: 抓取 type
                         .gte('check_in_time', startOfMonth)
                         .order('month_count', { ascending: false })
                         .limit(150);
                     
                     const uniqueMap = new Map();
                     (data || []).forEach(log => {
-                        if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.month_count, type: 'month', gender: log.gender });
+                        if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.month_count, type: log.type, gender: log.gender, member_id: log.member_id });
                     });
                     rankingList.value = Array.from(uniqueMap.values()).slice(0, 30);
                 } else {
                     rankingTitle.value = '總累計 VIP 排行榜 Top 30';
                     const { data } = await supabase.from('visit_logs')
-                        .select('member_id, name, phone, total_count, gender')
+                        .select('member_id, name, phone, total_count, gender, type')
                         .order('total_count', { ascending: false })
                         .limit(150);
                     
                     const uniqueMap = new Map();
                     (data || []).forEach(log => {
-                        if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.total_count, type: 'total', gender: log.gender });
+                        if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.total_count, type: log.type, gender: log.gender, member_id: log.member_id });
                     });
                     rankingList.value = Array.from(uniqueMap.values()).slice(0, 30);
                 }
@@ -799,6 +827,7 @@ const app = createApp({
             isLoadingHistory.value = true;
             memberHistoryLogs.value = [];
             try {
+                // V9.9: 撈取 type 欄位
                 const { data, error } = await supabase.from('visit_logs').select('*').eq('member_id', member.id).order('check_in_time', { ascending: false }).limit(100);
                 if(error) throw error;
                 memberHistoryLogs.value = data || [];
@@ -896,56 +925,50 @@ const app = createApp({
 
         const openRegReport = () => { modals.report = true; reportDate.value = todayStr; refreshReport(); };
 
-        // --- 核心邏輯：提交表單 (含升級邏輯) ---
         const submitForm = async () => {
             if(!activeForm.value.name || !activeForm.value.phone) return showToast('請填寫完整', 'error');
             isLoadingPhoto.value = true;
             try {
-                // 情境 1: 新會員註冊 (來自 modals.register)
                 if (modals.register) {
-                    // 先檢查電話是否存在
                     const { data: exist } = await supabase.from('members').select('*').eq('phone', activeForm.value.phone).single();
-                    
                     if(exist) {
-                        // 關鍵分歧：如果存在，且類型是 guest -> 執行「升級」
                         if (exist.type === 'guest') {
                              const { error: updateError } = await supabase.from('members').update({
                                 name: activeForm.value.name,
                                 gender: activeForm.value.gender,
                                 photo: activeForm.value.photo,
                                 notes: activeForm.value.notes,
-                                type: 'regular', // 升級為正式會員
+                                type: 'regular',
                                 updated_at: new Date()
                             }).eq('id', exist.id);
-
                             if(updateError) throw updateError;
+                            
+                            // V9.9: 註冊轉正後，自動記錄一次"會員"打卡
+                            // 因為之前的打卡是 "guest"
+                            await logVisit({ ...exist, ...activeForm.value, type: 'regular' }); 
+                            
                             showToast('帳號升級成功！', 'success');
                         } 
-                        // 如果存在且已經是 regular -> 報錯
                         else {
                             showFullscreen('重複註冊', '此電話已註冊過', 'warning'); 
                             isLoadingPhoto.value = false; 
                             return;
                         }
                     } else {
-                        // 完全新會員 -> 執行 Insert
                         const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
-                        const { error } = await supabase.from('members').insert({ 
-                            ...activeForm.value, 
-                            id, 
-                            type: 'regular',
-                            created_at: new Date() 
-                        });
+                        const newData = { ...activeForm.value, id, type: 'regular', created_at: new Date() };
+                        const { error } = await supabase.from('members').insert(newData);
                         if(error) throw error;
+                        
+                        await logVisit(newData); // 新註冊也打卡
                         showToast('註冊成功', 'success');
                     }
                     Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null, gender: '', type: 'regular' });
                 } 
-                // 情境 2: 編輯現有會員 (來自 modals.form)
                 else {
                     const { error } = await supabase.from('members').update({ 
                         name: activeForm.value.name, 
-                        gender: activeForm.value.gender, // 記得更新性別
+                        gender: activeForm.value.gender, 
                         notes: activeForm.value.notes, 
                         photo: activeForm.value.photo, 
                         phone: activeForm.value.phone,
@@ -959,40 +982,58 @@ const app = createApp({
             isLoadingPhoto.value = false;
         };
 
-        // --- 核心邏輯：現場客簡易建檔 ---
         const submitGuest = async () => {
             if(!guestForm.surname || !guestForm.gender) return;
             isLoading.value = true;
             try {
-                // 1. 建立影子帳號
                 const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                 const guestData = {
                     id: id,
                     phone: selfServiceInput.value,
-                    name: guestForm.surname, // 暫存姓氏
+                    name: guestForm.surname,
                     gender: guestForm.gender,
-                    type: 'guest', // 標記為現場客
+                    type: 'guest',
                     created_at: new Date()
                 };
-                
                 const { error } = await supabase.from('members').insert(guestData);
                 if(error) throw error;
 
-                // 2. 自動打卡
-                await logVisit(guestData);
+                // V9.9: 現場客註冊完成後，不直接關閉，而是顯示 guestPromo
+                // 但為了邏輯順暢，這裡視為第一次入店，直接顯示優惠
+                modals.guest = false; 
+                tempGuestData.value = guestData; // 暫存
+                modals.guestPromo = true; // 引導優惠
 
-                // 3. UI 流程
-                modals.guest = false;
-                modals.promo = true; // 顯示優惠
                 guestForm.surname = '';
                 guestForm.gender = '';
                 selfServiceInput.value = '';
 
-            } catch(e) {
-                console.error(e);
-                showToast('現場客建檔失敗', 'error');
-            }
+            } catch(e) { console.error(e); showToast('現場客建檔失敗', 'error'); }
             isLoading.value = false;
+        };
+
+        // V9.9 Feature: 處理現場客優惠 Modal 的動作
+        const handleGuestPromoAction = async (action) => {
+            if (action === 'next') {
+                // 下次再考量 -> 打卡 -> 關閉
+                if (tempGuestData.value) {
+                    await logVisit(tempGuestData.value);
+                }
+                modals.guestPromo = false;
+                tempGuestData.value = null;
+            } else if (action === 'join') {
+                // 馬上申請 -> 關閉 Promo -> 開啟註冊 -> 帶入電話
+                const phoneToRegister = tempGuestData.value?.phone;
+                modals.guestPromo = false;
+                tempGuestData.value = null;
+                
+                // 開啟註冊 Modal
+                modals.privacy = true; 
+                // 這裡我們需要一個機制把電話帶過去，或者等 privacy 確認後帶入
+                // 簡單做法：監聽 modals.register 變為 true 時，自動填入 selfServiceInput (但已被清空)
+                // 修正：我們手動設定 registerForm.phone
+                registerForm.phone = phoneToRegister;
+            }
         };
 
         const handleKeyboard = (e) => {
@@ -1054,8 +1095,8 @@ const app = createApp({
             const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
             const { count: monthCount } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).eq('member_id', member.id).gte('check_in_time', startOfMonth);
             const shortMemo = member.notes ? member.notes.substring(0, 20) : '';
-            // 寫入 log 時也包含 gender 方便查詢
-            await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, gender: member.gender, type: 'phone', check_in_time: new Date(), month_count: (monthCount || 0) + 1, total_count: (totalCount || 0) + 1, memo_snapshot: shortMemo });
+            // V9.9: 確保 type 被寫入
+            await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, gender: member.gender, type: member.type || 'regular', check_in_time: new Date(), month_count: (monthCount || 0) + 1, total_count: (totalCount || 0) + 1, memo_snapshot: shortMemo });
             fetchLogs(); 
         };
         
@@ -1066,12 +1107,22 @@ const app = createApp({
             try {
                 const { data } = await supabase.from('members').select('*').eq('phone', val).single();
                 if(data) {
-                    // 顯示隱私保護的名稱
-                    showFullscreen(`歡迎光臨`, `${getDisplayName(data)}`, 'success', data.notes, data.photo);
-                    logVisit(data);
+                    // V9.9 Logic Branch
+                    if (data.type === 'guest') {
+                        // 1. 現場客 -> 顯示優惠 Modal
+                        tempGuestData.value = data;
+                        modals.guestPromo = true;
+                    } else if (!data.gender) {
+                        // 2. 舊會員(無性別) -> 顯示互動補全畫面
+                        showFullscreen(`歡迎回來`, `${data.name}`, 'success', data.notes, data.photo, true, data.id); // interactive=true
+                        logVisit(data);
+                    } else {
+                        // 3. 正常會員 -> 顯示標準歡迎畫面
+                        showFullscreen(`歡迎光臨`, `${getDisplayName(data)}`, 'success', data.notes, data.photo);
+                        logVisit(data);
+                    }
                     await supabase.from('members').update({ updated_at: new Date() }).eq('id', data.id);
                 } else {
-                    // 查無資料 -> 開啟現場客建檔 Modal
                     modals.guest = true;
                 }
             } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
@@ -1111,9 +1162,7 @@ const app = createApp({
         const openSelfRegister = () => modals.privacy = true;
         const confirmPrivacy = () => { modals.privacy = false; modals.register = true; };
         const closeModals = () => { 
-            // 關閉所有 modal
             Object.keys(modals).forEach(k => modals[k] = false);
-            // 清除暫存
             guestForm.surname = ''; guestForm.gender = '';
         };
         const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; };
@@ -1143,7 +1192,6 @@ const app = createApp({
                 const items = []; const { data: exist } = await supabase.from('members').select('phone'); const dbSet = new Set(exist?.map(x=>x.phone)); const batchSet = new Set();
                 ws.eachRow((row, n) => {
                     if(n===1) return;
-                    // Excel 格式要對應
                     let name = row.getCell(1).text?.trim(); let phone = row.getCell(2).text?.trim(); let notes = row.getCell(3).text?.trim();
                     if(name && phone) { 
                         if (!dbSet.has(phone) && !batchSet.has(phone)) { 
@@ -1179,7 +1227,7 @@ const app = createApp({
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory, getDisplayName, guestForm, submitGuest };
+        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory, getDisplayName, guestForm, submitGuest, updateGenderFromWelcome, handleGuestPromoAction };
     }
 });
 app.mount('#app');
