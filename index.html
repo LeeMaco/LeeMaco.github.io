@@ -3,15 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.9.5 (核心重構版)</title>
+    <title>E書漫 AI 會員系統 V9.7 (穩定還原版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     
-    <script src="https://cdn.jsdelivr.net/npm/vue@3.3.4/dist/vue.global.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.3/dist/umd/supabase.min.js"></script>
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.39.0/dist/umd/supabase.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
     
@@ -19,26 +19,10 @@
     <link href="https://fonts.googleapis.com/css2?family=Fredoka:wght@400;600&display=swap" rel="stylesheet">
 
     <style>
-        body { 
-            font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; 
-            background-color: #f8fafc; 
-            -webkit-tap-highlight-color: transparent; 
-            overscroll-behavior-y: none; 
-        }
-        [v-cloak] { display: none !important; }
+        body { font-family: 'Fredoka', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; background-color: #f8fafc; -webkit-tap-highlight-color: transparent; overscroll-behavior-y: none; }
         
-        /* Loading Screen 樣式 */
-        #loading-screen { 
-            position: fixed; inset: 0; background: #f8fafc; z-index: 9999; 
-            display: flex; flex-direction: column; justify-content: center; align-items: center; 
-        }
-        .status-dot {
-            height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px;
-        }
-        .status-box {
-            margin-top: 20px; font-size: 12px; color: #64748b; text-align: left;
-            background: #fff; padding: 15px; border-radius: 10px; border: 1px solid #e2e8f0;
-        }
+        [v-cloak] { display: none !important; }
+        #loading-screen { position: fixed; inset: 0; background: #f8fafc; z-index: 9999; display: flex; justify-content: center; align-items: center; }
 
         .no-zoom { touch-action: manipulation; user-select: none; }
         .numpad-btn { transition: transform 0.05s, background 0.1s; position: relative; overflow: hidden; }
@@ -57,6 +41,9 @@
         .mirror-x { transform: scaleX(-1); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         input:focus, textarea:focus { font-size: 16px; } 
+        
+        /* Time Input Styling */
+        input[type="time"]::-webkit-calendar-picker-indicator { cursor: pointer; filter: invert(0.5); }
     </style>
 </head>
 <body class="bg-slate-50">
@@ -64,46 +51,9 @@
 <div id="loading-screen">
     <div class="text-center text-indigo-400">
         <i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4"></i>
-        <p class="font-bold text-lg">System Loading...</p>
-    </div>
-    
-    <div class="status-box">
-        <div id="status-vue"><span class="status-dot bg-slate-300"></span>Vue.js Loading...</div>
-        <div id="status-supabase"><span class="status-dot bg-slate-300"></span>Supabase Loading...</div>
-        <div style="margin-top:10px; border-top:1px solid #eee; padding-top:5px;">
-            <button onclick="localStorage.clear();location.reload()" class="text-rose-500 underline font-bold">
-                如果卡住超過5秒，請點此重置
-            </button>
-        </div>
+        <p class="font-bold">System Loading...</p>
     </div>
 </div>
-
-<script>
-    // 檢查函式庫是否載入成功
-    window.onload = function() {
-        const v = document.getElementById('status-vue');
-        const s = document.getElementById('status-supabase');
-        
-        if (typeof Vue !== 'undefined') {
-            v.innerHTML = '<span class="status-dot bg-emerald-500"></span>Vue.js Ready';
-        } else {
-            v.innerHTML = '<span class="status-dot bg-rose-500"></span>Vue.js Failed (Check Network)';
-        }
-
-        if (typeof supabase !== 'undefined') {
-            s.innerHTML = '<span class="status-dot bg-emerald-500"></span>Supabase Ready';
-        } else {
-            s.innerHTML = '<span class="status-dot bg-rose-500"></span>Supabase Failed (Check Network)';
-        }
-    };
-
-    window.onerror = function(msg, url, line, col, error) {
-        alert("系統發生錯誤，請截圖:\n" + msg + "\nLine: " + line);
-        // 強制關閉 Loading 讓用戶還能嘗試操作
-        document.getElementById('loading-screen').style.display = 'none';
-        return false;
-    };
-</script>
 
 <div id="app" v-cloak class="min-h-screen flex flex-col pb-safe" @click="initAudioContext">
     
@@ -166,58 +116,6 @@
         </transition-group>
     </div>
 
-    <div v-if="modals.guest" class="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[210] flex items-center justify-center p-4">
-        <div class="bg-white w-full max-w-md rounded-[2rem] p-8 shadow-2xl relative overflow-hidden">
-            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-blue-400 to-indigo-500"></div>
-            <h2 class="text-2xl font-black text-slate-800 mb-2">歡迎光臨 (現場客)</h2>
-            <p class="text-slate-400 font-bold mb-6">請輸入姓氏以完成入場</p>
-            
-            <div class="mb-6">
-                <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">貴賓電話</label>
-                <div class="text-3xl font-black text-slate-700 font-mono tracking-wider">{{ tempGuest.phone }}</div>
-            </div>
-
-            <div class="mb-8">
-                <label class="text-xs font-bold text-slate-400 uppercase tracking-widest block mb-2">請問貴姓？</label>
-                <input v-model="tempGuest.lastName" type="text" placeholder="例如：林" class="w-full text-center text-4xl font-bold border-b-4 border-slate-200 py-2 outline-none focus:border-indigo-500 bg-transparent text-slate-800 placeholder-slate-200">
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-                <button @click="confirmGuest('先生')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-indigo-50 hover:border-indigo-200 hover:text-indigo-600 transition disabled:opacity-30">先生</button>
-                <button @click="confirmGuest('小姐')" :disabled="!tempGuest.lastName" class="h-16 rounded-xl border-2 border-slate-200 font-bold text-xl text-slate-600 hover:bg-pink-50 hover:border-pink-200 hover:text-pink-600 transition disabled:opacity-30">小姐</button>
-            </div>
-            <button @click="modals.guest = false" class="mt-6 text-slate-300 font-bold w-full py-2 hover:text-slate-500">取消</button>
-        </div>
-    </div>
-
-    <div v-if="modals.seat" class="fixed inset-0 bg-slate-900/95 backdrop-blur-xl z-[220] flex flex-col p-4 overflow-y-auto">
-        <div class="max-w-5xl mx-auto w-full flex-1 flex flex-col">
-            <div class="flex justify-between items-center py-6">
-                <div>
-                    <h2 class="text-3xl font-black text-white mb-1">請選擇包廂樣式</h2>
-                    <p class="text-indigo-200 font-bold">{{ tempGuest.name }}，您好！</p>
-                </div>
-                <button @click="modals.seat = false" class="w-12 h-12 rounded-full bg-white/10 text-white hover:bg-white/20 flex items-center justify-center transition"><i class="fa-solid fa-times text-xl"></i></button>
-            </div>
-            
-            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pb-safe">
-                <div v-for="seat in config.seatTypes" :key="seat.id" @click="selectSeat(seat)" class="bg-white rounded-3xl overflow-hidden cursor-pointer transform transition hover:scale-[1.02] active:scale-95 group shadow-2xl relative">
-                    <div class="aspect-[4/3] bg-slate-200 relative overflow-hidden">
-                        <img :src="seat.img" class="w-full h-full object-cover group-hover:scale-110 transition duration-700">
-                        <div class="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end p-6">
-                            <h3 class="text-2xl font-black text-white tracking-wide">{{ seat.name }}</h3>
-                        </div>
-                        <div class="absolute top-4 left-4 w-10 h-10 rounded-full bg-white/20 backdrop-blur-md flex items-center justify-center text-white font-bold border border-white/30">{{ seat.id }}</div>
-                    </div>
-                    <div class="p-4 bg-white flex justify-between items-center">
-                        <span class="text-slate-400 font-bold text-sm">點擊選擇此座位</span>
-                        <i class="fa-solid fa-arrow-right text-indigo-500 -translate-x-2 opacity-0 group-hover:translate-x-0 group-hover:opacity-100 transition"></i>
-                    </div>
-                </div>
-            </div>
-        </div>
-    </div>
-
     <div v-if="modals.ranking" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[250] flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-md rounded-[2rem] shadow-2xl flex flex-col max-h-[85vh]">
             <div class="px-6 py-5 flex justify-between items-center bg-indigo-50 rounded-t-[2rem] border-b border-indigo-100">
@@ -244,6 +142,7 @@
                         {{ rank.count }} 次
                     </div>
                 </div>
+                <div v-if="rankingList.length === 0" class="text-center p-8 text-slate-400 font-bold">尚無足夠數據</div>
             </div>
         </div>
     </div>
@@ -259,10 +158,12 @@
                 </div>
                 <button @click="modals.history = false" class="w-8 h-8 rounded-full bg-white text-slate-400 hover:text-rose-500 flex items-center justify-center transition shadow-sm"><i class="fa-solid fa-times"></i></button>
             </div>
+            
             <div v-if="isLoadingHistory" class="p-12 text-center text-slate-400">
                 <i class="fa-solid fa-circle-notch fa-spin text-3xl mb-3 text-emerald-300"></i>
                 <p class="font-bold text-sm">讀取紀錄中...</p>
             </div>
+            
             <div v-else class="overflow-y-auto p-0 bg-white">
                 <ul v-if="memberHistoryLogs.length > 0" class="divide-y divide-slate-100">
                     <li v-for="(log, idx) in memberHistoryLogs" :key="idx" class="p-4 hover:bg-slate-50 transition flex items-start gap-4">
@@ -277,6 +178,7 @@
                             <div v-if="log.memo_snapshot" class="text-sm font-bold text-emerald-600 bg-emerald-50 p-2 rounded-lg inline-block">
                                 <i class="fa-solid fa-note-sticky mr-1 opacity-50"></i>{{ log.memo_snapshot }}
                             </div>
+                            <div v-else class="text-xs text-slate-300 font-bold italic">無備註紀錄</div>
                         </div>
                     </li>
                 </ul>
@@ -290,7 +192,7 @@
 
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.9.5</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.7</h2>
             <div class="space-y-4">
                 
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
@@ -332,7 +234,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.9.5</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.7</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -389,10 +291,10 @@
                         </div>
                     </div>
                     <div class="grid grid-cols-3 gap-3 max-w-sm mx-auto w-full">
-                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @click="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
-                        <button @click="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
-                        <button @click="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
-                        <button @click="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
+                        <button v-for="n in [1,2,3,4,5,6,7,8,9]" :key="n" @touchstart.prevent="appendNumber(n)" @mousedown.prevent="appendNumber(n)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">{{ n }}</button>
+                        <button @touchstart.prevent="backspace" @mousedown.prevent="backspace" class="numpad-btn no-zoom h-16 md:h-20 bg-rose-50 border-b-4 border-rose-200 rounded-2xl text-2xl text-rose-500 active:border-b-0 active:translate-y-1"><i class="fa-solid fa-delete-left"></i></button>
+                        <button @touchstart.prevent="appendNumber(0)" @mousedown.prevent="appendNumber(0)" class="numpad-btn no-zoom h-16 md:h-20 bg-white border-b-4 border-slate-200 rounded-2xl text-3xl font-black text-slate-700 active:border-b-0 active:translate-y-1">0</button>
+                        <button @touchstart.prevent="performVerification" @mousedown.prevent="performVerification" :disabled="isLoading" class="numpad-btn no-zoom h-16 md:h-20 bg-indigo-600 border-b-4 border-indigo-800 rounded-2xl text-2xl text-white font-bold active:border-b-0 active:translate-y-1 shadow-lg shadow-indigo-200 disabled:opacity-50"><i v-if="isLoading" class="fa-solid fa-circle-notch fa-spin"></i><i v-else class="fa-solid fa-arrow-right"></i></button>
                     </div>
                 </div>
             </div>
@@ -446,16 +348,16 @@
             </div>
             <div class="bg-white rounded-3xl shadow-lg border border-slate-100 overflow-hidden">
                 <div class="p-6 border-b border-slate-100 flex justify-between items-center bg-slate-50"><h3 class="font-bold text-slate-800 text-lg">即時來客紀錄</h3><button @click="fetchLogs" class="text-indigo-600 hover:text-indigo-800 text-sm font-bold"><i class="fa-solid fa-sync mr-1"></i>重新整理</button></div>
+                
                 <ul v-if="dashboardLogs.length > 0" class="divide-y divide-slate-100">
                     <li v-for="log in dashboardLogs" :key="log.id" class="p-5 flex justify-between items-start hover:bg-slate-50 transition gap-4">
-                        <div @click="log.member_id ? openMemberFromLog(log) : null" class="flex items-start gap-4 cursor-pointer group" :class="{'pointer-events-none': !log.member_id}">
-                            <div class="w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center text-white font-bold mt-1 transition"
-                                 :class="log.member_id ? 'bg-indigo-400 group-hover:bg-indigo-500' : 'bg-slate-300'">
-                                <i :class="log.member_id ? 'fa-solid fa-pen-to-square' : 'fa-solid fa-user-clock'"></i>
+                        <div @click="openMemberFromLog(log)" class="flex items-start gap-4 cursor-pointer group">
+                            <div class="w-12 h-12 rounded-2xl flex-shrink-0 flex items-center justify-center text-white font-bold bg-indigo-400 mt-1 group-hover:bg-indigo-500 transition">
+                                <i class="fa-solid fa-pen-to-square group-hover:scale-110 transition"></i>
                             </div>
                             <div class="flex flex-col gap-1">
                                 <div class="flex items-baseline gap-2">
-                                    <span class="font-black text-slate-800 text-lg transition" :class="log.member_id ? 'group-hover:text-indigo-600' : ''">{{ log.name }}</span>
+                                    <span class="font-black text-slate-800 text-lg group-hover:text-indigo-600 transition">{{ log.name }}</span>
                                     <span class="text-sm text-slate-400 font-bold tracking-wider">{{ log.phone }}</span>
                                 </div>
                                 <div class="flex gap-2">
@@ -480,6 +382,18 @@
         </div>
     </main>
 
+    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
+            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
+            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
+                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
+                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
+                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
+                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
+            </div>
+        </div>
+    </div>
+
     <div v-if="modals.register || modals.form" class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-50 flex items-center justify-center p-4 animate-fade-in-up">
         <div class="bg-white w-full max-w-md rounded-[2rem] max-h-[90vh] flex flex-col shadow-2xl overflow-hidden">
             <div class="px-6 py-5 bg-gradient-to-r from-indigo-600 to-purple-600 text-white flex justify-between items-center">
@@ -489,21 +403,23 @@
             <div class="p-6 overflow-y-auto space-y-5 flex-1 bg-slate-50">
                 <div class="space-y-4">
                     <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">姓名</label><input v-model="activeForm.name" type="text" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
-                    <div v-if="modals.register">
-                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">性別</label>
-                        <div class="flex gap-3 mt-1">
-                            <button @click="activeForm.gender = '先生'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '先生' ? 'bg-indigo-100 border-indigo-500 text-indigo-700' : 'bg-white border-slate-200 text-slate-400'">先生</button>
-                            <button @click="activeForm.gender = '小姐'" class="flex-1 py-2 rounded-xl border-2 font-bold text-lg transition" :class="activeForm.gender === '小姐' ? 'bg-pink-100 border-pink-500 text-pink-700' : 'bg-white border-slate-200 text-slate-400'">小姐</button>
-                        </div>
+                    <div>
+                        <label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label>
+                        <input v-model="activeForm.phone" type="tel" 
+                               class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700">
                     </div>
-                    <div><label class="text-xs font-bold text-slate-500 uppercase ml-1">電話</label><input v-model="activeForm.phone" type="tel" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none font-bold text-slate-700"></div>
+                    
                     <div>
                         <label class="text-xs font-bold text-slate-500 uppercase ml-1">備註 / 喜好</label>
                         <textarea v-model="activeForm.notes" rows="2" class="w-full border-2 border-slate-200 p-3 rounded-2xl mt-1 focus:border-indigo-500 outline-none resize-none font-bold text-slate-700 mb-2"></textarea>
                         <div class="flex flex-wrap gap-2">
-                            <button v-for="tag in currentTags" :key="tag" @click="toggleTag(tag)" class="px-3 py-1 rounded-full text-xs font-bold border transition select-none" :class="(activeForm.notes || '').includes(tag) ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'"><i v-if="(activeForm.notes || '').includes(tag)" class="fa-solid fa-check mr-1"></i>{{ tag }}</button>
+                            <button v-for="tag in currentTags" :key="tag" @click="toggleTag(tag)" class="px-3 py-1 rounded-full text-xs font-bold border transition select-none"
+                                :class="(activeForm.notes || '').includes(tag) ? 'bg-emerald-100 text-emerald-600 border-emerald-200' : 'bg-slate-50 text-slate-500 border-slate-200 hover:bg-slate-100'">
+                                <i v-if="(activeForm.notes || '').includes(tag)" class="fa-solid fa-check mr-1"></i>{{ tag }}
+                            </button>
                         </div>
                     </div>
+                    
                     <div class="bg-white p-4 rounded-2xl border border-slate-200 flex items-center gap-4">
                         <div v-if="activePhoto" class="relative">
                             <img :src="activePhoto" class="w-20 h-20 rounded-xl object-cover border-2 border-indigo-100">
@@ -519,21 +435,11 @@
                 </div>
             </div>
             <div class="p-5 border-t border-slate-100 bg-white flex gap-3">
-                <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center"><i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄</button>
+                <button v-if="modals.form" @click="openMemberHistory(activeForm)" class="px-3 py-3 text-emerald-600 font-bold bg-emerald-50 rounded-xl hover:bg-emerald-100 border border-emerald-200 flex items-center">
+                    <i class="fa-solid fa-clock-rotate-left mr-1"></i>紀錄
+                </button>
                 <button v-if="modals.form" @click="deleteMember" class="px-4 py-3 text-rose-500 font-bold bg-rose-50 rounded-xl hover:bg-rose-100">刪除</button>
                 <button @click="submitForm" :disabled="isLoadingPhoto" class="flex-1 py-3 bg-slate-800 text-white rounded-xl shadow-lg font-bold disabled:opacity-50 hover:bg-slate-700">確認儲存</button>
-            </div>
-        </div>
-    </div>
-
-    <div v-if="modals.privacy" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[80] flex items-center justify-center p-4 animate-fade-in-up">
-        <div class="bg-white w-full max-w-lg rounded-[2rem] flex flex-col max-h-[85vh] shadow-2xl">
-            <div class="p-6 border-b border-slate-100 bg-slate-50 rounded-t-[2rem]"><h3 class="font-black text-xl text-slate-800 flex items-center gap-2"><i class="fa-solid fa-shield-halved text-indigo-600"></i> 會員個資同意書</h3></div>
-            <div class="p-8 overflow-y-auto text-base text-slate-600 leading-relaxed space-y-4 font-medium">
-                <p>親愛的顧客您好，歡迎使用 <strong>{{ config.storeName || '本公司' }}</strong> 之會員服務。</p>
-                <p>為了保障您的權益，我們將蒐集您的姓名、電話及照片用於身分識別。</p>
-                <button @click="confirmPrivacy" class="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white py-4 rounded-xl font-bold text-lg hover:shadow-lg transition">我已詳閱並同意</button>
-                <button @click="modals.privacy = false" class="w-full mt-3 text-slate-400 font-bold py-2 hover:text-slate-600">取消</button>
             </div>
         </div>
     </div>
@@ -555,6 +461,62 @@
         </div>
     </div>
 
+    <div v-if="modals.report" class="fixed inset-0 bg-slate-900/90 backdrop-blur-md z-[85] flex items-center justify-center p-4 animate-fade-in-up">
+        <div class="bg-white w-full max-w-2xl rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div class="px-8 py-6 bg-gradient-to-r from-pink-500 to-rose-500 text-white flex justify-between items-center">
+                <h3 class="font-black text-2xl tracking-wide flex items-center"><i class="fa-solid fa-chart-bar mr-3"></i>會員註冊統計</h3>
+                <button @click="modals.report = false" class="w-10 h-10 rounded-full bg-white/20 hover:bg-white/40 flex items-center justify-center transition"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="bg-white px-8 py-4 border-b border-slate-100 flex items-center justify-between">
+                <label class="text-slate-500 font-bold">選擇營業日：</label>
+                <input type="date" v-model="reportDate" class="bg-slate-100 border-2 border-slate-200 rounded-xl px-4 py-2 font-bold text-slate-700 outline-none focus:border-pink-300" @change="refreshReport">
+            </div>
+            <div v-if="isLoadingReport" class="flex-1 flex flex-col items-center justify-center p-12 text-slate-400"><i class="fa-solid fa-circle-notch fa-spin text-4xl mb-4 text-pink-300"></i><p class="font-bold">數據分析中...</p></div>
+            <div v-else class="p-8 overflow-y-auto space-y-8 bg-slate-50">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200">
+                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2">
+                            <h4 class="font-black text-slate-700 text-lg">{{ reportDate }} 新增</h4>
+                            <span class="text-4xl font-black text-pink-500">{{ regStats.day.total }}</span>
+                        </div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班 ({{config.shifts.morning}}-{{config.shifts.middle}})</span><span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.morning }}</span></div>
+                            <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班 ({{config.shifts.middle}}-{{config.shifts.night}})</span><span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.middle }}</span></div>
+                            <div class="flex justify-between items-center">
+                                <span class="font-bold text-slate-500 flex items-center flex-col items-start">
+                                    <span><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班 (跨日)</span>
+                                    <span class="text-[10px] text-slate-300 ml-6">{{config.shifts.night}} ~ 隔日 {{config.shifts.morning}}</span>
+                                </span>
+                                <span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.day.night }}</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="bg-white p-6 rounded-3xl shadow-sm border border-slate-200 opacity-80">
+                        <div class="flex justify-between items-end mb-4 border-b border-slate-100 pb-2"><h4 class="font-black text-slate-700 text-lg">本月累計</h4><span class="text-4xl font-black text-indigo-500">{{ regStats.month.total }}</span></div>
+                        <div class="space-y-4">
+                            <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-sun text-orange-400 w-6"></i>早班</span><span class="bg-orange-50 text-orange-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.morning }}</span></div>
+                            <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-moon text-emerald-400 w-6"></i>中班</span><span class="bg-emerald-50 text-emerald-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.middle }}</span></div>
+                            <div class="flex justify-between items-center"><span class="font-bold text-slate-500 flex items-center"><i class="fa-solid fa-star text-purple-400 w-6"></i>晚班</span><span class="bg-purple-50 text-purple-600 px-3 py-1 rounded-lg font-bold">{{ regStats.month.night }}</span></div>
+                        </div>
+                    </div>
+                </div>
+                <div v-if="bulkCount > 0" class="text-center text-xs text-slate-400 font-bold bg-slate-100 py-2 rounded-lg">
+                    已自動過濾 {{ bulkCount }} 筆大量匯入數據
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div v-if="modals.camera" class="fixed inset-0 bg-black z-[100] flex flex-col">
+        <div class="relative flex-1 bg-black flex flex-col items-center justify-center overflow-hidden">
+            <video id="cameraVideo" autoplay playsinline class="w-full h-full object-cover mirror-x"></video>
+            <button @click="closeCamera" class="absolute top-6 right-6 w-10 h-10 rounded-full bg-black/50 text-white flex items-center justify-center backdrop-blur-md"><i class="fa-solid fa-times"></i></button>
+        </div>
+        <div class="h-32 bg-black flex items-center justify-center pb-safe">
+            <button @click="capturePhoto" class="w-20 h-20 rounded-full border-4 border-white bg-transparent flex items-center justify-center active:scale-95 transition"><div class="w-16 h-16 rounded-full bg-white"></div></button>
+        </div>
+    </div>
+
 </div>
 
 <script>
@@ -562,548 +524,497 @@ const { createApp, ref, computed, onMounted, reactive, nextTick, watch } = Vue;
 
 const app = createApp({
     setup() {
+        // --- 核心設定區塊 (已內建所有連線資料) ---
         const config = reactive({ 
+            // 1. Supabase 網址
             url: 'https://xxbovxeahbmehyrizdxj.supabase.co', 
+            
+            // 2. Supabase Anon Key
             key: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh4Ym92eGVhaGJtZWh5cml6ZHhqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQ2NzMyMjIsImV4cCI6MjA4MDI0OTIyMn0.DP692V8YTBpSQy8e8MMxlYLn4D-VWUJFXUwuWQkMvJA', 
+            
+            // 3. 管理員密碼
             adminPwd: '0211', 
+            
+            // 4. 商店顯示名稱
             storeName: 'E書漫', 
+            
+            // 5. 音效音量 (0.0 ~ 1.0)
             volume: 0.5,
-            shifts: { morning: "07:50", middle: "17:50", night: "22:50" },
-            seatTypes: [
-                { id: 'A', name: '開放式靠窗對坐沙發', img: 'https://i.imgur.com/8Qe5Q5K.jpg' }, 
-                { id: 'B', name: '靠窗拉門看書沙發', img: 'https://i.imgur.com/L2Z5Z8p.jpg' }, 
-                { id: 'C', name: '拉門看書包廂', img: 'https://i.imgur.com/0z5Q5Qn.jpg' },
-                { id: 'D', name: '拉門上網包廂', img: 'https://i.imgur.com/4Qe5Q5K.jpg' }, 
-                { id: 'E', name: '和室上網包廂', img: 'https://i.imgur.com/9Qe5Q5K.jpg' } 
-            ]
+            
+            // 6. 班別時段定義 (HH:mm)
+            shifts: { 
+                morning: "07:50", 
+                middle: "17:50", 
+                night: "22:50" 
+            } 
         });
 
-        const tempGuest = reactive({ phone: '', lastName: '', name: '', member_id: null, notes: '' });
-        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false, guest: false, seat: false });
+        // --- V9.5 升級：排行榜邏輯 ---
+        const rankingList = ref([]);
+        const rankingTitle = ref('');
+        const isLoadingRanking = ref(false);
+
         const staffLock = reactive({ show: false, input: '', defaultPwd: '1688' });
-        const cloudConfig = reactive({ tagsInput: '', lockPwd: '', tags: [] });
+        const cloudConfig = reactive({
+            tagsInput: '',
+            lockPwd: '',
+            tags: []
+        });
+        
+        // 預設標籤庫
         const defaultTags = ["靠窗", "安靜區", "無菸", "需統編", "飲料去冰", "不加糖", "冷氣強", "拒絕推銷", "老客戶"];
         const currentTags = computed(() => cloudConfig.tags.length > 0 ? cloudConfig.tags : defaultTags);
+
         const isConfigured = ref(false);
         const displayMembers = ref([]); 
         const totalMemberCount = ref(0); 
         const dashboardLogs = ref([]);
         const stats = ref({ monthVisits: 0 });
+
+        // --- V9.7 新增：個人歷史紀錄相關變數 ---
         const memberHistoryLogs = ref([]);
         const isLoadingHistory = ref(false);
-        const rankingList = ref([]);
-        const rankingTitle = ref('');
-        const isLoadingRanking = ref(false);
+
         const getTaiwanDate = () => new Date(new Date().toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
         const todayStr = getTaiwanDate().toISOString().split('T')[0];
+        
         const reportDate = ref(todayStr); 
         const bulkCount = ref(0);
-        const regStats = reactive({ day: { morning: 0, middle: 0, night: 0, total: 0 }, month: { morning: 0, middle: 0, night: 0, total: 0 } });
+        const regStats = reactive({
+            day: { morning: 0, middle: 0, night: 0, total: 0 },
+            month: { morning: 0, middle: 0, night: 0, total: 0 }
+        });
+        
         const toasts = ref([]);
         const fullscreenMsg = reactive({ show: false, title: '', sub: '', type: 'success', note: '', photo: null });
+        
         const isLoading = ref(false);
         const isLoadingList = ref(false);
         const isLoadingPhoto = ref(false);
         const isLoadingReport = ref(false);
         const isImporting = ref(false);
         const isExporting = ref(false);
+        
         const currentTab = ref('self_service');
         const searchQuery = ref('');
         const dateStart = ref('');
         const dateEnd = ref('');
+        
         const currentPage = ref(0);
         const hasMore = ref(true);
         const PAGE_SIZE = 50;
+
+        const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false });
+        const tabs = [{id:'self_service', label:'接待櫃台', icon:'fa-solid fa-desktop'},{id:'list', label:'會員管理', icon:'fa-solid fa-users-gear'},{id:'dashboard', label:'營運分析', icon:'fa-solid fa-chart-pie'}];
+
         const form = reactive({ id: null, name: '', phone: '', notes: '', photo: null, created_at: null });
-        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null, gender: '' }); 
+        const registerForm = reactive({ name: '', phone: '', notes: '', photo: null });
         const activeForm = computed(() => modals.register ? registerForm : form);
         const activePhoto = computed(() => modals.register ? registerForm.photo : form.photo);
+
         const selfServiceInput = ref('');
         let supabase = null;
         let audioContext = null;
         let videoStream = null;
 
         const initAudioContext = () => { if(!audioContext) audioContext = new (window.AudioContext || window.webkitAudioContext)(); };
-        
-        const playSound = (type) => { 
-            if (!audioContext) initAudioContext(); 
-            if (audioContext.state === 'suspended') audioContext.resume(); 
-            const gainNode = audioContext.createGain(); 
-            gainNode.connect(audioContext.destination); 
-            gainNode.gain.value = config.volume; 
-            const now = audioContext.currentTime; 
-            const playOsc = (freq, time, type='sine') => { 
-                const osc = audioContext.createOscillator(); 
-                osc.type = type; 
-                osc.frequency.value = freq; 
-                osc.connect(gainNode); 
-                osc.start(time); 
-                osc.stop(time + 0.15); 
-            }; 
-            if (type === 'success') { 
-                playOsc(523.25, now); playOsc(659.25, now + 0.1); playOsc(783.99, now + 0.2); playOsc(1046.50, now + 0.3); 
-            } else if (type === 'warning') { 
-                playOsc(440, now, 'triangle'); playOsc(440, now + 0.2, 'triangle'); 
-            } else { 
-                playOsc(150, now, 'sawtooth'); playOsc(100, now + 0.2, 'sawtooth'); 
-            } 
-        };
-
-        const showToast = (msg, type='success', title='提示') => { 
-            const id = Date.now(); 
-            toasts.value.push({ id, msg, type, title: type==='success'?'太棒了':(type==='warning'?'注意':'哎呀') }); 
-            playSound(type); 
-            setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 2500); 
-        };
-
-        const showFullscreen = (title, sub, type='success', note='', photo=null) => { 
-            fullscreenMsg.title = title; 
-            fullscreenMsg.sub = sub; 
-            fullscreenMsg.type = type; 
-            fullscreenMsg.note = note; 
-            fullscreenMsg.photo = photo; 
-            fullscreenMsg.show = true; 
-            playSound(type); 
-            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000); 
-        };
-
-        const confirmGuest = (title) => {
-            tempGuest.name = `${tempGuest.lastName}${title}`; 
-            modals.guest = false; 
-            modals.seat = true; 
-        };
-
-        const selectSeat = (seat) => {
-            modals.seat = false;
-            const seatNote = `${seat.id}區-${seat.name}`;
-            const existingNote = tempGuest.notes || '';
-            const finalNote = existingNote.includes(seat.id+'區') ? existingNote : (existingNote ? `${existingNote}, ${seatNote}` : seatNote);
-            
-            const finalMember = {
-                id: tempGuest.member_id, 
-                name: tempGuest.name,
-                phone: tempGuest.phone,
-                notes: finalNote, 
-                photo: tempGuest.photo
+        const playSound = (type) => {
+            if (!audioContext) initAudioContext();
+            if (audioContext.state === 'suspended') audioContext.resume();
+            const gainNode = audioContext.createGain();
+            gainNode.connect(audioContext.destination);
+            gainNode.gain.value = config.volume;
+            const now = audioContext.currentTime;
+            const playOsc = (freq, time, type='sine') => {
+                const osc = audioContext.createOscillator(); osc.type = type; osc.frequency.value = freq; osc.connect(gainNode); osc.start(time); osc.stop(time + 0.15);
             };
-
-            showFullscreen(`歡迎入場`, finalMember.name, 'success', seatNote, finalMember.photo);
-            logVisit(finalMember);
+            if (type === 'success') { playOsc(523.25, now); playOsc(659.25, now + 0.1); playOsc(783.99, now + 0.2); playOsc(1046.50, now + 0.3); } 
+            else if (type === 'warning') { playOsc(440, now, 'triangle'); playOsc(440, now + 0.2, 'triangle'); } 
+            else { playOsc(150, now, 'sawtooth'); playOsc(100, now + 0.2, 'sawtooth'); }
         };
 
-        const performVerification = async () => {
-            const val = selfServiceInput.value.trim();
-            if(!val) return;
-            isLoading.value = true;
-            try {
-                // 先查是不是會員
-                const { data } = await supabase.from('members').select('*').eq('phone', val).single();
-                
-                if(data) {
-                    // A. 是會員 -> 存入暫存 -> 跳轉選包廂
-                    tempGuest.member_id = data.id;
-                    tempGuest.name = data.name;
-                    tempGuest.phone = data.phone;
-                    tempGuest.notes = data.notes;
-                    tempGuest.photo = data.photo;
-                    modals.seat = true; 
-                } else {
-                    // B. 是現場客 -> 開啟輸入姓氏視窗
-                    tempGuest.member_id = null;
-                    tempGuest.phone = val;
-                    tempGuest.lastName = '';
-                    tempGuest.notes = '現場客'; 
-                    tempGuest.photo = null;
-                    modals.guest = true;
-                }
-            } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
-            isLoading.value = false;
+        const showToast = (msg, type='success', title='提示') => {
+            const id = Date.now();
+            toasts.value.push({ id, msg, type, title: type==='success'?'太棒了':(type==='warning'?'注意':'哎呀') });
+            playSound(type);
+            setTimeout(() => toasts.value = toasts.value.filter(t => t.id !== id), 2500);
         };
 
-        const logVisit = async (member) => { 
-            if(!supabase) return;
-            
-            let query = supabase.from('visit_logs').select('check_in_time').order('check_in_time', { ascending: false }).limit(1);
-            if(member.id) query = query.eq('member_id', member.id);
-            else query = query.eq('phone', member.phone); 
-
-            const { data: lastLogs } = await query;
-
-            if (lastLogs && lastLogs.length > 0) {
-                const lastTime = new Date(lastLogs[0].check_in_time).getTime();
-                const diffHours = (new Date().getTime() - lastTime) / (1000 * 60 * 60);
-                if (diffHours < 3) { console.log('Skipped duplicate visit'); return; }
-            }
-
-            let totalQ = supabase.from('visit_logs').select('*', { count: 'exact', head: true });
-            let monthQ = supabase.from('visit_logs').select('*', { count: 'exact', head: true });
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-
-            if (member.id) {
-                totalQ = totalQ.eq('member_id', member.id);
-                monthQ = monthQ.eq('member_id', member.id).gte('check_in_time', startOfMonth);
-            } else {
-                totalQ = totalQ.eq('phone', member.phone);
-                monthQ = monthQ.eq('phone', member.phone).gte('check_in_time', startOfMonth);
-            }
-
-            const { count: totalCount } = await totalQ;
-            const { count: monthCount } = await monthQ;
-
-            const shortMemo = member.notes ? member.notes.substring(0, 30) : '';
-
-            await supabase.from('visit_logs').insert({ 
-                member_id: member.id, 
-                name: member.name, 
-                phone: member.phone, 
-                type: 'phone', 
-                check_in_time: new Date(),
-                month_count: (monthCount || 0) + 1,
-                total_count: (totalCount || 0) + 1,
-                memo_snapshot: shortMemo
-            });
-            fetchLogs(); 
+        const showFullscreen = (title, sub, type='success', note='', photo=null) => {
+            fullscreenMsg.title = title; fullscreenMsg.sub = sub; fullscreenMsg.type = type; fullscreenMsg.note = note; fullscreenMsg.photo = photo; fullscreenMsg.show = true;
+            playSound(type);
+            setTimeout(() => { fullscreenMsg.show = false; selfServiceInput.value = ''; fullscreenMsg.photo = null; }, 2000);
         };
 
-        const toggleTag = (tag) => { 
-            let current = activeForm.value.notes || ''; 
+        const toggleTag = (tag) => {
+            let current = activeForm.value.notes || '';
             if (current.includes(tag)) {
                 activeForm.value.notes = current.replace(tag, '').replace('  ', ' ').trim();
             } else {
                 const prefix = current.length > 0 ? ' ' : '';
-                activeForm.value.notes = current + prefix + tag; 
+                activeForm.value.notes = current + prefix + tag;
             }
         };
+
+        const appendLock = (n) => { if(staffLock.input.length < 6) staffLock.input += n; };
         
-        const appendLock = (n) => { 
-            if(staffLock.input.length < 6) staffLock.input += n; 
+        // --- V9.6 修正：解鎖後自動跳轉接待櫃台 ---
+        const unlockSystem = () => {
+            const targetPwd = cloudConfig.lockPwd || staffLock.defaultPwd;
+            if (staffLock.input === targetPwd) {
+                localStorage.setItem('device_authorized', 'true');
+                staffLock.show = false;
+                isConfigured.value = true; // ★ 關鍵修正：告訴系統設定已完成，隱藏後台視窗
+                currentTab.value = 'self_service'; // ★ 自動跳轉
+                showToast('解除鎖定', 'success');
+            } else {
+                showToast('密碼錯誤', 'error');
+                staffLock.input = '';
+            }
         };
-        
-        const unlockSystem = () => { 
-            const targetPwd = cloudConfig.lockPwd || staffLock.defaultPwd; 
-            if (staffLock.input === targetPwd) { 
-                localStorage.setItem('device_authorized', 'true'); 
-                staffLock.show = false; 
-                isConfigured.value = true; 
-                currentTab.value = 'self_service'; 
-                showToast('解除鎖定', 'success'); 
-            } else { 
-                showToast('密碼錯誤', 'error'); 
-                staffLock.input = ''; 
-            } 
+
+        const fetchCloudConfig = async () => {
+            if (!supabase) return;
+            try {
+                const { data, error } = await supabase.from('store_config').select('*');
+                if (error) throw error;
+                if (data) {
+                    data.forEach(item => {
+                        if (item.key === 'tags') {
+                            cloudConfig.tags = item.value;
+                            cloudConfig.tagsInput = item.value.join(',');
+                        }
+                        if (item.key === 'staff_lock_pwd') {
+                            cloudConfig.lockPwd = item.value;
+                        }
+                    });
+                }
+                // ★ V9.5 修復：若雲端無標籤，則自動填入預設值到輸入框，方便管理者查看
+                if(!cloudConfig.tagsInput) cloudConfig.tagsInput = defaultTags.join(',');
+            } catch (e) { console.warn('Cloud config error', e); }
         };
-        
-        const fetchCloudConfig = async () => { 
-            if (!supabase) return; 
-            try { 
-                const { data, error } = await supabase.from('store_config').select('*'); 
-                if (data) { 
-                    data.forEach(item => { 
-                        if (item.key === 'tags') { cloudConfig.tags = item.value; cloudConfig.tagsInput = item.value.join(','); } 
-                        if (item.key === 'staff_lock_pwd') { cloudConfig.lockPwd = item.value; } 
-                    }); 
-                } 
-                if(!cloudConfig.tagsInput) cloudConfig.tagsInput = defaultTags.join(','); 
-            } catch (e) {
-                console.warn('Config fetch error', e);
-            } 
+
+        const saveCloudConfig = async () => {
+            if (!supabase) return;
+            try {
+                const tagsArray = cloudConfig.tagsInput.split(',').map(t => t.trim()).filter(t => t);
+                const upsertTags = { key: 'tags', value: tagsArray };
+                const upsertPwd = { key: 'staff_lock_pwd', value: cloudConfig.lockPwd || '1688' };
+                const { error } = await supabase.from('store_config').upsert([upsertTags, upsertPwd]);
+                if (error) throw error;
+                cloudConfig.tags = tagsArray;
+                showToast('雲端設定已更新', 'success');
+            } catch (e) { showToast('更新失敗', 'error'); }
         };
-        
-        const saveCloudConfig = async () => { 
-            if (!supabase) return; 
-            try { 
-                const tagsArray = cloudConfig.tagsInput.split(',').map(t => t.trim()).filter(t => t); 
-                const upsertTags = { key: 'tags', value: tagsArray }; 
-                const upsertPwd = { key: 'staff_lock_pwd', value: cloudConfig.lockPwd || '1688' }; 
-                await supabase.from('store_config').upsert([upsertTags, upsertPwd]); 
-                cloudConfig.tags = tagsArray; 
-                showToast('雲端設定已更新', 'success'); 
-            } catch (e) { showToast('更新失敗', 'error'); } 
+
+        // --- V9.5 新增：排行榜查詢邏輯 ---
+        const showRanking = async (type) => {
+            if(!supabase) return;
+            modals.ranking = true;
+            isLoadingRanking.value = true;
+            rankingList.value = [];
+            
+            try {
+                if (type === 'month') {
+                    rankingTitle.value = '本月來客排行榜 Top 30';
+                    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+                    // 撈取本月紀錄，依照月次數排序
+                    const { data } = await supabase.from('visit_logs')
+                        .select('member_id, name, phone, month_count')
+                        .gte('check_in_time', startOfMonth)
+                        .order('month_count', { ascending: false })
+                        .limit(150); // 多撈一點來過濾重複
+                    
+                    // 前端去重 (每個會員只取最高的一次紀錄)
+                    const uniqueMap = new Map();
+                    (data || []).forEach(log => {
+                        if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.month_count, type: 'month' });
+                    });
+                    rankingList.value = Array.from(uniqueMap.values()).slice(0, 30);
+                    
+                } else {
+                    rankingTitle.value = '總累計 VIP 排行榜 Top 30';
+                    // 撈取所有紀錄，依照總次數排序
+                    const { data } = await supabase.from('visit_logs')
+                        .select('member_id, name, phone, total_count')
+                        .order('total_count', { ascending: false })
+                        .limit(150);
+                    
+                    const uniqueMap = new Map();
+                    (data || []).forEach(log => {
+                        if (!uniqueMap.has(log.member_id)) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.total_count, type: 'total' });
+                    });
+                    rankingList.value = Array.from(uniqueMap.values()).slice(0, 30);
+                }
+            } catch(e) { console.error(e); showToast('讀取失敗', 'error'); }
+            isLoadingRanking.value = false;
         };
-        
-        const showRanking = async (type) => { 
-            if(!supabase) return; 
-            modals.ranking = true; 
-            isLoadingRanking.value = true; 
-            rankingList.value = []; 
-            try { 
-                if (type === 'month') { 
-                    rankingTitle.value = '本月來客排行榜 Top 30'; 
-                    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(); 
-                    const { data } = await supabase.from('visit_logs').select('member_id, name, phone, month_count').gte('check_in_time', startOfMonth).order('month_count', { ascending: false }).limit(150); 
-                    const uniqueMap = new Map(); 
-                    (data || []).forEach(log => { if (!uniqueMap.has(log.member_id) && log.member_id) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.month_count, type: 'month' }); }); 
-                    rankingList.value = Array.from(uniqueMap.values()).slice(0, 30); 
-                } else { 
-                    rankingTitle.value = '總累計 VIP 排行榜 Top 30'; 
-                    const { data } = await supabase.from('visit_logs').select('member_id, name, phone, total_count').order('total_count', { ascending: false }).limit(150); 
-                    const uniqueMap = new Map(); 
-                    (data || []).forEach(log => { if (!uniqueMap.has(log.member_id) && log.member_id) uniqueMap.set(log.member_id, { name: log.name, phone: log.phone, count: log.total_count, type: 'total' }); }); 
-                    rankingList.value = Array.from(uniqueMap.values()).slice(0, 30); 
-                } 
-            } catch(e) { console.error(e); } 
-            isLoadingRanking.value = false; 
+
+        // --- V9.5 新增：從 Log 快速開啟會員編輯 ---
+        const openMemberFromLog = async (log) => {
+            if(!supabase) return;
+            // 先顯示 Loading
+            const toastId = Date.now();
+            toasts.value.push({ id: toastId, msg: '讀取會員資料中...', type: 'warning', title: '請稍候' });
+            
+            try {
+                const { data, error } = await supabase.from('members').select('*').eq('id', log.member_id).single();
+                if(error) throw error;
+                // 關閉 Toast
+                toasts.value = toasts.value.filter(t => t.id !== toastId);
+                // 開啟編輯視窗
+                editMember(data);
+            } catch(e) {
+                toasts.value = toasts.value.filter(t => t.id !== toastId);
+                showToast('無法讀取會員資料', 'error');
+            }
         };
-        
-        const openMemberFromLog = async (log) => { 
-            if(!supabase) return; 
-            const toastId = Date.now(); 
-            toasts.value.push({ id: toastId, msg: '讀取中...', type: 'warning' }); 
-            try { 
-                const { data } = await supabase.from('members').select('*').eq('id', log.member_id).single(); 
-                toasts.value = toasts.value.filter(t => t.id !== toastId); 
-                editMember(data); 
-            } catch(e) { toasts.value = toasts.value.filter(t => t.id !== toastId); } 
+
+        // --- V9.7 新增：開啟個人歷史紀錄查詢 ---
+        const openMemberHistory = async (member) => {
+            if(!member.id) return;
+            modals.history = true;
+            isLoadingHistory.value = true;
+            memberHistoryLogs.value = [];
+
+            try {
+                // 查詢該會員所有紀錄 (限制最新100筆，避免跑太久)
+                const { data, error } = await supabase.from('visit_logs')
+                    .select('*')
+                    .eq('member_id', member.id)
+                    .order('check_in_time', { ascending: false })
+                    .limit(100);
+                
+                if(error) throw error;
+                memberHistoryLogs.value = data || [];
+            } catch(e) {
+                console.error(e);
+                showToast('讀取紀錄失敗', 'error');
+            }
+            isLoadingHistory.value = false;
         };
-        
-        const openMemberHistory = async (member) => { 
-            if(!member.id) return; 
-            modals.history = true; 
-            isLoadingHistory.value = true; 
-            memberHistoryLogs.value = []; 
-            try { 
-                const { data } = await supabase.from('visit_logs').select('*').eq('member_id', member.id).order('check_in_time', { ascending: false }).limit(100); 
-                memberHistoryLogs.value = data || []; 
-            } catch(e) {} 
-            isLoadingHistory.value = false; 
+
+        const timeToMinutes = (timeStr) => {
+            if(!timeStr) return 0;
+            const [h, m] = timeStr.split(':').map(Number);
+            return h * 60 + m;
         };
-        
-        const timeToMinutes = (timeStr) => { 
-            if(!timeStr) return 0; 
-            const [h, m] = timeStr.split(':').map(Number); 
-            return h * 60 + m; 
-        };
-        
-        const getMemberBorder = (isoDate) => { 
-            if (!isoDate) return ''; 
-            const d = new Date(isoDate); 
-            const taiwanTime = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"})); 
-            const currentMins = taiwanTime.getHours() * 60 + taiwanTime.getMinutes(); 
-            const S = config.shifts; 
-            const morningMins = timeToMinutes(S.morning); 
-            const middleMins = timeToMinutes(S.middle); 
-            const nightMins = timeToMinutes(S.night); 
+
+        const getMemberBorder = (isoDate) => {
+            if (!isoDate) return '';
+            const d = new Date(isoDate);
+            const taiwanTime = new Date(d.toLocaleString("en-US", {timeZone: "Asia/Taipei"}));
+            const currentMins = taiwanTime.getHours() * 60 + taiwanTime.getMinutes();
+            const S = config.shifts;
+            const morningMins = timeToMinutes(S.morning);
+            const middleMins = timeToMinutes(S.middle);
+            const nightMins = timeToMinutes(S.night);
             if (currentMins >= morningMins && currentMins < middleMins) return 'border-time-day'; 
             if (currentMins >= middleMins && currentMins < nightMins) return 'border-time-night'; 
             return 'border-time-late'; 
         };
-        
-        const formatDate = (iso, time=false) => { 
-            if(!iso) return '--'; 
-            const d = new Date(iso); 
-            return d.toLocaleString('zh-TW', { timeZone: 'Asia/Taipei', hour12: false, year: 'numeric', month: '2-digit', day: '2-digit', ...(time && { hour: '2-digit', minute: '2-digit' }) }).replace(/\//g, '-'); 
+
+        const formatDate = (iso, time=false) => {
+            if(!iso) return '--';
+            const d = new Date(iso);
+            return d.toLocaleString('zh-TW', {
+                timeZone: 'Asia/Taipei',
+                hour12: false,
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                ...(time && { hour: '2-digit', minute: '2-digit' })
+            }).replace(/\//g, '-');
         };
-        
-        const calculateRegStats = (members, selectedDateStr) => { 
-            regStats.day = { morning: 0, middle: 0, night: 0, total: 0 }; 
-            regStats.month = { morning: 0, middle: 0, night: 0, total: 0 }; 
-            const timeCount = {}; 
-            members.forEach(m => { 
-                if(!m.created_at) return; 
+
+        const calculateRegStats = (members, selectedDateStr) => {
+            regStats.day = { morning: 0, middle: 0, night: 0, total: 0 };
+            regStats.month = { morning: 0, middle: 0, night: 0, total: 0 };
+            const timeCount = {};
+            members.forEach(m => {
+                if(!m.created_at) return;
                 const tKey = new Date(m.created_at).getTime(); 
-                timeCount[tKey] = (timeCount[tKey] || 0) + 1; 
-            }); 
-            let skippedCount = 0; 
+                timeCount[tKey] = (timeCount[tKey] || 0) + 1;
+            });
+            let skippedCount = 0;
             const selectedMonthPrefix = selectedDateStr.substring(0, 7); 
-            const S = config.shifts; 
-            const morningMins = timeToMinutes(S.morning); 
-            const middleMins = timeToMinutes(S.middle); 
-            const nightMins = timeToMinutes(S.night); 
-            members.forEach(m => { 
-                if (!m.created_at) return; 
-                const rawTime = new Date(m.created_at).getTime(); 
-                if (timeCount[rawTime] > 3) { skippedCount++; return; } 
-                const twOffset = 8 * 60 * 60 * 1000; 
-                const twTimeVal = rawTime + twOffset; 
-                const twDateObj = new Date(twTimeVal); 
-                const currentMins = twDateObj.getUTCHours() * 60 + twDateObj.getUTCMinutes(); 
+            const S = config.shifts;
+            const morningMins = timeToMinutes(S.morning);
+            const middleMins = timeToMinutes(S.middle);
+            const nightMins = timeToMinutes(S.night);
+
+            members.forEach(m => {
+                if (!m.created_at) return;
+                const rawTime = new Date(m.created_at).getTime();
+                if (timeCount[rawTime] > 3) { skippedCount++; return; }
+                const twOffset = 8 * 60 * 60 * 1000;
+                const twTimeVal = rawTime + twOffset;
+                const twDateObj = new Date(twTimeVal);
+                const currentMins = twDateObj.getUTCHours() * 60 + twDateObj.getUTCMinutes();
                 const dateStr = twDateObj.toISOString().split('T')[0]; 
                 let shift = ''; 
                 let businessDate = dateStr; 
                 if (currentMins >= morningMins && currentMins < middleMins) { shift = 'morning'; } 
                 else if (currentMins >= middleMins && currentMins < nightMins) { shift = 'middle'; } 
-                else { shift = 'night'; if (currentMins < morningMins) { const prevDayObj = new Date(twTimeVal - (24 * 60 * 60 * 1000)); businessDate = prevDayObj.toISOString().split('T')[0]; } } 
-                if (businessDate === selectedDateStr) { regStats.day[shift]++; regStats.day.total++; } 
-                if (businessDate.startsWith(selectedMonthPrefix)) { regStats.month[shift]++; regStats.month.total++; } 
-            }); 
-            bulkCount.value = skippedCount; 
+                else { shift = 'night'; if (currentMins < morningMins) { const prevDayObj = new Date(twTimeVal - (24 * 60 * 60 * 1000)); businessDate = prevDayObj.toISOString().split('T')[0]; } }
+
+                if (businessDate === selectedDateStr) { regStats.day[shift]++; regStats.day.total++; }
+                if (businessDate.startsWith(selectedMonthPrefix)) { regStats.month[shift]++; regStats.month.total++; }
+            });
+            bulkCount.value = skippedCount;
         };
-        
-        const refreshReport = async () => { 
-            if (!supabase) return; 
-            isLoadingReport.value = true; 
-            try { 
-                const target = new Date(reportDate.value); 
-                const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).toISOString(); 
-                const endQuery = new Date(target.getFullYear(), target.getMonth() + 1, 2).toISOString(); 
-                let allData = []; 
-                let page = 0; 
-                const pageSize = 1000; 
-                while(true) { 
-                    const { data, error } = await supabase.from('members').select('created_at').gte('created_at', startOfMonth).lt('created_at', endQuery).range(page * pageSize, (page + 1) * pageSize - 1); 
-                    if (error) throw error; 
-                    if (!data || data.length === 0) break; 
-                    allData = allData.concat(data); 
-                    if (data.length < pageSize) break; 
-                    page++; 
-                } 
-                calculateRegStats(allData, reportDate.value); 
-            } catch (e) {} 
-            isLoadingReport.value = false; 
+
+        const refreshReport = async () => {
+            if (!supabase) return;
+            isLoadingReport.value = true;
+            try {
+                const target = new Date(reportDate.value);
+                const startOfMonth = new Date(target.getFullYear(), target.getMonth(), 1).toISOString();
+                const endQuery = new Date(target.getFullYear(), target.getMonth() + 1, 2).toISOString();
+                let allData = []; let page = 0; const pageSize = 1000;
+                while(true) {
+                    const { data, error } = await supabase.from('members').select('created_at').gte('created_at', startOfMonth).lt('created_at', endQuery).range(page * pageSize, (page + 1) * pageSize - 1);
+                    if (error) throw error; if (!data || data.length === 0) break;
+                    allData = allData.concat(data); if (data.length < pageSize) break; page++;
+                }
+                calculateRegStats(allData, reportDate.value);
+            } catch (e) { console.error(e); showToast('報表錯誤', 'error'); }
+            isLoadingReport.value = false;
         };
-        
+
         const openRegReport = () => { modals.report = true; reportDate.value = todayStr; refreshReport(); };
-        
+
         const submitForm = async () => {
             if(!activeForm.value.name || !activeForm.value.phone) return showToast('請填寫完整', 'error');
             isLoadingPhoto.value = true;
             try {
-                if (modals.register && activeForm.gender) {
-                    activeForm.notes = (activeForm.notes ? activeForm.notes + ' ' : '') + activeForm.gender; 
-                }
-
                 if (modals.register) {
                     const { data: exist } = await supabase.from('members').select('id').eq('phone', activeForm.value.phone).single();
                     if(exist) { showFullscreen('重複註冊', '此電話已註冊過', 'warning'); isLoadingPhoto.value = false; return; }
                     const id = Date.now().toString() + Math.random().toString(36).substr(2, 5);
                     const { error } = await supabase.from('members').insert({ ...activeForm.value, id, created_at: new Date() });
                     if(error) { if (error.code === '23505') showFullscreen('重複註冊', '此電話已註冊過', 'warning'); else throw error; } 
-                    else { showToast('註冊成功', 'success'); Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null, gender: '' }); }
+                    else { showToast('註冊成功', 'success'); Object.assign(registerForm, { name: '', phone: '', notes: '', photo: null }); }
                 } else {
                     const { error } = await supabase.from('members').update({ name: activeForm.value.name, notes: activeForm.value.notes, photo: activeForm.value.photo, phone: activeForm.value.phone }).eq('id', activeForm.value.id);
                     if(error) throw error; showToast('修改成功', 'success');
                 }
                 closeModals(); updateDbUsage(); searchMembers(true);
-            } catch(e) { if (e.code !== '23505') showToast('操作失敗', 'error'); } 
-            isLoadingPhoto.value = false; 
+            } catch(e) { if (e.code !== '23505') showToast('操作失敗', 'error'); }
+            isLoadingPhoto.value = false;
         };
 
-        const handleKeyboard = (e) => { 
-            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return; 
-            const isAnyModalOpen = Object.values(modals).some(v => v); 
-            if(staffLock.show) { 
-                if(e.key >= '0' && e.key <= '9') appendLock(e.key); 
-                else if(e.key === 'Enter') unlockSystem(); 
-                else if(e.key === 'Backspace') staffLock.input = staffLock.input.slice(0, -1); 
-                return; 
-            } 
-            if (currentTab.value === 'self_service' && !isAnyModalOpen) { 
-                if(e.key >= '0' && e.key <= '9') appendNumber(e.key); 
-                else if (e.key === 'Backspace') backspace(); 
-                else if (e.key === 'Enter') performVerification(); 
-                else if (e.key === 'Escape') clearInput(); 
-            } 
-        };
-        
-        const processImage = (fileOrBlob) => { 
-            return new Promise((resolve) => { 
-                const img = new Image(); 
-                img.onload = () => { 
-                    const canvas = document.createElement('canvas'); 
-                    let width = img.width; let height = img.height; 
-                    const MAX_WIDTH = 800; 
-                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; } 
-                    canvas.width = width; canvas.height = height; 
-                    const ctx = canvas.getContext('2d'); 
-                    ctx.drawImage(img, 0, 0, width, height); 
-                    resolve(canvas.toDataURL('image/webp', 0.6)); 
-                }; 
-                img.src = URL.createObjectURL(fileOrBlob); 
-            }); 
-        };
-        
-        const openCamera = async () => { 
-            modals.camera = true; 
-            await nextTick(); 
-            const video = document.getElementById('cameraVideo'); 
-            try { 
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }); 
-                video.srcObject = stream; 
-                videoStream = stream; 
-            } catch(e) { 
-                showToast('無法啟動相機', 'error'); 
-                modals.camera = false; 
-            } 
-        };
-        
-        const capturePhoto = async () => { 
-            const video = document.getElementById('cameraVideo'); 
-            if(video.readyState !== 4) return; 
-            const canvas = document.createElement('canvas'); 
-            const size = Math.min(video.videoWidth, video.videoHeight); 
-            canvas.width = 640; 
-            canvas.height = 640; 
-            const ctx = canvas.getContext('2d'); 
-            ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640); 
-            canvas.toBlob(async (blob) => { 
-                const compressed = await processImage(blob); 
-                if(modals.register) registerForm.photo = compressed; 
-                else form.photo = compressed; 
-                closeCamera(); 
-            }, 'image/jpeg', 0.9); 
-        };
-        
-        const closeCamera = () => { 
-            if(videoStream) videoStream.getTracks().forEach(t => t.stop()); 
-            modals.camera = false; 
-        };
-        
-        const handleFileUpload = async (e) => { 
-            const file = e.target.files[0]; 
-            if (!file) return; 
-            const compressed = await processImage(file); 
-            if (modals.register) registerForm.photo = compressed; 
-            else form.photo = compressed; 
-        };
-        
-        const updateDbUsage = async () => { 
-            if(supabase) { 
-                const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); 
-                totalMemberCount.value = count || 0; 
+        const handleKeyboard = (e) => {
+            if (['INPUT', 'TEXTAREA'].includes(document.activeElement.tagName)) return;
+            const isAnyModalOpen = Object.values(modals).some(v => v);
+            if(staffLock.show) {
+               if(e.key >= '0' && e.key <= '9') appendLock(e.key);
+               else if(e.key === 'Enter') unlockSystem();
+               else if(e.key === 'Backspace') staffLock.input = staffLock.input.slice(0, -1);
+               return;
+            }
+            if (currentTab.value === 'self_service' && !isAnyModalOpen) {
+                if(e.key >= '0' && e.key <= '9') appendNumber(e.key);
+                else if (e.key === 'Backspace') backspace();
+                else if (e.key === 'Enter') performVerification();
+                else if (e.key === 'Escape') clearInput();
             }
         };
+
+        const processImage = (fileOrBlob) => {
+            return new Promise((resolve) => {
+                const img = new Image();
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width; let height = img.height; const MAX_WIDTH = 800;
+                    if (width > MAX_WIDTH) { height *= MAX_WIDTH / width; width = MAX_WIDTH; }
+                    canvas.width = width; canvas.height = height; const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height); resolve(canvas.toDataURL('image/webp', 0.6));
+                };
+                img.src = URL.createObjectURL(fileOrBlob);
+            });
+        };
+
+        const openCamera = async () => { modals.camera = true; await nextTick(); const video = document.getElementById('cameraVideo'); try { const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 1280 }, height: { ideal: 720 } } }); video.srcObject = stream; videoStream = stream; } catch(e) { showToast('無法啟動相機', 'error'); modals.camera = false; } };
+        const capturePhoto = async () => { const video = document.getElementById('cameraVideo'); if(video.readyState !== 4) return; const canvas = document.createElement('canvas'); const size = Math.min(video.videoWidth, video.videoHeight); canvas.width = 640; canvas.height = 640; const ctx = canvas.getContext('2d'); ctx.drawImage(video, (video.videoWidth-size)/2, (video.videoHeight-size)/2, size, size, 0, 0, 640, 640); canvas.toBlob(async (blob) => { const compressed = await processImage(blob); if(modals.register) registerForm.photo = compressed; else form.photo = compressed; closeCamera(); }, 'image/jpeg', 0.9); };
+        const closeCamera = () => { if(videoStream) videoStream.getTracks().forEach(t => t.stop()); modals.camera = false; };
+        const handleFileUpload = async (e) => { const file = e.target.files[0]; if (!file) return; const compressed = await processImage(file); if (modals.register) registerForm.photo = compressed; else form.photo = compressed; };
+
+        const updateDbUsage = async () => { if(supabase) { const { count } = await supabase.from('members').select('*', { count: 'exact', head: true }); totalMemberCount.value = count || 0; }};
         
-        const fetchLogs = async () => { 
-            if(!supabase) return; 
-            const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50); 
-            dashboardLogs.value = data || []; 
-            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString(); 
-            const { count, error } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth); 
-            if(!error && count !== null) stats.value.monthVisits = count; 
+        const fetchLogs = async () => {
+            if(!supabase) return;
+            const { data } = await supabase.from('visit_logs').select('*').order('check_in_time', { ascending: false }).limit(50);
+            dashboardLogs.value = data || [];
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const { count, error } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).gte('check_in_time', startOfMonth);
+            if(!error && count !== null) stats.value.monthVisits = count;
+        };
+
+        const logVisit = async (member) => { 
+            if(!supabase) return;
+            const { data: lastLogs } = await supabase.from('visit_logs').select('check_in_time').eq('member_id', member.id).order('check_in_time', { ascending: false }).limit(1);
+            if (lastLogs && lastLogs.length > 0) {
+                const lastTime = new Date(lastLogs[0].check_in_time).getTime();
+                const diffHours = (new Date().getTime() - lastTime) / (1000 * 60 * 60);
+                if (diffHours < 3) { console.log('Skipped duplicate visit'); return; }
+            }
+            const { count: totalCount } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).eq('member_id', member.id);
+            const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+            const { count: monthCount } = await supabase.from('visit_logs').select('*', { count: 'exact', head: true }).eq('member_id', member.id).gte('check_in_time', startOfMonth);
+            const shortMemo = member.notes ? member.notes.substring(0, 20) : '';
+            await supabase.from('visit_logs').insert({ member_id: member.id, name: member.name, phone: member.phone, type: 'phone', check_in_time: new Date(), month_count: (monthCount || 0) + 1, total_count: (totalCount || 0) + 1, memo_snapshot: shortMemo });
+            fetchLogs(); 
         };
         
-        const searchMembers = async (reset = false) => { 
-            if(!supabase) return; 
-            if(reset) { currentPage.value = 0; displayMembers.value = []; hasMore.value = true; } 
-            if(!hasMore.value && !reset) return; 
-            isLoadingList.value = true; 
-            try { 
-                let qb = supabase.from('members').select('*'); 
-                if(searchQuery.value) { 
-                    const q = searchQuery.value; 
-                    if (q.includes('-') || q.startsWith('20')) qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`); 
-                    else qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,notes.ilike.%${q}%`); 
-                } 
-                if(dateStart.value) qb = qb.gte('created_at', dateStart.value); 
-                if(dateEnd.value) qb = qb.lte('created_at', dateEnd.value + 'T23:59:59'); 
-                const from = currentPage.value * PAGE_SIZE; 
-                const to = from + PAGE_SIZE - 1; 
-                const { data, error } = await qb.order('created_at', {ascending:false}).range(from, to); 
-                if(error) throw error; 
-                if (data.length < PAGE_SIZE) hasMore.value = false; 
-                displayMembers.value = [...displayMembers.value, ...data]; 
-                currentPage.value++; 
-            } catch(e){ showToast('搜尋失敗', 'error'); } 
-            finally { isLoadingList.value = false; } 
+        const performVerification = async () => {
+            const val = selfServiceInput.value.trim();
+            if(!val) return;
+            isLoading.value = true;
+            try {
+                const { data } = await supabase.from('members').select('*').eq('phone', val).single();
+                if(data) {
+                    showFullscreen(`歡迎光臨`, `${data.name}`, 'success', data.notes, data.photo);
+                    logVisit(data);
+                    await supabase.from('members').update({ updated_at: new Date() }).eq('id', data.id);
+                } else showFullscreen('查詢失敗', val, 'error');
+            } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
+            isLoading.value = false;
+        };
+
+        const searchMembers = async (reset = false) => {
+            if(!supabase) return;
+            if(reset) { currentPage.value = 0; displayMembers.value = []; hasMore.value = true; }
+            if(!hasMore.value && !reset) return;
+
+            isLoadingList.value = true;
+            try {
+                let qb = supabase.from('members').select('*');
+                if(searchQuery.value) {
+                    const q = searchQuery.value;
+                    if (q.includes('-') || q.startsWith('20')) qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,created_at.ilike.%${q}%`);
+                    else qb = qb.or(`name.ilike.%${q}%,phone.ilike.%${q}%,notes.ilike.%${q}%`);
+                }
+                if(dateStart.value) qb = qb.gte('created_at', dateStart.value);
+                if(dateEnd.value) qb = qb.lte('created_at', dateEnd.value + 'T23:59:59');
+                const from = currentPage.value * PAGE_SIZE;
+                const to = from + PAGE_SIZE - 1;
+                const { data, error } = await qb.order('created_at', {ascending:false}).range(from, to);
+                if(error) throw error;
+                if (data.length < PAGE_SIZE) hasMore.value = false;
+                displayMembers.value = [...displayMembers.value, ...data];
+                currentPage.value++;
+            } catch(e){ showToast('搜尋失敗', 'error'); } finally { isLoadingList.value = false; }
         };
         
         const loadMore = () => searchMembers(false);
+
         const appendNumber = (n) => { if (selfServiceInput.value.length < 10) selfServiceInput.value += n; };
         const backspace = () => selfServiceInput.value = selfServiceInput.value.slice(0,-1);
         const clearInput = () => selfServiceInput.value = '';
         const openSelfRegister = () => modals.privacy = true;
         const confirmPrivacy = () => { modals.privacy = false; modals.register = true; };
-        const closeModals = () => { modals.form=false; modals.register=false; modals.privacy=false; modals.io=false; modals.camera=false; modals.report=false; modals.ranking=false; modals.history=false; modals.seat=false; modals.guest=false; };
+        const closeModals = () => { modals.form=false; modals.register=false; modals.privacy=false; modals.io=false; modals.camera=false; modals.report=false; modals.ranking=false; modals.history=false; };
         const editMember = (m) => { Object.assign(form, JSON.parse(JSON.stringify(m))); modals.form = true; };
         const deleteMember = async () => { if(!confirm('刪除?')) return; await supabase.from('members').delete().eq('id', form.id); closeModals(); updateDbUsage(); searchMembers(true); };
         const deletePhoto = () => { if(modals.register) registerForm.photo = null; else form.photo = null; };
@@ -1111,76 +1022,37 @@ const app = createApp({
         const editConfigSecure = () => { if(prompt('請輸入管理員密碼以進入後台設定') === config.adminPwd) { isConfigured.value = false; } else { showToast('密碼錯誤', 'error'); } };
         const checkAdmin = (cb) => { if(prompt('Admin Pwd')===config.adminPwd) cb(); else showToast('密碼錯誤', 'error'); };
         
-        const exportAllMembers = async () => { 
-            isExporting.value = true; 
-            try { 
-                const BATCH=1000; let page=0; let all=[]; 
-                while(true) { 
-                    const {data} = await supabase.from('members').select('*').range(page*BATCH, (page+1)*BATCH-1); 
-                    if(!data?.length) break; 
-                    all.push(...data); 
-                    page++; 
-                } 
-                const wb = new ExcelJS.Workbook(); 
-                const ws = wb.addWorksheet('Members'); 
-                ws.columns = [{header:'ID',key:'id'},{header:'Name',key:'name'},{header:'Phone',key:'phone'},{header:'Notes',key:'notes'},{header:'Date',key:'created_at'}]; 
-                all.forEach(m => ws.addRow(m)); 
-                const buf = await wb.xlsx.writeBuffer(); 
-                saveAs(new Blob([buf]), `Members_${new Date().toISOString().slice(0,10)}.xlsx`); 
-                showToast(`匯出 ${all.length} 筆`, 'success'); 
-            } catch(e) { showToast('匯出失敗', 'error'); } 
-            isExporting.value = false; 
+        const exportAllMembers = async () => {
+            isExporting.value = true;
+            try {
+                const BATCH=1000; let page=0; let all=[];
+                while(true) { const {data} = await supabase.from('members').select('*').range(page*BATCH, (page+1)*BATCH-1); if(!data?.length) break; all.push(...data); page++; }
+                const wb = new ExcelJS.Workbook(); const ws = wb.addWorksheet('Members');
+                ws.columns = [{header:'ID',key:'id'},{header:'Name',key:'name'},{header:'Phone',key:'phone'},{header:'Notes',key:'notes'},{header:'Date',key:'created_at'}];
+                all.forEach(m => ws.addRow(m));
+                const buf = await wb.xlsx.writeBuffer(); saveAs(new Blob([buf]), `Members_${new Date().toISOString().slice(0,10)}.xlsx`);
+                showToast(`匯出 ${all.length} 筆`, 'success');
+            } catch(e) { showToast('匯出失敗', 'error'); } isExporting.value = false;
         };
         
-        const handleImport = async (e) => { 
-            const f = e.target.files[0]; 
-            if(!f) return; 
-            isImporting.value = true; 
-            try { 
-                const wb = new ExcelJS.Workbook(); 
-                await wb.xlsx.load(await f.arrayBuffer()); 
-                const ws = wb.getWorksheet(1); 
-                const items = []; 
-                const { data: exist } = await supabase.from('members').select('phone'); 
-                const dbSet = new Set(exist?.map(x=>x.phone)); 
-                const batchSet = new Set(); 
-                ws.eachRow((row, n) => { 
-                    if(n===1) return; 
-                    let name = row.getCell(1).text?.trim(); 
-                    let phone = row.getCell(2).text?.trim(); 
-                    let notes = row.getCell(3).text?.trim(); 
-                    if(name && phone) { 
-                        if (!dbSet.has(phone) && !batchSet.has(phone)) { 
-                            items.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), name, phone, notes, created_at: new Date() }); 
-                            batchSet.add(phone); 
-                        } 
-                    } 
-                }); 
-                if(items.length) { 
-                    for(let i=0; i<items.length; i+=100) await supabase.from('members').insert(items.slice(i, i+100)); 
-                    showToast(`成功匯入 ${items.length} 筆`, 'success'); 
-                    updateDbUsage(); 
-                    searchMembers(true); 
-                } else { showToast('無新資料可匯入', 'warning'); } 
-                modals.io = false; 
-            } catch(e){ console.error(e); showToast('匯入失敗', 'error'); } 
-            isImporting.value = false; 
-            e.target.value = ''; 
+        const handleImport = async (e) => {
+            const f = e.target.files[0]; if(!f) return; isImporting.value = true;
+            try {
+                const wb = new ExcelJS.Workbook(); await wb.xlsx.load(await f.arrayBuffer()); const ws = wb.getWorksheet(1);
+                const items = []; const { data: exist } = await supabase.from('members').select('phone'); const dbSet = new Set(exist?.map(x=>x.phone)); const batchSet = new Set();
+                ws.eachRow((row, n) => {
+                    if(n===1) return;
+                    let name = row.getCell(1).text?.trim(); let phone = row.getCell(2).text?.trim(); let notes = row.getCell(3).text?.trim();
+                    if(name && phone) { if (!dbSet.has(phone) && !batchSet.has(phone)) { items.push({ id: Date.now().toString() + Math.random().toString(36).substr(2,5), name, phone, notes, created_at: new Date() }); batchSet.add(phone); } }
+                });
+                if(items.length) { for(let i=0; i<items.length; i+=100) await supabase.from('members').insert(items.slice(i, i+100)); showToast(`成功匯入 ${items.length} 筆`, 'success'); updateDbUsage(); searchMembers(true); } else { showToast('無新資料可匯入', 'warning'); }
+                modals.io = false;
+            } catch(e){ console.error(e); showToast('匯入失敗', 'error'); } isImporting.value = false; e.target.value = '';
         };
 
         onMounted(async () => {
              const s = localStorage.getItem('supabase_config_v7');
-             if(s) { 
-                 try { 
-                     const parsed = JSON.parse(s); 
-                     Object.assign(config, parsed); 
-                     if (typeof config.shifts.morning === 'number') { 
-                         config.shifts.morning = config.shifts.morning.toString().padStart(2,'0') + ':00'; 
-                         config.shifts.middle = config.shifts.middle.toString().padStart(2,'0') + ':00'; 
-                         config.shifts.night = config.shifts.night.toString().padStart(2,'0') + ':00'; 
-                     } 
-                 } catch(e) {} 
-             }
+             if(s) { try { const parsed = JSON.parse(s); Object.assign(config, parsed); if (typeof config.shifts.morning === 'number') { config.shifts.morning = config.shifts.morning.toString().padStart(2,'0') + ':00'; config.shifts.middle = config.shifts.middle.toString().padStart(2,'0') + ':00'; config.shifts.night = config.shifts.night.toString().padStart(2,'0') + ':00'; } } catch(e) {} }
 
              if(config.url && config.key) {
                  try {
@@ -1192,21 +1064,15 @@ const app = createApp({
                          updateDbUsage(); fetchLogs(); searchMembers(true);
                      } else { staffLock.show = true; }
                      fetchCloudConfig();
-                 } catch (e) { 
-                     console.error("Auto login error:", e); 
-                     // 即使報錯，也要把 Loading 關掉，讓使用者看到錯誤訊息，而不是卡死
-                     alert("連線設定錯誤: " + e.message);
-                 }
+                 } catch (e) { console.error("Auto login error:", e); alert("連線設定錯誤"); }
              } else { isConfigured.value = false; }
 
-             const loader = document.getElementById('loading-screen'); 
-             if(loader) loader.style.display = 'none';
-             
+             const loader = document.getElementById('loading-screen'); if(loader) loader.style.display = 'none';
              window.addEventListener('keydown', handleKeyboard);
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory, tempGuest, confirmGuest, selectSeat };
+        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen:()=>fullscreenMsg.show=false, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory };
     }
 });
 app.mount('#app');
