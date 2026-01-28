@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>E書漫 AI 會員系統 V9.11 (現場客自動化版)</title>
+    <title>E書漫 AI 會員系統 V9.12 (現場客回饋優化版)</title>
     
     <meta name="theme-color" content="#4f46e5">
     <meta name="apple-mobile-web-app-capable" content="yes">
@@ -176,7 +176,7 @@
 
     <div v-if="!isConfigured && !staffLock.show" class="fixed inset-0 bg-slate-900 z-[99] flex items-center justify-center p-6 overflow-y-auto">
         <div class="bg-white rounded-2xl p-8 w-full max-w-md shadow-2xl my-auto">
-            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.11</h2>
+            <h2 class="text-2xl font-bold text-slate-800 mb-6 flex items-center gap-2"><i class="fa-solid fa-gears text-indigo-600"></i> 後台管理 V9.12</h2>
             <div class="space-y-4">
                 <div class="p-4 bg-indigo-50 rounded-xl border border-indigo-100">
                     <h4 class="font-bold text-indigo-700 mb-3 border-b border-indigo-200 pb-2"><i class="fa-solid fa-cloud mr-2"></i>雲端同步設定</h4>
@@ -203,7 +203,7 @@
         <div class="px-5 py-3 flex justify-between items-center">
             <h1 class="text-xl font-bold text-slate-800 flex items-center">
                 <i class="fa-solid fa-store text-indigo-600 mr-2"></i>{{ config.storeName || 'SmartMember' }} 
-                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.11</span>
+                <span class="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full ml-2">V9.12</span>
             </h1>
             <div class="flex gap-4 items-center">
                 <div class="hidden md:flex flex-col items-end w-36">
@@ -395,12 +395,35 @@
         </div>
     </div>
     
+    <div v-if="modals.guestPromo" class="fixed inset-0 bg-slate-900/90 z-[250] flex items-center justify-center p-6 animate-fade-in-up">
+        <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 text-center relative overflow-hidden shadow-2xl">
+            <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-pink-500"></div>
+            <div class="mb-4 w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-3xl text-indigo-600 animate-bounce">
+                <i class="fa-solid fa-gift"></i>
+            </div>
+            <h2 class="text-2xl font-black text-slate-800 mb-2">歡迎您光臨 E書漫</h2>
+            <p class="text-slate-500 font-bold mb-6">邀請您加入會員 立即享有優惠</p>
+            <div class="space-y-3 mb-8">
+                <div class="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-left flex items-center gap-3">
+                    <div class="text-indigo-600 text-xl font-black">9折</div>
+                    <div class="flex-1"><div class="font-bold text-slate-700">會員計時優惠</div><div class="text-xs text-indigo-400 font-bold">現辦現折</div></div>
+                </div>
+                <div class="bg-pink-50 p-4 rounded-2xl border border-pink-100 text-left flex items-center gap-3">
+                    <div class="text-pink-600 text-xl font-black">包時</div>
+                    <div class="flex-1"><div class="font-bold text-slate-700">超省折扣方案 (3/6/9hr)</div><div class="text-xs text-pink-400 font-bold">21:00 ～ 翌日 11:59 入場適用</div></div>
+                </div>
+            </div>
+            <div class="space-y-3">
+                <button @click="handleGuestPromoAction('join')" class="w-full py-4 bg-gradient-to-r from-indigo-600 to-pink-600 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] transition">馬上申請加入會員 <i class="fa-solid fa-arrow-right ml-1"></i></button>
+                <button @click="handleGuestPromoAction('next')" class="w-full py-3 text-slate-400 font-bold hover:text-slate-600">下次再考量</button>
+            </div>
+        </div>
+    </div>
+    
     <div v-if="modals.promo" class="fixed inset-0 bg-slate-900/90 z-[250] flex items-center justify-center p-6 animate-fade-in-up" @click="modals.promo=false">
         <div class="bg-white w-full max-w-md rounded-[2.5rem] p-8 text-center relative overflow-hidden">
              <div class="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-indigo-500 to-pink-500"></div>
-             <div class="mb-4 w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-3xl text-indigo-600 animate-bounce">
-                 <i class="fa-solid fa-check"></i>
-             </div>
+             <div class="mb-4 w-20 h-20 bg-indigo-50 rounded-full flex items-center justify-center mx-auto text-3xl text-indigo-600 animate-bounce"><i class="fa-solid fa-check"></i></div>
              <h2 class="text-2xl font-black text-slate-800 mb-2">已成功建檔</h2>
              <p class="text-slate-500 font-bold mb-6">您現在已享有現場客專屬優惠</p>
              <button class="w-full py-4 bg-slate-800 text-white rounded-2xl font-black shadow-xl hover:scale-[1.02] transition">我知道了</button>
@@ -602,7 +625,6 @@ const app = createApp({
         const hasMore = ref(true);
         const PAGE_SIZE = 50;
 
-        // V9.11: 新增 guestWarning, 移除 guest
         const modals = reactive({ form: false, register: false, privacy: false, io: false, camera: false, report: false, ranking: false, history: false, guestWarning: false, promo: false, guestPromo: false });
         const tabs = [{id:'self_service', label:'接待櫃台', icon:'fa-solid fa-desktop'},{id:'list', label:'會員管理', icon:'fa-solid fa-users-gear'},{id:'dashboard', label:'營運分析', icon:'fa-solid fa-chart-pie'}];
 
@@ -950,18 +972,17 @@ const app = createApp({
             isLoadingPhoto.value = false;
         };
 
-        // V9.11: 處理現場客警告的按鈕動作
         const handleGuestWarningAction = async (action) => {
             if (action === 'register') {
                 modals.guestWarning = false;
-                modals.privacy = true; // 開啟註冊流程
+                modals.privacy = true; 
                 registerForm.phone = selfServiceInput.value;
             } else if (action === 'guest') {
                 await submitAutoGuest();
             }
         };
 
-        // V9.11: 自動建立現場客資料
+        // V9.12: 現場客回饋修正 - 使用 showFullscreen
         const submitAutoGuest = async () => {
             isLoading.value = true;
             try {
@@ -969,7 +990,7 @@ const app = createApp({
                 const guestData = {
                     id: id,
                     phone: selfServiceInput.value,
-                    name: '現場客', // 自動命名
+                    name: '現場客', 
                     type: 'guest',
                     created_at: new Date()
                 };
@@ -977,15 +998,37 @@ const app = createApp({
                 const { error } = await supabase.from('members').insert(guestData);
                 if(error) throw error;
 
-                // 打卡並顯示優惠
                 await logVisit(guestData);
                 modals.guestWarning = false;
-                modals.promo = true;
+                
+                // V9.12: 觸發歡迎畫面
+                showFullscreen(
+                    '歡迎光臨',
+                    `(現場) ${guestData.phone}`,
+                    'success',
+                    '未加入會員 (無優惠)'
+                );
                 
                 selfServiceInput.value = '';
 
             } catch(e) { console.error(e); showToast('入場失敗', 'error'); }
             isLoading.value = false;
+        };
+
+        const handleGuestPromoAction = async (action) => {
+            if (action === 'next') {
+                if (tempGuestData.value) {
+                    await logVisit(tempGuestData.value);
+                }
+                modals.guestPromo = false;
+                tempGuestData.value = null;
+            } else if (action === 'join') {
+                const phoneToRegister = tempGuestData.value?.phone;
+                modals.guestPromo = false;
+                tempGuestData.value = null;
+                modals.privacy = true; 
+                registerForm.phone = phoneToRegister;
+            }
         };
 
         const handleKeyboard = (e) => {
@@ -1058,11 +1101,9 @@ const app = createApp({
             try {
                 const { data } = await supabase.from('members').select('*').eq('phone', val).single();
                 if(data) {
-                    // V9.11: 若已是現場客資料，直接視為再次入場，不用警告
-                    // 但為了體驗，還是顯示一下優惠 Modal
                     if (data.type === 'guest') {
                         logVisit(data);
-                        showFullscreen(`歡迎光臨`, `(現場) ${val}`, 'success'); // 簡單歡迎
+                        showFullscreen(`歡迎光臨`, `(現場) ${val}`, 'success', '未加入會員 (無優惠)'); 
                     } else if (!data.gender) {
                         showFullscreen(`歡迎回來`, `${data.name}`, 'success', data.notes, data.photo, true, data.id); 
                         logVisit(data);
@@ -1072,7 +1113,6 @@ const app = createApp({
                     }
                     await supabase.from('members').update({ updated_at: new Date() }).eq('id', data.id);
                 } else {
-                    // V9.11: 查無資料 -> 顯示警告 Modal
                     modals.guestWarning = true;
                 }
             } catch(e) { showFullscreen('查詢錯誤', e.message, 'error'); }
@@ -1180,7 +1220,7 @@ const app = createApp({
              watch(currentTab, (v) => { if(v==='dashboard') fetchLogs(); });
         });
 
-        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory, getDisplayName, submitAutoGuest, updateGenderFromWelcome, handleGuestWarningAction, filterMemberOnly };
+        return { config, isConfigured, saveConfig, editConfigSecure, displayMembers, totalMemberCount, dashboardLogs, regStats, currentTab, tabs, modals, closeModals, form, registerForm, activeForm, activePhoto, submitForm, editMember, deleteMember, deletePhoto, searchQuery, dateStart, dateEnd, searchMembers, isLoading, isLoadingList, isLoadingPhoto, isLoadingReport, selfServiceInput, appendNumber, backspace, clearInput, performVerification, openSelfRegister, confirmPrivacy, toasts, fullscreenMsg, closeFullscreen, fetchLogs, formatDate, isImporting, isExporting, handleImport, exportAllMembers, checkAdmin, getMemberBorder, handleFileUpload, initAudioContext, openCamera, capturePhoto, closeCamera, openRegReport, reportDate, refreshReport, todayStr, stats, loadMore, hasMore, bulkCount, staffLock, appendLock, unlockSystem, cloudConfig, saveCloudConfig, currentTags, toggleTag, rankingList, rankingTitle, showRanking, isLoadingRanking, openMemberFromLog, openMemberHistory, memberHistoryLogs, isLoadingHistory, getDisplayName, submitAutoGuest, updateGenderFromWelcome, handleGuestWarningAction, filterMemberOnly, handleGuestPromoAction };
     }
 });
 app.mount('#app');
